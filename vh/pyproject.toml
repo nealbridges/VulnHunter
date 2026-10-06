@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "c1-vulnhunter-vh"
+version = "0.1.0"
+description = "Deterministic, model-free operator CLI for a single VulnHunter scan run."
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+
+# No runtime dependencies: vh shells out to git and the host's own
+# headless command. pytest is needed only for the test suite.
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov"]
+
+[project.urls]
+homepage = "https://github.com/nealbridges/VulnHunter"
+upstream = "https://github.com/capitalone/vulnhunter"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vh*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

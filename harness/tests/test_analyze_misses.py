@@ -1,12 +1,14 @@
 """Tests for local_harness.benchmark.analyze_misses."""
 
 import json
+import os
 import subprocess
 import types
 
 import pytest
 
 import local_harness.benchmark.analyze_misses as am
+from local_harness.config import PHASES_DIR
 
 
 def _proc(returncode=0, stdout="", stderr=""):
@@ -122,7 +124,6 @@ def test_locate_loss_phase_dispatch_loss(tmp_path):
 
 def test_build_diagnostic_prompt(monkeypatch, tmp_path):
     monkeypatch.setattr(am, "BENCHMARK_DIR", str(tmp_path))
-    monkeypatch.setattr(am, "REPO_ROOT", str(tmp_path))
     (tmp_path / "myrepo.json").write_text("[]")
     finding = {"finding_id": "F1", "type": "SQLi", "description": "d", "repo_name": "myrepo"}
     prompt = am.build_diagnostic_prompt(finding, "phase1", "evidence", "/rd", "/repo")
@@ -260,3 +261,77 @@ def test_main_miss_no_results_dir(monkeypatch, tmp_path):
     am.main()
     data = json.loads((tmp_path / "a.json").read_text())
     assert data[0]["loss_phase"] == "no_results"
+
+
+# --- regression: phase prompt paths must resolve (GitHub report #2) ----------
+# The map used to hold "skill/phases/..." paths joined onto a repo root, but
+# the prompts live in vulnhunt/phases/ (config.PHASES_DIR). Every path the
+# module hands the diagnosing agent must point at a real file.
+
+
+def test_phase_to_prompt_paths_resolve():
+    for phase, files in am.PHASE_TO_PROMPT.items():
+        for basename in files:
+            path = os.path.join(am.PHASES_DIR, basename)
+            assert os.path.isfile(path), f"{phase}: {path} does not exist"
+
+
+def test_phase_to_prompt_no_stale_directory_prefix():
+    for phase, files in am.PHASE_TO_PROMPT.items():
+        for basename in files:
+            assert not basename.startswith("skill/"), (
+                f"{phase}: {basename} still carries the stale skill/ prefix"
+            )
+            assert "/" not in basename, (
+                f"{phase}: {basename} should be a basename resolved via PHASES_DIR"
+            )
+
+
+def test_phase_to_prompt_references_real_phase_files():
+    # Each referenced basename must exist in the actual vulnhunt/phases dir.
+    on_disk = set(os.listdir(PHASES_DIR))
+    referenced = {b for files in am.PHASE_TO_PROMPT.values() for b in files}
+    assert referenced <= on_disk, f"stale references: {sorted(referenced - on_disk)}"
+
+
+def test_resolve_prompt_paths_returns_existing_files():
+    paths = am.resolve_prompt_paths("phase1")
+    assert paths == [os.path.join(am.PHASES_DIR, "phase1_recon.md")]
+    assert all(os.path.isfile(p) for p in paths)
+
+
+def test_resolve_prompt_paths_unknown_phase_falls_back():
+    paths = am.resolve_prompt_paths("no-such-phase")
+    assert os.path.isfile(paths[0])
+    assert paths[0].endswith("phase2_hunt.md")
+
+
+def test_diagnostic_prompt_paths_exist(tmp_path, monkeypatch):
+    # The prompt handed to the diagnostic agent must reference prompt files
+    # that actually exist, or the agent cannot identify the instruction gap.
+    monkeypatch.setattr(am, "BENCHMARK_DIR", str(tmp_path))
+    (tmp_path / "myrepo.json").write_text("[]")
+    finding = {"finding_id": "F1", "type": "SQLi", "description": "d",
+               "repo_name": "myrepo"}
+    prompt = am.build_diagnostic_prompt(
+        finding, "phase1", "evidence", "/rd", "/repo")
+    for line in prompt.splitlines():
+        if "Relevant prompt file(s):" in line:
+            for candidate in line.split(":", 1)[1].split(","):
+                candidate = candidate.strip()
+                if candidate and candidate != "unknown":
+                    assert os.path.isfile(candidate), (
+                        f"prompt references missing file: {candidate}"
+                    )
+        elif "All prompt files:" in line:
+            directory = line.split(":", 1)[1].strip()
+            assert os.path.isdir(directory), (
+                f"prompt references missing directory: {directory}"
+            )
+
+
+def test_diagnostic_system_prompt_names_real_directory():
+    # The output-format hint tells the agent how to spell prompt_file; it
+    # must match the real directory layout.
+    assert "skill/phases/" not in am.DIAGNOSTIC_SYSTEM_PROMPT
+    assert "vulnhunt/phases/" in am.DIAGNOSTIC_SYSTEM_PROMPT

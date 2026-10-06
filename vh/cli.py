@@ -3,6 +3,11 @@
 The host harness runs the hunt. This module clones, writes and checks the
 scan manifest, and launches whatever headless command that harness already
 uses. It does not import a model SDK and it does not name a harness.
+
+The manifest this module writes is a stub: it records the agent exit code
+and schema shape, but never findings. Findings are populated by the
+agent-side writer (vulnhunter-agent), which extracts them from the scan
+README against the same schema.
 """
 
 from __future__ import annotations
@@ -61,9 +66,12 @@ def cmd_find_results(args: argparse.Namespace) -> int:
     return 0
 
 
-def _manifest_body(results: Path, exit_code: int) -> dict:
-    readme = results / "README.md"
-    exit_code = 0 if readme.is_file() and readme.stat().st_size > 0 else 1
+def _manifest_body(results: Path, exit_code: int | None) -> dict:
+    # An explicit --exit-code wins. When omitted, derive one from the scan
+    # README: a non-empty report means the hunt ran, anything else is a miss.
+    if exit_code is None:
+        readme = results / "README.md"
+        exit_code = 0 if readme.is_file() and readme.stat().st_size > 0 else 1
     if exit_code not in _EXIT_OK:
         exit_code = 1
     return {
@@ -168,7 +176,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     write = sub.add_parser("write-manifest", help="write a schema-shaped scan_manifest.json")
     write.add_argument("results")
-    write.add_argument("--exit-code", type=int, default=1)
+    write.add_argument(
+        "--exit-code",
+        type=int,
+        default=None,
+        help="agent exit code to record (0-4). When omitted, it is "
+        "derived from the scan README: non-empty means 0, otherwise 1.",
+    )
     write.set_defaults(func=cmd_write_manifest)
 
     check = sub.add_parser("validate-manifest", help="check a scan_manifest.json")

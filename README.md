@@ -139,6 +139,7 @@ Each component is organized into a self-contained subtree:
 | `vulnhunt-fix-verify/` | The `/vulnhunt-fix-verify` standalone verification skill (Prompt-only). See [`vulnhunt-fix-verify/README.md`](vulnhunt-fix-verify/README.md). |
 | `vulnhunter-agent/` | Config-driven headless runtime wrapper that runs scans and files GitHub issues. See [`vulnhunter-agent/README.md`](vulnhunter-agent/README.md). |
 | `harness/` | Developer tooling for running large batch-scans and benchmarking detection accuracy. See [`harness/README.md`](harness/README.md). |
+| `vh/` | Deterministic operator CLI for a single scan: clone, find the results directory, write and validate the scan manifest, and launch the host's headless command. No model SDK. |
 
 ---
 
@@ -255,6 +256,19 @@ python -m local_harness.benchmark.run --tally-only      # Re-generate the analyt
 
 > **Bring Your Own Corpus:** This repository ships with a minimal synthetic example (`harness/local_harness/benchmark/ground_truth/EXAMPLE.json`) mapped to public targets like OWASP NodeGoat, Juice Shop, and WebGoat. Build out your own testing suites inside `ground_truth/<repo>.json`. Define your target scanning/judging engines in `harness/local_harness/config.py`.
 
+### Operator CLI (`vh/`)
+`vh` is a deterministic, model-free companion for a single scan run. It sequences the mechanical steps around a hunt and validates the output shape:
+
+```bash
+vh clone <url> --dest <dir>                    # shallow-clone the target
+vh find-results <checkout>                     # print *_VULNHUNT_RESULTS_* directories
+vh write-manifest <results-dir> --exit-code 4  # write scan_manifest.json; record the agent exit code
+vh validate-manifest <results-dir>             # check the manifest against the schema rules
+VULNHUNT_HOST_CMD="<one-shot>" vh host <prompt-file>   # run the harness's headless one-shot
+```
+
+`--exit-code` records the exit code the hunt actually produced (0-4; an invalid value is recorded as 1). When the flag is omitted, the exit code is derived from the results directory: a non-empty `README.md` scan report means 0, anything else means 1. `vh write-manifest` writes a schema-shaped stub manifest — it never populates `findings`; the headless runtime agent (`vulnhunter-agent/`) is the writer that extracts real findings from the scan report.
+
 ---
 
 ## Running Tests
@@ -265,6 +279,7 @@ Each Python component maintains its own isolated testing suite. Run them using `
 cd harness          && pip install -e ".[dev]" && python -m pytest tests/ --cov=local_harness
 cd vulnhunter-fix   && pip install -e ".[dev]" && python -m pytest -q
 cd vulnhunter-agent && pip install -e ".[dev]" && python -m pytest -q
+python -m pytest vh/tests -q    # from the repository root; vh is a plain package
 ```
 
 ---
