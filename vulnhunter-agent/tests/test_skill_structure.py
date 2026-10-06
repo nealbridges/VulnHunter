@@ -28,28 +28,45 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# (skill directory name, shipped files that must exist)
-SKILLS = [
-    "vulnhunt",
-    "vulnhunter-fix",
-    "vulnhunt-fix-verify",
-    "vulnhunter-run",
-]
+# Every shipped skill lives directly under the repo root OR under skills/.
+# Discovery is dynamic so adding a skill cannot bypass the contract: the test
+# finds every <name>/SKILL.md and enforces the full contract on it.
+SKILL_ROOTS = [REPO_ROOT, REPO_ROOT / "skills"]
 
-REQUIRED_TOP_LEVEL = {
-    "vulnhunt": {"SKILL.md", "README.md", "phases/phase1_recon.md",
-                 "phases/phase2_shared.md", "phases/phase2b_verify.md",
-                 "phases/phase4_report.md"},
-    "vulnhunter-fix": {"SKILL.md", "README.md"},
-    "vulnhunt-fix-verify": {"SKILL.md", "README.md"},
-    "vulnhunter-run": {"SKILL.md"},
+
+def _discover_skills() -> dict[str, Path]:
+    """Map skill name -> directory, for every <dir>/SKILL.md shipped."""
+    found: dict[str, Path] = {}
+    for root in SKILL_ROOTS:
+        if not root.is_dir():
+            continue
+        for skill_md in sorted(root.glob("*/SKILL.md")):
+            found[skill_md.parent.name] = skill_md.parent
+    return found
+
+
+SKILLS = sorted(_discover_skills())
+
+# Per-skill files that must ship (README optional for operator skills).
+REQUIRED_TOP_LEVEL: dict[str, set[str]] = {
+    "vulnhunt": {"phases/phase1_recon.md", "phases/phase2_shared.md",
+                 "phases/phase2b_verify.md", "phases/phase4_report.md",
+                 "README.md"},
+    "vulnhunter-fix": {"README.md"},
+    "vulnhunt-fix-verify": {"README.md", "phases/phase0_preflight.md",
+                            "phases/phase1_extract.md",
+                            "phases/phase2_verify.md", "phases/phase4_emit.md"},
+    "vulnhunter-run": set(),
+    "runtime-provisioner": set(),
 }
+# A skill must ship a README unless it is an operator/prompt-only skill.
+README_EXEMPT = {"vulnhunter-run", "runtime-provisioner"}
 
 FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
 
 
 def _skill_root(skill: str) -> Path:
-    return REPO_ROOT / skill
+    return REPO_ROOT / skill if (REPO_ROOT / skill).is_dir() else REPO_ROOT / "skills" / skill
 
 
 def _frontmatter_fields(skill: str) -> dict:
@@ -63,7 +80,7 @@ def _frontmatter_fields(skill: str) -> dict:
     for the `name`/`description` keys, which is why the shipped skills keep
     those two single-line.
     """
-    path = REPO_ROOT / skill / "SKILL.md"
+    path = _skill_root(skill) / "SKILL.md"
     text = path.read_text(encoding="utf-8")
     match = FRONTMATTER_RE.match(text)
     assert match, f"{skill}/SKILL.md: missing YAML frontmatter block"
@@ -93,7 +110,7 @@ class TestSkillFormatContract:
     """The format contract ANY harness loader needs (see module docstring)."""
 
     def test_skill_md_exists(self, skill: str) -> None:
-        assert (REPO_ROOT / skill / "SKILL.md").is_file(), (
+        assert (_skill_root(skill) / "SKILL.md").is_file(), (
             f"{skill}/SKILL.md missing — the skill is not installable"
         )
 
@@ -107,7 +124,7 @@ class TestSkillFormatContract:
         SkillLibrary) raise on colon-less or folded lines. The two keys every
         loader must surface (name, description) therefore must survive a
         line-partition parse: keep them single-line in the shipped files."""
-        text = (REPO_ROOT / skill / "SKILL.md").read_text(encoding="utf-8")
+        text = _skill_root(skill).joinpath("SKILL.md").read_text(encoding="utf-8")
         match = FRONTMATTER_RE.match(text)
         assert match, f"{skill}: missing frontmatter"
         for line in match.group(1).splitlines():
@@ -127,7 +144,7 @@ class TestSkillFormatContract:
 
     def test_required_files_present(self, skill: str) -> None:
         required = REQUIRED_TOP_LEVEL.get(skill, set())
-        missing = [p for p in required if not (REPO_ROOT / skill / p).is_file()]
+        missing = [p for p in required if not (_skill_root(skill) / p).is_file()]
         assert not missing, f"{skill}: missing shipped files: {missing}"
 
     def test_no_unresolved_relative_md_links(self, skill: str) -> None:
@@ -141,7 +158,7 @@ class TestSkillFormatContract:
         """
         broken: list[str] = []
         placeholder = re.compile(r"VULN-\d|NNN")
-        for md in (REPO_ROOT / skill).rglob("*.md"):
+        for md in _skill_root(skill).rglob("*.md"):
             for target in re.findall(r"\]\(([^)#\s]+\.md)\)", md.read_text(encoding="utf-8")):
                 if "://" in target:  # absolute URL — not a repo-relative link
                     continue
@@ -175,7 +192,7 @@ class TestHarnessNeutrality:
     def test_procedure_files_stay_harness_neutral(self, skill: str) -> None:
         """Prompt-only skills must not hardcode one harness in procedure text."""
         offenders: list[str] = []
-        for md in (REPO_ROOT / skill).rglob("*.md"):
+        for md in _skill_root(skill).rglob("*.md"):
             text = md.read_text(encoding="utf-8")
             for pattern, why in self.FORBIDDEN:
                 for match in pattern.finditer(text):

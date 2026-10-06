@@ -26,6 +26,9 @@ SCAN_GLOBS = (
     "vulnhunt-fix-verify/*.md",
     "vulnhunt-fix-verify/phases/*.md",
     "vulnhunter-run/*.md",
+    "skills/*/SKILL.md",          # new-generation skills (operator procedures)
+    "skills/*/phases/*.md",
+    "skills/*/references/*.md",
 )
 
 # A requirement = one sentence containing a normative keyword. The skills use
@@ -45,10 +48,12 @@ SENTENCE_SPLIT_RE = re.compile(r"(?<=[.;])\s+(?=[A-Z`(])|\n\n+")
 # Requirement IDs: VH-<AREA>-<NNN>, assigned in first-seen scan order and
 # persisted in the register so they stay stable across runs. Ordered
 # longest-prefix-first so `vulnhunt-fix-verify` routes to VER, not HUNT.
+# `skills/runtime-provisioner` etc. route by their basename under skills/.
 AREA_BY_PREFIX = {
     "vulnhunter-fix": "FIX",
     "vulnhunt-fix-verify": "VER",
     "vulnhunter-run": "RUN",
+    "skills/runtime-provisioner": "RUN",
     "vulnhunt": "HUNT",
 }
 
