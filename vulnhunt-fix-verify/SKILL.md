@@ -1,9 +1,6 @@
 ---
 name: vulnhunt-fix-verify
-description: >
-  Verify that specific findings from a prior /vulnhunt scan have been
-  correctly addressed in a supplied code checkout. Read-only over the
-  target repo; produces a per-finding verdict JSON.
+description: Verify that specific findings from a prior /vulnhunt scan have been correctly addressed in a supplied code checkout. Read-only over the target repo; produces a per-finding verdict JSON. 
 trigger:
   - /vulnhunt-fix-verify
   - user asks to verify a vulnerability fix

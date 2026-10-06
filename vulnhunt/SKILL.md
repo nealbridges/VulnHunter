@@ -1,9 +1,6 @@
 ---
 name: vulnhunt
-description: >
-  Scan a codebase for exploitable security defects. Enumerates every
-  user-controllable input, traces each forward to dangerous sinks,
-  proves exploitability with executable tests, and proposes validated fixes.
+description: Scan a codebase for exploitable security defects. Enumerates every user-controllable input, traces each forward to dangerous sinks, proves exploitability with executable tests, and proposes validated fixes. 
 trigger:
   - /vulnhunt
   - user asks to find security vulnerabilities

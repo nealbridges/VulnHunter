@@ -1,9 +1,6 @@
 ---
 name: vulnhunter-run
-description: >
-  Unattended VulnHunter operator. Clone a repo, run the vulnhunt skill with
-  this harness's own tools and subagents, then write and check the scan
-  manifest. Does not call a model SDK and does not name a harness.
+description: Unattended VulnHunter operator. Clone a repo, run the vulnhunt skill with this harness's own tools and subagents, then write and check the scan manifest. Does not call a model SDK and does not name a harness. 
 trigger:
   - /vulnhunter-run
   - user asks to scan a repository unattended

@@ -1,14 +1,6 @@
 ---
 name: vulnhunter-fix
-description: >
-  Automate vulnerability remediation from VulnHunter scan results using TDD.
-  Parses VulnHunter findings, writes exploit demos proving each vulnerability,
-  writes security tests that define correct behavior (RED), implements fixes
-  to pass those tests (GREEN), and delivers via PR or fallback GitHub issue.
-  Each PR includes the exploit demo, failing-then-passing test, and fix.
-  Use when the user says "/vulnhunter-fix", "fix the vulnerabilities", "remediate
-  the findings", "apply the security fixes", "create PRs for the vuln fixes",
-  or provides a GitHub repo URL alongside a VulnHunter results path.
+description: Automate vulnerability remediation from VulnHunter scan results using TDD. Parses VulnHunter findings, writes exploit demos proving each vulnerability, writes security tests that define correct behavior (RED), implements fixes to pass those tests (GREEN), and delivers via PR or fallback GitHub issue. Each PR includes the exploit demo, failing-then-passing test, and fix. Use when the user says "/vulnhunter-fix", "fix the vulnerabilities", "remediate the findings", "apply the security fixes", "create PRs for the vuln fixes", or provides a GitHub repo URL alongside a VulnHunter results path. 
 trigger:
   - /vulnhunter-fix
   - user wants to fix vulnerabilities from a VulnHunter scan
