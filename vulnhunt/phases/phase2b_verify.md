@@ -108,7 +108,22 @@ broadly granted. This applies equally to AWS-managed queue/event consumers
 policy — bare CWE-306 is Code Quality. IDOR via message contents (CWE-639),
 cross-tenant confused-deputy, and downstream auth bypass remain in scope.
 
-#### 5. Downgrade discipline
+#### 5. Decide the runtime (sandbox depth) — per candidate
+
+For every candidate you are about to CONFIRM, decide and record the runtime NOW —
+follow the runtime-provisioner skill (loaded copy or
+`skills/runtime-provisioner/SKILL.md`). Classify the proof requirements
+(boundary type, attacker-reachable surface, observable outcome — the outcome
+stated in one sentence), choose the cheapest sufficient sandbox in the fixed
+preference order (Docker container → in-process harness → static with written
+justification), and write the finding's `Runtime:` line. Budget rule: **Medium
+and above must execute in a container.** A mock is allowed only when the real
+dependency is genuinely unavailable, and then the finding records
+`Runtime: EXECUTED-MOCK — <what was mocked and why>` and its severity ceiling
+is Low until a real-boundary run is done. Phase 3a will execute in this
+recorded runtime; Phase 3b will measure against it.
+
+#### 6. Downgrade discipline
 
 Before downgrading or eliminating ANY candidate, you MUST:
 1. Grep for ALL call sites of the sink function (not just the path you traced)
@@ -252,11 +267,15 @@ not surfaced as separate findings. Platform PoC + exploit test stand in.
 
 For each candidate finding, record the verification result:
 
-| Finding | Gates complete? | Production-reachable? | Defenses cover attack? | Severity correct? | All call sites checked? | Verdict |
-|---|---|---|---|---|---|---|
-| VULN-001 | Yes | 2 of 5 call sites reachable | No mitigation found | Yes — High | 5/5 verified | CONFIRMED (reduced scope) |
-| VULN-002 | Yes | No — `txnLog` written by coordinator at engine.go:441 | N/A | N/A | 3/3 verified non-exploitable | FALSE POSITIVE |
-| VULN-003 | Yes | Yes | xss() — scope mismatch, not a defense | Yes — High | 4/4 verified | CONFIRMED |
+| Finding | Gates complete? | Production-reachable? | Defenses cover attack? | Severity correct? | Runtime decision | All call sites checked? | Verdict |
+|---|---|---|---|---|---|---|---|
+| VULN-001 | Yes | 2 of 5 call sites reachable | No mitigation found | Yes — High | docker:python:3.12-slim@sha256:... | 5/5 verified | CONFIRMED (reduced scope) |
+| VULN-002 | Yes | No — `txnLog` written by coordinator at engine.go:441 | N/A | N/A | N/A (eliminated before runtime choice) | 3/3 verified non-exploitable | FALSE POSITIVE |
+| VULN-003 | Yes | Yes | xss() — scope mismatch, not a defense | Yes — High | docker:nginx:1.27-alpine@sha256:... | 4/4 verified | CONFIRMED |
+
+The `Runtime decision` column carries the sandbox choice recorded on the
+finding (step 5 above). A FALSE POSITIVE or eliminated candidate shows N/A —
+the runtime decision only applies to candidates being CONFIRMED.
 
 **FALSE POSITIVE verdicts require evidence.** Every FALSE POSITIVE must cite the
 specific file:line of the defense, type constraint, or non-attacker origin that
