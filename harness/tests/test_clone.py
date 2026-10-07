@@ -107,12 +107,15 @@ def test_clone_at_commit_fast_fetch_timeout_then_full_clone(monkeypatch, tmp_pat
     monkeypatch.setattr(clone.os.path, "isdir", lambda p: next(isdir_seq, False))
     monkeypatch.setattr(clone.os, "makedirs", lambda *a, **k: None)
 
+    checkout_cmds: list[list[str]] = []
+
     def fake_run(cmd, **k):
         if cmd[1:2] == ["fetch"]:
             raise subprocess.TimeoutExpired(cmd="git fetch", timeout=1)
         if cmd[1:2] == ["clone"]:
             return _proc(0)
         if cmd[1:2] == ["checkout"]:
+            checkout_cmds.append(list(cmd))
             return _proc(0)
         return _proc(0)
 
@@ -120,6 +123,14 @@ def test_clone_at_commit_fast_fetch_timeout_then_full_clone(monkeypatch, tmp_pat
     monkeypatch.setattr(gitops_mod.subprocess, "run", fake_run)
     result_dir, err = clone.clone_at_commit("url", "abcdef12", target)
     assert err is None
+    # Pin the checkout grammar: the commit hash is a TREE-ISH and must come
+    # BEFORE the `--` separator (after `--`, git parses PATHSPECs, and
+    # `git checkout -- <sha>` fails with "did not match any file(s) known to
+    # git"). Regression guard for the grammar bug found in review.
+    assert len(checkout_cmds) == 1
+    assert checkout_cmds[0][1:2] == ["checkout"]
+    assert checkout_cmds[0][2:3] == ["abcdef12"]
+    assert checkout_cmds[0][3:4] == ["--"]
 
 
 def test_clone_at_commit_full_clone_fails(monkeypatch, tmp_path):
@@ -298,3 +309,50 @@ def test_shallow_clone_git_unavailable(monkeypatch, tmp_path):
     monkeypatch.setattr(gitops_mod.subprocess, "run", boom)
     result_dir, err = clone.shallow_clone("url", target)
     assert "git unavailable" in err
+
+
+def test_clone_at_commit_real_checkout_of_known_commit(tmp_path):
+    """Integration (no subprocess mocks): fast-fetch path against real git.
+
+    Proves the checkout grammar end to end: clone_at_commit must land the
+    repo on the requested commit via the FULL-CLONE fallback... and, when
+    the fast fetch succeeds, via FETCH_HEAD. We drive the fetch to a
+    non-fast-forwardable state only indirectly; what this test pins is that
+    a real `clone_at_commit` against a local origin produces a checked-out
+    worktree at the right commit with no 'pathspec' errors (the grammar bug
+    found in review lived entirely behind mocked subprocess asserts).
+    """
+    import json
+    import os
+
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    env = dict(os.environ)
+    subprocess.run(["git", "init", "-q", str(origin)], check=True)
+    subprocess.run(["git", "-C", str(origin), "checkout", "-q", "-b", "main"], check=True)
+    (origin / "f.txt").write_text("one\n")
+    subprocess.run(["git", "-C", str(origin), "add", "f.txt"], check=True)
+    subprocess.run(
+        ["git", "-C", str(origin), "-c", "user.name=t", "-c", "user.email=t@t", "commit",
+         "-q", "-m", "one"],
+        check=True,
+        env={**env, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+             "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"},
+    )
+    sha = subprocess.run(
+        ["git", "-C", str(origin), "rev-parse", "HEAD"], capture_output=True, text=True,
+        check=True,
+    ).stdout.strip()
+
+    # Full-clone fallback path (clone_at_commit does fetch --depth 1 first;
+    # for a LOCAL path transport depth is ignored, so either path is real git).
+    target = str(tmp_path / "worktree")
+    result_dir, err = clone.clone_at_commit(str(origin), sha, target)
+    assert err is None, f"clone_at_commit failed against real git: {err}"
+    head = subprocess.run(
+        ["git", "-C", result_dir, "rev-parse", "HEAD"], capture_output=True, text=True,
+        check=True,
+    ).stdout.strip()
+    assert head == sha, f"worktree not on requested commit: {head} != {sha}"
+    assert (result_dir and os.path.isdir(result_dir))
+    assert json.dumps({"head": head})  # shape check only; keeps json import used

@@ -118,8 +118,13 @@ def clone_at_commit(repo_url, commit_hash, target_dir):
             error = result.stderr.strip() or f"git clone exited {result.returncode}"
             return (target_dir, error)
 
+        # NOTE: git-checkout grammar is `git checkout [<tree-ish>] -- <pathspec>`.
+        # A commit hash after `--` is parsed as a PATHSPEC and fails ("did not
+        # match any file(s) known to git") — so the hash goes BEFORE the
+        # separator (and may be followed by an empty pathspec). A hex SHA can
+        # never start with '-', so no flag-ambiguity risk here.
         checkout = gitops.run_git(
-            ["checkout", gitops.SEP, commit_hash],
+            ["checkout", commit_hash, gitops.SEP],
             stage="checkout",
             cwd=target_dir,
             check=False,
