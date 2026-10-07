@@ -5,6 +5,8 @@ from pathlib import Path
 
 import local_harness.scan as scan
 
+from vulnhunter_common import hostcmd as hostcmd_mod
+
 # --- results dir helpers ---
 
 
@@ -214,7 +216,7 @@ def test_scan_folder_success(monkeypatch, tmp_path):
     def fake_popen(*a, **k):
         return _FakePopen(lines, returncode=0)
 
-    monkeypatch.setattr(scan.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(hostcmd_mod.subprocess, "Popen", fake_popen)
 
     # avoid real timer thread firing
     class _NoTimer:
@@ -255,7 +257,7 @@ def test_scan_folder_readonly_appends_prompt(monkeypatch, tmp_path):
         captured["prompt"] = Path(cmd[-1]).read_text(encoding="utf-8")
         return _FakePopen([json.dumps({"type": "result"}) + "\n"], returncode=0)
 
-    monkeypatch.setattr(scan.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(hostcmd_mod.subprocess, "Popen", fake_popen)
 
     class _NoTimer:
         def __init__(self, *a, **k):
@@ -289,7 +291,7 @@ def test_scan_folder_timeout(monkeypatch, tmp_path):
         proc_holder["p"] = p
         return p
 
-    monkeypatch.setattr(scan.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(hostcmd_mod.subprocess, "Popen", fake_popen)
 
     # Timer that fires immediately on start to simulate a timeout kill.
     class _FireTimer:
@@ -335,7 +337,7 @@ def test_scan_folder_timeout_with_valid_results_not_discarded(monkeypatch, tmp_p
     def fake_popen(*a, **k):
         return _FakePopen(events, returncode=0)
 
-    monkeypatch.setattr(scan.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(hostcmd_mod.subprocess, "Popen", fake_popen)
 
     class _FireTimer:
         def __init__(self, interval, fn):

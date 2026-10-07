@@ -22,6 +22,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - project: vulnhunter_common
+            python-version: "3.12"
+            extras: dev
           - project: vh
             python-version: "3.12"
             extras: dev
@@ -52,15 +55,20 @@ jobs:
       - name: Install project with dev extras
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[${{ matrix.extras }}]"
+          pip install -e "../vulnhunter_common" -e ".[${{ matrix.extras }}]"
 
       - name: Run pytest with coverage
+        if: matrix.project != 'vulnhunter_common'
         run: |
           pytest -v \
             --cov \
             --cov-report=term \
             --cov-report=xml \
             --junitxml=pytest-report.xml
+
+      - name: Run pytest (contract layer)
+        if: matrix.project == 'vulnhunter_common'
+        run: pytest -v
 
       - name: Type-check (vh only; ratchet targets per mypy.ini)
         if: matrix.project == 'vh'

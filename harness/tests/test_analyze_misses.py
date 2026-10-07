@@ -3,11 +3,14 @@
 import json
 import os
 import subprocess
+import sys
 import types
 
 import local_harness.benchmark.analyze_misses as am
 import pytest
 from local_harness.config import PHASES_DIR
+
+from vulnhunter_common import hostcmd as hostcmd_mod
 
 
 def _proc(returncode=0, stdout="", stderr=""):
@@ -146,9 +149,11 @@ def test_parse_diagnostic_output_invalid():
 
 
 def test_invoke_diagnostic_success(monkeypatch):
-    monkeypatch.setenv("VULNHUNT_HOST_CMD", "host-oneshot")
+    monkeypatch.setenv("VULNHUNT_HOST_CMD", f"{sys.executable} host-oneshot")
     monkeypatch.setattr(
-        am.subprocess, "run", lambda *a, **k: _proc(0, stdout='{"root_cause":"rc"}')
+        hostcmd_mod.subprocess,
+        "run",
+        lambda *a, **k: _proc(0, stdout='{"root_cause":"rc"}'),
     )
     finding = {"finding_id": "F1", "type": "SQLi", "description": "d", "repo_name": "r"}
     out = am.invoke_diagnostic(finding, "phase1", "ev", "/rd", "/repo")
@@ -156,20 +161,20 @@ def test_invoke_diagnostic_success(monkeypatch):
 
 
 def test_invoke_diagnostic_timeout(monkeypatch):
-    monkeypatch.setenv("VULNHUNT_HOST_CMD", "host-oneshot")
+    monkeypatch.setenv("VULNHUNT_HOST_CMD", f"{sys.executable} host-oneshot")
 
     def boom(*a, **k):
         raise subprocess.TimeoutExpired(cmd="claude", timeout=1)
 
-    monkeypatch.setattr(am.subprocess, "run", boom)
+    monkeypatch.setattr(hostcmd_mod.subprocess, "run", boom)
     finding = {"finding_id": "F1", "type": "SQLi", "description": "d", "repo_name": "r"}
     out = am.invoke_diagnostic(finding, "phase1", "ev", "/rd", "/repo")
     assert out["root_cause"] == "diagnostic timed out"
 
 
 def test_invoke_diagnostic_nonzero(monkeypatch):
-    monkeypatch.setenv("VULNHUNT_HOST_CMD", "host-oneshot")
-    monkeypatch.setattr(am.subprocess, "run", lambda *a, **k: _proc(3, stderr="boom"))
+    monkeypatch.setenv("VULNHUNT_HOST_CMD", f"{sys.executable} host-oneshot")
+    monkeypatch.setattr(hostcmd_mod.subprocess, "run", lambda *a, **k: _proc(3, stderr="boom"))
     finding = {"finding_id": "F1", "type": "SQLi", "description": "d", "repo_name": "r"}
     out = am.invoke_diagnostic(finding, "phase1", "ev", "/rd", "/repo")
     assert "diagnostic failed" in out["root_cause"]

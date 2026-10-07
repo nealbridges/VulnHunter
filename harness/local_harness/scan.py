@@ -2,15 +2,15 @@
 
 import json
 import os
-import shlex
 import shutil
-import subprocess
 import tempfile
 import threading
 import time
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+
+from vulnhunter_common import hostcmd
 
 from .config import (
     MAX_SCAN_WORKERS,
@@ -207,8 +207,13 @@ def scan_folder(folder_path, log_file=None, readonly=False):
     print(f"  [{ts()}] [{label}] STARTING scan", flush=True)
     start = time.time()
 
-    host = os.environ.get("VULNHUNT_HOST_CMD", "").strip()
-    if not host:
+    # hostcmd owns the VULNHUNT_HOST_CMD contract (resolution, argv shape
+    # with the prompt file appended LAST, merged-stderr streaming drain).
+    # This call site keeps its own timeout semantics: a Timer kill after
+    # SCAN_TIMEOUT while the caller drains stdout line by line.
+    try:
+        host = hostcmd.resolve()
+    except hostcmd.HostCommandError:
         print(
             f"  [{ts()}] [{label}] Error: VULNHUNT_HOST_CMD is not set. "
             "Set it to this harness's headless one-shot. The prompt file "
@@ -221,17 +226,7 @@ def scan_folder(folder_path, log_file=None, readonly=False):
     prompt_file = os.path.join(prompt_dir, "prompt.txt")
     with open(prompt_file, "w") as handle:
         handle.write(prompt)
-    argv = shlex.split(host) + [prompt_file]
-    proc = subprocess.Popen(
-        argv,
-        stdout=subprocess.PIPE,
-        # Merge stderr into stdout (which we drain below) rather than piping it
-        # to its own buffer no one reads — an unread stderr pipe deadlocks the
-        # child once it writes more than the pipe buffer (~64 KB).
-        stderr=subprocess.STDOUT,
-        text=True,
-        cwd=folder_path,
-    )
+    proc = hostcmd.popen(host, prompt_file, cwd=folder_path)
 
     event_count = 0
     timed_out = False

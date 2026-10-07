@@ -18,7 +18,6 @@ import glob
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -28,6 +27,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+# Repo root, for the shared contract layer (vulnhunter_common) — installed
+# as c1-vulnhunter-common in CI; the path insert keeps in-place runs working.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
 from local_harness.config import (
     BENCHMARK_DIR,
@@ -37,6 +39,7 @@ from local_harness.config import (
     STATE_FILE,
     atomic_write_json,
 )
+from vulnhunter_common import hostcmd
 
 # Phase prompt basenames, resolved against config.PHASES_DIR (which honors
 # VULNHUNT_SKILLS_DIR and falls back to the vulnhunt/ copy in this repo).
@@ -325,9 +328,12 @@ def invoke_diagnostic(finding, phase_key, evidence, results_dir, repo_dir):
     fid = finding["finding_id"]
     prompt = build_diagnostic_prompt(finding, phase_key, evidence, results_dir, repo_dir)
 
-    host = os.environ.get("VULNHUNT_HOST_CMD", "").strip()
-    if not host:
-        print(f"    [{fid}] VULNHUNT_HOST_CMD is not set", flush=True)
+    # hostcmd owns the VULNHUNT_HOST_CMD contract (resolution, argv shape,
+    # transcript-on-stdout); this call site keeps its fixed 1200s budget.
+    try:
+        host = hostcmd.resolve()
+    except hostcmd.HostCommandError as exc:
+        print(f"    [{fid}] {exc}", flush=True)
         return {
             "root_cause": "VULNHUNT_HOST_CMD is not set",
             "prompt_file": "unknown",
@@ -343,16 +349,10 @@ def invoke_diagnostic(finding, phase_key, evidence, results_dir, repo_dir):
     prompt_file = os.path.join(prompt_dir, "prompt.txt")
     with open(prompt_file, "w") as handle:
         handle.write(DIAGNOSTIC_SYSTEM_PROMPT + "\n\n" + prompt)
-    cmd = shlex.split(host) + [prompt_file]
 
     start = time.time()
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=1200,
-        )
+        result = hostcmd.run(host, prompt_file, timeout=1200)
     except subprocess.TimeoutExpired:
         elapsed = time.time() - start
         print(f"    [{fid}] TIMED OUT after {elapsed:.0f}s", flush=True)

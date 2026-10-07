@@ -21,15 +21,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+from vulnhunter_common import gitops, hostcmd
+
 _SCAN_ID = re.compile(r"^.+_VULNHUNT_RESULTS_.+$")
 _EXIT_OK = {0, 1, 2, 3, 4}
-
-
-def _git() -> str:
-    git = shutil.which("git")
-    if not git:
-        raise SystemExit("git is not on PATH")
-    return git
 
 
 def cmd_clone(args: argparse.Namespace) -> int:
@@ -44,9 +39,14 @@ def cmd_clone(args: argparse.Namespace) -> int:
             print(f"clone already exists: {dest}", file=sys.stderr)
             return 2
         shutil.rmtree(dest)
-    cmd = [_git(), "clone", "--depth", str(args.depth), "--", url, str(dest)]
-    proc = subprocess.run(cmd)
-    return proc.returncode
+    try:
+        # gitops owns the argv contract (the -- separator before the URL)
+        # and the error taxonomy; depth is part of the shallow-clone pattern.
+        gitops.clone_shallow(url, str(dest), depth=args.depth)
+    except gitops.GitError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    return 0
 
 
 def _results_dirs(root: Path) -> list[Path]:
@@ -151,22 +151,22 @@ def cmd_validate_manifest(args: argparse.Namespace) -> int:
 
 
 def cmd_host(args: argparse.Namespace) -> int:
-    raw = os.environ.get("VULNHUNT_HOST_CMD", "").strip()
-    if not raw:
-        print(
-            "VULNHUNT_HOST_CMD is not set. Set it to your harness's headless "
-            "one-shot. The prompt file path is appended as the last argument.",
-            file=sys.stderr,
-        )
+    # hostcmd owns the VULNHUNT_HOST_CMD contract: shlex-split, prompt file
+    # appended LAST, transcript on the child's stdout. vh keeps its
+    # prompt-exists pre-check and the historical no-timeout behavior (the
+    # harness-side launcher owns timeouts); a --timeout flag is a follow-up,
+    # not a silent change.
+    try:
+        host = hostcmd.resolve()
+    except hostcmd.HostCommandError as exc:
+        print(str(exc), file=sys.stderr)
         return 2
     prompt = Path(args.prompt)
     if not prompt.is_file():
         print(f"prompt file not found: {prompt}", file=sys.stderr)
         return 2
-    import shlex
-
-    argv = shlex.split(raw) + [str(prompt.resolve())]
-    return subprocess.run(argv).returncode
+    proc = subprocess.run(hostcmd.argv_for(host, str(prompt.resolve())))
+    return proc.returncode
 
 
 def build_parser() -> argparse.ArgumentParser:
