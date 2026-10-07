@@ -45,6 +45,11 @@ jobs:
           - project: vh
             python-version: "3.12"
             extras: dev
+            cov-fail-under: "65"  # measured 67 on 3.12 (2026-10-07); ratchet up
+          - project: vh
+            python-version: "3.11"
+            extras: dev
+            cov-fail-under: "65"
           - project: harness
             python-version: "3.12"
             extras: dev
@@ -77,11 +82,11 @@ jobs:
       - name: Run pytest with coverage
         if: matrix.project != 'vulnhunter_common'
         run: |
-          pytest -v \
-            --cov \
-            --cov-report=term \
-            --cov-report=xml \
-            --junitxml=pytest-report.xml
+          COV_ARGS=(--cov --cov-report=term --cov-report=xml --junitxml=pytest-report.xml)
+          if [ -n "${{ matrix.cov-fail-under }}" ]; then
+            COV_ARGS+=(--cov-fail-under=${{ matrix.cov-fail-under }})
+          fi
+          pytest -v "${COV_ARGS[@]}"
 
       - name: Run pytest (contract layer)
         if: matrix.project == 'vulnhunter_common'
