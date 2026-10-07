@@ -5,6 +5,8 @@ import types
 
 import local_harness.clone as clone
 
+from vulnhunter_common import gitops as gitops_mod
+
 
 def _proc(returncode=0, stdout="", stderr=""):
     return types.SimpleNamespace(returncode=returncode, stdout=stdout, stderr=stderr)
@@ -30,17 +32,22 @@ def test_target_dir_name_truncates_commit():
 
 
 def test_is_at_commit_match(monkeypatch):
-    monkeypatch.setattr(clone.subprocess, "run", lambda *a, **k: _proc(0, stdout="0123456789\n"))
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(
+        gitops_mod.subprocess, "run", lambda *a, **k: _proc(0, stdout="0123456789\n")
+    )
     assert clone.is_at_commit("/tmp/x", "01234567abc") is True
 
 
 def test_is_at_commit_mismatch(monkeypatch):
-    monkeypatch.setattr(clone.subprocess, "run", lambda *a, **k: _proc(0, stdout="ffffffff\n"))
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", lambda *a, **k: _proc(0, stdout="ffffffff\n"))
     assert clone.is_at_commit("/tmp/x", "01234567") is False
 
 
 def test_is_at_commit_nonzero(monkeypatch):
-    monkeypatch.setattr(clone.subprocess, "run", lambda *a, **k: _proc(1, stdout=""))
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", lambda *a, **k: _proc(1, stdout=""))
     assert clone.is_at_commit("/tmp/x", "01234567") is False
 
 
@@ -48,7 +55,8 @@ def test_is_at_commit_timeout(monkeypatch):
     def boom(*a, **k):
         raise subprocess.TimeoutExpired(cmd="git", timeout=10)
 
-    monkeypatch.setattr(clone.subprocess, "run", boom)
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", boom)
     assert clone.is_at_commit("/tmp/x", "01234567") is False
 
 
@@ -56,7 +64,8 @@ def test_is_at_commit_git_missing(monkeypatch):
     def boom(*a, **k):
         raise FileNotFoundError()
 
-    monkeypatch.setattr(clone.subprocess, "run", boom)
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", boom)
     assert clone.is_at_commit("/tmp/x", "01234567") is False
 
 
@@ -78,16 +87,17 @@ def test_clone_at_commit_fast_fetch_success(monkeypatch, tmp_path):
 
     def fake_run(cmd, **k):
         calls.append(cmd)
-        if cmd[:2] == ["git", "fetch"]:
+        if cmd[1:2] == ["fetch"]:
             return _proc(0)
-        if cmd[:2] == ["git", "checkout"]:
+        if cmd[1:2] == ["checkout"]:
             return _proc(0)
         return _proc(0)
 
-    monkeypatch.setattr(clone.subprocess, "run", fake_run)
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", fake_run)
     result_dir, err = clone.clone_at_commit("url", "abcdef12", target)
     assert err is None
-    assert ["git", "fetch", "--depth=1", "origin", "abcdef12"] in calls
+    assert ["fetch", "--depth=1", "origin", "--", "abcdef12"] in [c[1:] for c in calls]
 
 
 def test_clone_at_commit_fast_fetch_timeout_then_full_clone(monkeypatch, tmp_path):
@@ -98,15 +108,16 @@ def test_clone_at_commit_fast_fetch_timeout_then_full_clone(monkeypatch, tmp_pat
     monkeypatch.setattr(clone.os, "makedirs", lambda *a, **k: None)
 
     def fake_run(cmd, **k):
-        if cmd[:2] == ["git", "fetch"]:
+        if cmd[1:2] == ["fetch"]:
             raise subprocess.TimeoutExpired(cmd="git fetch", timeout=1)
-        if cmd[:2] == ["git", "clone"]:
+        if cmd[1:2] == ["clone"]:
             return _proc(0)
-        if cmd[:2] == ["git", "checkout"]:
+        if cmd[1:2] == ["checkout"]:
             return _proc(0)
         return _proc(0)
 
-    monkeypatch.setattr(clone.subprocess, "run", fake_run)
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", fake_run)
     result_dir, err = clone.clone_at_commit("url", "abcdef12", target)
     assert err is None
 
@@ -118,13 +129,14 @@ def test_clone_at_commit_full_clone_fails(monkeypatch, tmp_path):
     monkeypatch.setattr(clone.os, "makedirs", lambda *a, **k: None)
 
     def fake_run(cmd, **k):
-        if cmd[:2] == ["git", "fetch"]:
+        if cmd[1:2] == ["fetch"]:
             return _proc(1)  # fetch fails (non-timeout)
-        if cmd[:2] == ["git", "clone"]:
+        if cmd[1:2] == ["clone"]:
             return _proc(128, stderr="fatal: repo not found")
         return _proc(0)
 
-    monkeypatch.setattr(clone.subprocess, "run", fake_run)
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", fake_run)
     result_dir, err = clone.clone_at_commit("url", "abcdef12", target)
     assert "repo not found" in err
 
@@ -136,15 +148,16 @@ def test_clone_at_commit_checkout_fails(monkeypatch, tmp_path):
     monkeypatch.setattr(clone.os, "makedirs", lambda *a, **k: None)
 
     def fake_run(cmd, **k):
-        if cmd[:2] == ["git", "fetch"]:
+        if cmd[1:2] == ["fetch"]:
             return _proc(1)
-        if cmd[:2] == ["git", "clone"]:
+        if cmd[1:2] == ["clone"]:
             return _proc(0)
-        if cmd[:2] == ["git", "checkout"]:
+        if cmd[1:2] == ["checkout"]:
             return _proc(1, stderr="checkout boom")
         return _proc(0)
 
-    monkeypatch.setattr(clone.subprocess, "run", fake_run)
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", fake_run)
     result_dir, err = clone.clone_at_commit("url", "abcdef12", target)
     assert "checkout boom" in err
 
@@ -156,7 +169,8 @@ def test_clone_at_commit_git_unavailable(monkeypatch, tmp_path):
     def boom(*a, **k):
         raise FileNotFoundError("git not on PATH")
 
-    monkeypatch.setattr(clone.subprocess, "run", boom)
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", boom)
     result_dir, err = clone.clone_at_commit("url", "abcdef12", target)
     assert "git unavailable" in err
 
@@ -166,15 +180,16 @@ def test_clone_at_commit_init_nonzero_falls_back(monkeypatch, tmp_path):
     monkeypatch.setattr(clone, "CLONE_BASE_DIR", str(tmp_path / "base"))
 
     def fake_run(cmd, **k):
-        if cmd[:2] == ["git", "init"]:
+        if cmd[1:2] == ["init"]:
             return _proc(1)  # init fails -> skip fast fetch, go to full clone
-        if cmd[:2] == ["git", "clone"]:
+        if cmd[1:2] == ["clone"]:
             return _proc(0)
-        if cmd[:2] == ["git", "checkout"]:
+        if cmd[1:2] == ["checkout"]:
             return _proc(0)
         return _proc(0)
 
-    monkeypatch.setattr(clone.subprocess, "run", fake_run)
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", fake_run)
     result_dir, err = clone.clone_at_commit("url", "abcdef12", target)
     assert err is None
 
@@ -186,13 +201,14 @@ def test_clone_at_commit_full_clone_timeout(monkeypatch, tmp_path):
     monkeypatch.setattr(clone.os, "makedirs", lambda *a, **k: None)
 
     def fake_run(cmd, **k):
-        if cmd[:2] == ["git", "fetch"]:
+        if cmd[1:2] == ["fetch"]:
             return _proc(1)
-        if cmd[:2] == ["git", "clone"]:
+        if cmd[1:2] == ["clone"]:
             raise subprocess.TimeoutExpired(cmd="git clone", timeout=1)
         return _proc(0)
 
-    monkeypatch.setattr(clone.subprocess, "run", fake_run)
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", fake_run)
     result_dir, err = clone.clone_at_commit("url", "abcdef12", target)
     assert "timed out" in err
 
@@ -209,7 +225,7 @@ def test_clone_at_commit_wrong_commit_removed(monkeypatch, tmp_path):
     monkeypatch.setattr(
         clone.subprocess,
         "run",
-        lambda cmd, **k: _proc(0) if cmd[:2] == ["git", "fetch"] else _proc(0),
+        lambda cmd, **k: _proc(0) if cmd[1:2] == ["fetch"] else _proc(0),
     )
     result_dir, err = clone.clone_at_commit("url", "abcdef12", target)
     assert removed["r"] == target
@@ -228,7 +244,8 @@ def test_shallow_clone_reclone(monkeypatch, tmp_path):
     removed = []
     monkeypatch.setattr(clone.shutil, "rmtree", lambda p: removed.append(p))
     monkeypatch.setattr(clone.os, "makedirs", lambda *a, **k: None)
-    monkeypatch.setattr(clone.subprocess, "run", lambda *a, **k: _proc(0))
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", lambda *a, **k: _proc(0))
     result_dir, err = clone.shallow_clone("url", target, re_clone=True)
     assert err is None and removed == [target]
 
@@ -237,7 +254,8 @@ def test_shallow_clone_success(monkeypatch, tmp_path):
     target = str(tmp_path / "c")
     monkeypatch.setattr(clone.os.path, "isdir", lambda p: False)
     monkeypatch.setattr(clone.os, "makedirs", lambda *a, **k: None)
-    monkeypatch.setattr(clone.subprocess, "run", lambda *a, **k: _proc(0))
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", lambda *a, **k: _proc(0))
     result_dir, err = clone.shallow_clone("url", target)
     assert err is None
 
@@ -246,7 +264,10 @@ def test_shallow_clone_fails(monkeypatch, tmp_path):
     target = str(tmp_path / "c")
     monkeypatch.setattr(clone.os.path, "isdir", lambda p: False)
     monkeypatch.setattr(clone.os, "makedirs", lambda *a, **k: None)
-    monkeypatch.setattr(clone.subprocess, "run", lambda *a, **k: _proc(1, stderr="no such repo"))
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(
+        gitops_mod.subprocess, "run", lambda *a, **k: _proc(1, stderr="no such repo")
+    )
     result_dir, err = clone.shallow_clone("url", target)
     assert "no such repo" in err
 
@@ -259,7 +280,8 @@ def test_shallow_clone_timeout(monkeypatch, tmp_path):
     def boom(*a, **k):
         raise subprocess.TimeoutExpired(cmd="git", timeout=120)
 
-    monkeypatch.setattr(clone.subprocess, "run", boom)
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", boom)
     result_dir, err = clone.shallow_clone("url", target)
     assert "timed out" in err
 
@@ -272,6 +294,7 @@ def test_shallow_clone_git_unavailable(monkeypatch, tmp_path):
     def boom(*a, **k):
         raise FileNotFoundError("git not on PATH")
 
-    monkeypatch.setattr(clone.subprocess, "run", boom)
+    monkeypatch.setattr(gitops_mod.shutil, "which", lambda name, p=None: "/usr/bin/git")
+    monkeypatch.setattr(gitops_mod.subprocess, "run", boom)
     result_dir, err = clone.shallow_clone("url", target)
     assert "git unavailable" in err
