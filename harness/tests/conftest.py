@@ -1,5 +1,10 @@
 """Make the shared contract layer importable for in-place harness runs.
 
+Layer: test infrastructure (plan §2.2) — not itself a contract, process, or
+runtime file; it supports the CONTRACT layer's importability so that the
+deterministic RUNTIME suites can exercise `vulnhunter_common` regardless of
+the working directory.
+
 The component suites run with working-directory = the component (CI) or
 from its directory locally; `vulnhunter_common` is installed as
 `c1-vulnhunter-common` in CI, but local in-place runs may not have it
