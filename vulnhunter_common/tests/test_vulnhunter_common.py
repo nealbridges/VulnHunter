@@ -237,6 +237,25 @@ def test_run_raises_timeoutexpired_on_timeout(tmp_path: Path) -> None:
         hostcmd.run(host, str(tmp_path / "prompt.txt"), timeout=0.3)
 
 
+def test_run_merge_stderr_true_folds_stderr_into_stdout(tmp_path: Path) -> None:
+    script = _fake_host_script(tmp_path, "import sys; print('o'); print('e', file=sys.stderr)\n")
+    host = hostcmd.resolve({"VULNHUNT_HOST_CMD": f"{sys.executable} {script}"})
+    proc = hostcmd.run(host, str(tmp_path / "prompt.txt"), merge_stderr=True)
+    assert proc.returncode == 0
+    assert "o" in proc.stdout and "e" in proc.stdout
+    assert not (proc.stderr or "").strip()
+
+
+def test_run_merge_stderr_false_captures_stderr_separately(tmp_path: Path) -> None:
+    script = _fake_host_script(tmp_path, "import sys; print('o'); print('e', file=sys.stderr)\n")
+    host = hostcmd.resolve({"VULNHUNT_HOST_CMD": f"{sys.executable} {script}"})
+    proc = hostcmd.run(host, str(tmp_path / "prompt.txt"), merge_stderr=False)
+    assert proc.returncode == 0
+    assert "o" in proc.stdout
+    assert "e" in proc.stderr
+    assert "e" not in proc.stdout
+
+
 def test_popen_streams_combined_output(tmp_path: Path) -> None:
     script = _fake_host_script(
         tmp_path, "import sys; print('out'); print('err', file=sys.stderr)\n"

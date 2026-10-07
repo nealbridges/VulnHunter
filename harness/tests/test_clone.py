@@ -333,14 +333,32 @@ def test_clone_at_commit_real_checkout_of_known_commit(tmp_path):
     (origin / "f.txt").write_text("one\n")
     subprocess.run(["git", "-C", str(origin), "add", "f.txt"], check=True)
     subprocess.run(
-        ["git", "-C", str(origin), "-c", "user.name=t", "-c", "user.email=t@t", "commit",
-         "-q", "-m", "one"],
+        [
+            "git",
+            "-C",
+            str(origin),
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@t",
+            "commit",
+            "-q",
+            "-m",
+            "one",
+        ],
         check=True,
-        env={**env, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
-             "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"},
+        env={
+            **env,
+            "GIT_AUTHOR_NAME": "t",
+            "GIT_AUTHOR_EMAIL": "t@t",
+            "GIT_COMMITTER_NAME": "t",
+            "GIT_COMMITTER_EMAIL": "t@t",
+        },
     )
     sha = subprocess.run(
-        ["git", "-C", str(origin), "rev-parse", "HEAD"], capture_output=True, text=True,
+        ["git", "-C", str(origin), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
         check=True,
     ).stdout.strip()
 
@@ -350,9 +368,11 @@ def test_clone_at_commit_real_checkout_of_known_commit(tmp_path):
     result_dir, err = clone.clone_at_commit(str(origin), sha, target)
     assert err is None, f"clone_at_commit failed against real git: {err}"
     head = subprocess.run(
-        ["git", "-C", result_dir, "rev-parse", "HEAD"], capture_output=True, text=True,
+        ["git", "-C", result_dir, "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
         check=True,
     ).stdout.strip()
     assert head == sha, f"worktree not on requested commit: {head} != {sha}"
-    assert (result_dir and os.path.isdir(result_dir))
+    assert result_dir and os.path.isdir(result_dir)
     assert json.dumps({"head": head})  # shape check only; keeps json import used

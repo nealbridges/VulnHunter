@@ -70,16 +70,16 @@ def popen(
     prompt_file: str,
     *,
     cwd: str | None = None,
-    timeout: float | None = None,
     merge_stderr: bool = True,
 ) -> subprocess.Popen:
     """Spawn the host command with the streaming-drain-safe pipe setup.
 
-    stdout is a pipe the caller must drain; stderr is merged into it
-    (an undrained stderr pipe deadlocks a chatty child past ~64 KB —
-    the deadlock scan.py's comment documents). With ``timeout``, a
-    :class:`subprocess.TimeoutExpired` is raised for the caller to
-    convert into its own timeout semantics (kill, record, continue).
+    stdout is a pipe the caller must drain; stderr is merged into it by
+    default (an undrained stderr pipe deadlocks a chatty child past
+    ~64 KB — the deadlock scan.py's comment documents). There is no
+    ``timeout`` here: a :class:`~subprocess.Popen` cannot time itself out;
+    callers either enforce it around the drain (scan.py's Timer) or use
+    :func:`run`, which raises :class:`subprocess.TimeoutExpired`.
     """
     argv = argv_for(host, prompt_file)
     return subprocess.Popen(
@@ -99,13 +99,20 @@ def run(
     timeout: float | None = None,
     merge_stderr: bool = True,
 ) -> subprocess.CompletedProcess:
-    """Run to completion (capture combined output). Raises
-    :class:`subprocess.TimeoutExpired` on timeout — the caller decides the
-    timeout semantics (analyze_misses uses a fixed budget; scan.py streams)."""
+    """Run to completion. Raises :class:`subprocess.TimeoutExpired` on
+    timeout — the caller decides the timeout semantics (analyze_misses
+    uses a fixed budget; scan.py streams).
+
+    ``merge_stderr`` honors the same drain-safety rule as :func:`popen`:
+    with the default ``True`` the child's stderr is folded into
+    ``stdout`` (so nothing blocks on a full stderr pipe); with ``False``
+    stderr is captured separately on ``CompletedProcess.stderr``.
+    """
     argv = argv_for(host, prompt_file)
     return subprocess.run(
         argv,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT if merge_stderr else subprocess.PIPE,
         text=True,
         timeout=timeout,
         cwd=cwd,
