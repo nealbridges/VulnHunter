@@ -158,12 +158,27 @@ def test_clone_shallow_uses_separator_and_clones(origin_repo: Path, tmp_path: Pa
     assert len(log.stdout.strip().splitlines()) == 1
 
 
-def test_run_git_survives_url_that_looks_like_a_flag(origin_repo: Path, tmp_path: Path) -> None:
+def test_run_git_survives_url_that_looks_like_a_flag(tmp_path: Path) -> None:
     # The #16-class bug: a URL/branch beginning with '-' used to be parsed
-    # as a flag. The SEP contract makes the boundary explicit.
+    # as a flag. The SEP contract makes the boundary explicit. Prove it
+    # with a REAL clone of an origin whose path begins with '-' — without
+    # the separator, `git clone --depth 1 -dashy-repo.git` would parse
+    # '-dashy-repo.git' as an option and fail.
+    origin = tmp_path / "--dashy-repo.git"
+    origin.mkdir()
+    _git(origin, "init", "-q", "--bare")
+    seed = tmp_path / "seed"
+    seed.mkdir()
+    _git(seed, "init", "-q", "-b", "main")
+    (seed / "f.txt").write_text("v1\n")
+    _git(seed, "add", "-A")
+    _git(seed, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "seed")
+    _git(seed, "remote", "add", "origin", str(origin))
+    _git(seed, "push", "-q", "origin", "main")
+
     dest = tmp_path / "clone2"
-    gitops.clone_shallow(str(origin_repo), str(dest))
-    assert (dest / "f.txt").exists()
+    gitops.clone_shallow(str(origin), str(dest))
+    assert (dest / "f.txt").read_text() == "v1\n"
 
 
 def test_rev_parse_resolves_head(origin_repo: Path, tmp_path: Path) -> None:
