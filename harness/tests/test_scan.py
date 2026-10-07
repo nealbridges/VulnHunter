@@ -1,11 +1,17 @@
 """Tests for local_harness.scan."""
 
 import json
+import sys
 from pathlib import Path
 
 import local_harness.scan as scan
 
 from vulnhunter_common import hostcmd as hostcmd_mod
+
+# scan_folder resolves the host command from the environment via
+# hostcmd.resolve(); every test that drives a scan must set VULNHUNT_HOST_CMD
+# to a PATH-valid program (sys.executable is guaranteed present).
+_HOST = f"{sys.executable} host-oneshot"
 
 # --- results dir helpers ---
 
@@ -198,6 +204,7 @@ def test_scan_folder_success(monkeypatch, tmp_path):
     folder = tmp_path / "repo"
     folder.mkdir()
     # SKILLS_DIR must look installed; results dir found after scan.
+    monkeypatch.setenv("VULNHUNT_HOST_CMD", _HOST)
     monkeypatch.setattr(scan, "SKILLS_DIR", str(tmp_path / "skills"))
     (tmp_path / "skills").mkdir()
 
@@ -245,6 +252,7 @@ def test_scan_folder_success(monkeypatch, tmp_path):
 def test_scan_folder_readonly_appends_prompt(monkeypatch, tmp_path):
     folder = tmp_path / "repo"
     folder.mkdir()
+    monkeypatch.setenv("VULNHUNT_HOST_CMD", _HOST)
     monkeypatch.setattr(scan, "SKILLS_DIR", str(tmp_path / "skills"))
     (tmp_path / "skills").mkdir()
 
@@ -281,6 +289,7 @@ def test_scan_folder_readonly_appends_prompt(monkeypatch, tmp_path):
 def test_scan_folder_timeout(monkeypatch, tmp_path):
     folder = tmp_path / "repo"
     folder.mkdir()
+    monkeypatch.setenv("VULNHUNT_HOST_CMD", _HOST)
     monkeypatch.setattr(scan, "SKILLS_DIR", str(tmp_path / "skills"))
     (tmp_path / "skills").mkdir()
 
@@ -316,6 +325,7 @@ def test_scan_folder_timeout_with_valid_results_not_discarded(monkeypatch, tmp_p
     # results; scan_folder must not discard them as a timeout.
     folder = tmp_path / "repo"
     folder.mkdir()
+    monkeypatch.setenv("VULNHUNT_HOST_CMD", _HOST)
     monkeypatch.setattr(scan, "SKILLS_DIR", str(tmp_path / "skills"))
     (tmp_path / "skills").mkdir()
 

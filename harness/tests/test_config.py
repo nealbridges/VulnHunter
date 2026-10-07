@@ -20,7 +20,30 @@ def test_retry_and_timeout_constants():
     assert config.SCAN_MAX_RETRIES == 3
     assert config.SCAN_RETRY_BACKOFF_MULTIPLIER == 2.0
     assert config.JUDGE_MAX_RETRIES == 3
-    assert isinstance(config.MODEL, str) and config.MODEL
+
+
+def test_model_mirrors_env_var():
+    """Contract: config.MODEL mirrors VULNHUNT_MODEL (empty when unset).
+
+    The constants test above must not depend on the ambient environment
+    (VULNHUNT_MODEL is a scan-time env contract, not a build constant),
+    so the mirror behavior is pinned here explicitly: set the env, reload,
+    assert, restore. (Pre-existing on main the assertion read ambient
+    VULNHUNT_MODEL, which made the suite env-dependent.)
+    """
+    import importlib
+
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        monkeypatch.setenv("VULNHUNT_MODEL", "test-model-for-reload")
+        importlib.reload(config)
+        assert config.MODEL == "test-model-for-reload"
+        monkeypatch.delenv("VULNHUNT_MODEL", raising=False)
+        importlib.reload(config)
+        assert config.MODEL == ""
+    finally:
+        monkeypatch.undo()
+        importlib.reload(config)
 
 
 def test_batch_and_history_paths():
