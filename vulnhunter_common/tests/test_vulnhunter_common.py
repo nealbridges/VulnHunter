@@ -98,7 +98,9 @@ def test_vars_used_in_code_are_registered() -> None:
 
 def test_core_documented_vars_agree_with_docs() -> None:
     # Direction 2: every core var must appear in the docs that claim the
-    # env contract (vulnhunter-run SKILL.md + the component READMEs).
+    # env contract (vulnhunter-run SKILL.md + the root README — the only
+    # docs the repo ships today; component READMEs join the pin as they
+    # land, see plan item 11 / §8.4).
     docs = "\n".join(
         p.read_text(encoding="utf-8")
         for p in (REPO_ROOT / "vulnhunter-run" / "SKILL.md", REPO_ROOT / "README.md")
@@ -116,6 +118,28 @@ def test_registered_vars_with_skill_mentions_are_findable_in_skills() -> None:
     assert mentioned, "registry names never appear in skills; registry drifted"
     # And each mention must be registered (implied by construction here) —
     # the load-bearing check is the code-direction test above.
+
+
+def test_vars_mentioned_in_skill_prose_are_registered() -> None:
+    # Direction 3 (plan item 8): every VULNHUNT_* name MENTIONED IN SKILL
+    # PROSE must be registered. This is the prose→registry direction the
+    # plan promised: a new env var introduced in skill prose surfaces here
+    # as a failure until it is declared in the registry. Trailing-
+    # underscore fragments (f"..._VULNHUNT_RESULTS_{ts}") are normalized
+    # exactly as in the code-direction test.
+    pattern = re.compile(r"VULNHUNT_[A-Z_]+")
+    mentioned: set[str] = set()
+    for path in _skill_md_files():
+        mentioned |= set(pattern.findall(path.read_text(encoding="utf-8")))
+    mentioned.discard("VULNHUNT_")
+    mentioned = {
+        name if name in env_mod.REGISTRY_BY_NAME else name.rstrip("_") for name in mentioned
+    }
+    unregistered = sorted(mentioned - set(env_mod.REGISTRY_BY_NAME))
+    assert not unregistered, (
+        f"VULNHUNT_* variables named in skill prose but missing from "
+        f"vulnhunter_common.env REGISTRY: {unregistered}"
+    )
 
 
 # --- gitops ------------------------------------------------------------------
