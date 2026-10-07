@@ -359,7 +359,10 @@ def test_schema_copies_are_identical() -> None:
 
     Until the schema is single-homed (plan §6/D-follow-up), the two copies
     must not drift — this test is the drift alarm that forces a conscious
-    sync.
+    sync. Byte identity is the pin (matching the "same-bytes" language in
+    manifest.py and §8.4): the copies are shipped as identical files, so
+    even a comment/whitespace reformat of one copy must be a conscious act
+    that updates both.
     """
     vendored = REPO_ROOT / "vulnhunter-agent" / "scan_manifest.schema.json"
     common_copy = (
@@ -369,6 +372,12 @@ def test_schema_copies_are_identical() -> None:
         "copy vulnhunter-agent/scan_manifest.schema.json to vulnhunter_common/ "
         "and keep this pin green"
     )
+    assert vendored.read_bytes() == common_copy.read_bytes(), (
+        "scan_manifest.schema.json copies diverged (byte-identity pin) — "
+        "sync them or move to a single home (plan §6)"
+    )
+    # Semantic equality is implied by byte identity; keep the parsed check
+    # for a precise failure message when the bytes DO diverge.
     assert json.loads(vendored.read_text()) == json.loads(common_copy.read_text()), (
         "scan_manifest.schema.json copies diverged — sync them or move to a single home (plan §6)"
     )
