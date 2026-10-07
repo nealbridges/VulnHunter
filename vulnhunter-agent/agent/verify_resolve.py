@@ -30,7 +30,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from .clone import clone_at_commit, shallow_clone
-from .config import AgentConfig, GitHubConfig, PublishConfig, VerifyConfig
+from .config import AgentConfig
 from .issues_remote_report import DownloadedReport, download_named_report
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ def _hint_host(url: str) -> str | None:
     form (parsed by hand — ``urlparse`` does not understand it).
     """
     if url.startswith("git@"):
-        host = url[len("git@"):].split(":", 1)[0]
+        host = url[len("git@") :].split(":", 1)[0]
         return host.lower() or None
     parsed = urlparse(url)
     return parsed.hostname.lower() if parsed.hostname else None
@@ -113,7 +113,7 @@ def authorized_token_path_prefixes(
     prefixes: set[str] = {p.strip() for p in extra if p and p.strip()}
     for url in aliases.values():
         if url.startswith("git@"):
-            path = url[len("git@"):].split(":", 1)[1] if ":" in url else ""
+            path = url[len("git@") :].split(":", 1)[1] if ":" in url else ""
         else:
             path = urlparse(url).path
         owner = path.strip("/").split("/")[0] if path.strip("/") else ""
@@ -154,9 +154,7 @@ def clone_additional_repo(
             allowed_token_path_prefixes=allowed_token_path_prefixes,
         )
     except RuntimeError as exc:
-        raise ResolveError(
-            f"Could not clone additional repo {url!r}: {exc}"
-        ) from exc
+        raise ResolveError(f"Could not clone additional repo {url!r}: {exc}") from exc
 
 
 def clone_target_repo(
@@ -193,9 +191,7 @@ def clone_target_repo(
             github_host=github_host,
         )
     except RuntimeError as exc:
-        raise ResolveError(
-            f"Could not clone target repo {repo_url!r}: {exc}"
-        ) from exc
+        raise ResolveError(f"Could not clone target repo {repo_url!r}: {exc}") from exc
 
 
 def stage_report(
@@ -241,8 +237,7 @@ def stage_report(
         )
     except Exception as exc:
         raise ResolveError(
-            f"Could not download named report {results_dir_name!r} for "
-            f"{source_repo_url!r}: {exc}"
+            f"Could not download named report {results_dir_name!r} for {source_repo_url!r}: {exc}"
         ) from exc
     try:
         # Copy contents into destination_dir/<results_dir_name>/.

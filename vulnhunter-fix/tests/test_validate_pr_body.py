@@ -17,7 +17,6 @@ class TestExtractCloses:
         assert extract_closes("Closes #42") == {42}
 
     def test_comma_separated_one_line(self):
-        body = "Closes #1, #2, #3\n\nRest of body…"
         # GitHub's parser handles `Closes #N1, #N2, #N3` by treating
         # each `#N` as a separate close. Our regex matches the
         # keyword + the FIRST #N immediately after — so the bare
@@ -96,9 +95,9 @@ class TestCli:
         body = tmp_path / "body.md"
         body.write_text("Closes #1\nCloses #2, Closes #3\n")
         result = subprocess.run(
-            [sys.executable, str(script), str(body),
-             "--expected-issues", "1,2,3"],
-            capture_output=True, text=True,
+            [sys.executable, str(script), str(body), "--expected-issues", "1,2,3"],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
         assert "ok:" in result.stdout
@@ -107,9 +106,9 @@ class TestCli:
         body = tmp_path / "body.md"
         body.write_text("Closes #1\n")
         result = subprocess.run(
-            [sys.executable, str(script), str(body),
-             "--expected-issues", "1,2,3"],
-            capture_output=True, text=True,
+            [sys.executable, str(script), str(body), "--expected-issues", "1,2,3"],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 1
         assert "Fix the PR body" in result.stderr
@@ -119,9 +118,9 @@ class TestCli:
         body.write_text("Closes #5, Closes #6\n")
         # GitHub-style hash-prefixed input
         result = subprocess.run(
-            [sys.executable, str(script), str(body),
-             "--expected-issues", "#5,#6"],
-            capture_output=True, text=True,
+            [sys.executable, str(script), str(body), "--expected-issues", "#5,#6"],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
 
@@ -129,8 +128,8 @@ class TestCli:
         body = tmp_path / "body.md"
         body.write_text("Closes #1\n")
         result = subprocess.run(
-            [sys.executable, str(script), str(body),
-             "--expected-issues", "1,foo"],
-            capture_output=True, text=True,
+            [sys.executable, str(script), str(body), "--expected-issues", "1,foo"],
+            capture_output=True,
+            text=True,
         )
         assert result.returncode != 0

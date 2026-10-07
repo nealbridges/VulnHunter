@@ -39,11 +39,19 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 REQUIRED_TOP_KEYS = {"findings"}
 REQUIRED_FINDING_KEYS = {
-    "id", "title", "cwe", "primary_cwe", "severity", "status",
-    "location", "root_cause", "entry_point", "data_flow", "proposed_fix",
+    "id",
+    "title",
+    "cwe",
+    "primary_cwe",
+    "severity",
+    "status",
+    "location",
+    "root_cause",
+    "entry_point",
+    "data_flow",
+    "proposed_fix",
 }
 REQUIRED_FIX_KEYS = {"strategy", "files_to_change", "why"}
 
@@ -62,19 +70,13 @@ def validate_payload(payload: Any) -> int:
     Raises ``ValidationError`` on the first rule violation.
     """
     if not isinstance(payload, dict):
-        raise ValidationError(
-            f"top-level JSON must be an object, got {type(payload).__name__}"
-        )
+        raise ValidationError(f"top-level JSON must be an object, got {type(payload).__name__}")
     missing_top = REQUIRED_TOP_KEYS - set(payload.keys())
     if missing_top:
-        raise ValidationError(
-            f"top-level object missing required keys: {sorted(missing_top)}"
-        )
+        raise ValidationError(f"top-level object missing required keys: {sorted(missing_top)}")
     findings = payload["findings"]
     if not isinstance(findings, list):
-        raise ValidationError(
-            f"`findings` must be a list, got {type(findings).__name__}"
-        )
+        raise ValidationError(f"`findings` must be a list, got {type(findings).__name__}")
     for idx, finding in enumerate(findings):
         try:
             _validate_finding(finding)
@@ -92,17 +94,11 @@ def _validate_finding(f: Any) -> None:
         raise ValidationError(f"missing required keys: {sorted(missing)}")
     for key in REQUIRED_FINDING_KEYS - {"proposed_fix"}:
         if not isinstance(f[key], str):
-            raise ValidationError(
-                f"{key!r} must be a string, got {type(f[key]).__name__}"
-            )
+            raise ValidationError(f"{key!r} must be a string, got {type(f[key]).__name__}")
     if not _VULN_ID_RE.match(f["id"]):
-        raise ValidationError(
-            f"id={f['id']!r} must match VULN-NNN (zero-padded 3-digit form)"
-        )
+        raise ValidationError(f"id={f['id']!r} must match VULN-NNN (zero-padded 3-digit form)")
     if f["primary_cwe"] and not _PRIMARY_CWE_RE.match(f["primary_cwe"]):
-        raise ValidationError(
-            f"primary_cwe={f['primary_cwe']!r} must match CWE-NNN if non-empty"
-        )
+        raise ValidationError(f"primary_cwe={f['primary_cwe']!r} must match CWE-NNN if non-empty")
     if f["severity"] not in ACCEPTED_SEVERITIES:
         raise ValidationError(
             f"severity={f['severity']!r} must be one of {sorted(ACCEPTED_SEVERITIES)}"
@@ -110,24 +106,18 @@ def _validate_finding(f: Any) -> None:
         )
     if f["status"] != "Confirmed":
         raise ValidationError(
-            f"status={f['status']!r} must be 'Confirmed' — Step 5a only emits "
-            f"confirmed findings"
+            f"status={f['status']!r} must be 'Confirmed' — Step 5a only emits confirmed findings"
         )
     fix = f["proposed_fix"]
     if not isinstance(fix, dict):
-        raise ValidationError(
-            f"proposed_fix must be an object, got {type(fix).__name__}"
-        )
+        raise ValidationError(f"proposed_fix must be an object, got {type(fix).__name__}")
     missing_fix = REQUIRED_FIX_KEYS - set(fix.keys())
     if missing_fix:
-        raise ValidationError(
-            f"proposed_fix missing required keys: {sorted(missing_fix)}"
-        )
+        raise ValidationError(f"proposed_fix missing required keys: {sorted(missing_fix)}")
     for key in REQUIRED_FIX_KEYS:
         if not isinstance(fix[key], str):
             raise ValidationError(
-                f"proposed_fix.{key!r} must be a string, got "
-                f"{type(fix[key]).__name__}"
+                f"proposed_fix.{key!r} must be a string, got {type(fix[key]).__name__}"
             )
 
 
@@ -148,8 +138,7 @@ def main_with_argv(argv: list[str]) -> int:
     except ValidationError as exc:
         print(f"error: {exc}", file=sys.stderr)
         print(
-            "Re-run Step 5a's subagent — its output did not match the "
-            "documented shape.",
+            "Re-run Step 5a's subagent — its output did not match the documented shape.",
             file=sys.stderr,
         )
         return 1

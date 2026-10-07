@@ -57,7 +57,8 @@ def collect_results(clone_base=None, upload_dir=None):
             continue
 
         results_dirs = [
-            d for d in os.listdir(entry_path)
+            d
+            for d in os.listdir(entry_path)
             if os.path.isdir(os.path.join(entry_path, d)) and "_VULNHUNT_RESULTS_" in d
         ]
 
@@ -181,7 +182,9 @@ def scan_status(clone_base=None, log_filename=None):
         print(f"--- COMPLETE ({len(complete)}) ---")
         for name, duration_s, cost_data in complete:
             mins = duration_s / 60
-            cost_str = f", ${cost_data['total_cost_usd']:.2f}" if cost_data.get("total_cost_usd") else ""
+            cost_str = (
+                f", ${cost_data['total_cost_usd']:.2f}" if cost_data.get("total_cost_usd") else ""
+            )
             print(f"  {name}  [{mins:.1f} min{cost_str}]")
         print()
 
@@ -193,4 +196,9 @@ def scan_status(clone_base=None, log_filename=None):
             print(f"  ... and {len(not_started) - 10} more")
         print()
 
-    return {"complete": complete, "errored": errored, "running": running, "not_started": not_started}
+    return {
+        "complete": complete,
+        "errored": errored,
+        "running": running,
+        "not_started": not_started,
+    }

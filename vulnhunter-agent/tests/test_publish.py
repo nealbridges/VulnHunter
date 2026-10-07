@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 import pytest
 import respx
-
 from agent import publish as publish_mod
 from agent._github import api_base
 from agent.config import AgentConfig, GitHubConfig, PublishConfig, TLSConfig
@@ -21,6 +19,7 @@ from agent.publish import (
     ensure_destination_repo,
     publish_results,
 )
+
 from tests.conftest import _build_agent_config
 
 
@@ -107,9 +106,7 @@ class TestParseOwnerRepo:
 
     def test_tree_url_takes_first_two_segments(self) -> None:
         # Source URLs are sometimes pasted with /tree/<branch> appended.
-        assert _parse_owner_repo(
-            "https://github.com/owner/repo/tree/main"
-        ) == ("owner", "repo")
+        assert _parse_owner_repo("https://github.com/owner/repo/tree/main") == ("owner", "repo")
 
     def test_trailing_slash_tolerated(self) -> None:
         assert _parse_owner_repo("https://github.com/owner/repo/") == ("owner", "repo")
@@ -162,9 +159,7 @@ class TestEnsureDestinationRepo:
 
     @respx.mock
     def test_get_404_then_org_create_returns_true(self) -> None:
-        respx.get("https://api.github.com/repos/owner/name").mock(
-            return_value=httpx.Response(404)
-        )
+        respx.get("https://api.github.com/repos/owner/name").mock(return_value=httpx.Response(404))
         respx.get("https://api.github.com/users/owner").mock(
             return_value=httpx.Response(200, json={"type": "Organization"})
         )
@@ -176,15 +171,14 @@ class TestEnsureDestinationRepo:
         # httpx serializes JSON without inter-key whitespace; assert against
         # the parsed form so we don't pin the exact byte layout.
         import json as _json
+
         body = _json.loads(create.calls.last.request.read())
         assert body["private"] is True
         assert body["auto_init"] is True
 
     @respx.mock
     def test_get_404_then_user_self_returns_true(self) -> None:
-        respx.get("https://api.github.com/repos/owner/name").mock(
-            return_value=httpx.Response(404)
-        )
+        respx.get("https://api.github.com/repos/owner/name").mock(return_value=httpx.Response(404))
         respx.get("https://api.github.com/users/owner").mock(
             return_value=httpx.Response(200, json={"type": "User"})
         )
@@ -199,9 +193,7 @@ class TestEnsureDestinationRepo:
 
     @respx.mock
     def test_user_namespace_token_mismatch_raises(self) -> None:
-        respx.get("https://api.github.com/repos/owner/name").mock(
-            return_value=httpx.Response(404)
-        )
+        respx.get("https://api.github.com/repos/owner/name").mock(return_value=httpx.Response(404))
         respx.get("https://api.github.com/users/owner").mock(
             return_value=httpx.Response(200, json={"type": "User"})
         )
@@ -221,9 +213,7 @@ class TestEnsureDestinationRepo:
 
     @respx.mock
     def test_owner_lookup_404_raises(self) -> None:
-        respx.get("https://api.github.com/repos/owner/name").mock(
-            return_value=httpx.Response(404)
-        )
+        respx.get("https://api.github.com/repos/owner/name").mock(return_value=httpx.Response(404))
         respx.get("https://api.github.com/users/owner").mock(
             return_value=httpx.Response(404, text="Not Found")
         )
@@ -232,9 +222,7 @@ class TestEnsureDestinationRepo:
 
     @respx.mock
     def test_create_non_201_raises(self) -> None:
-        respx.get("https://api.github.com/repos/owner/name").mock(
-            return_value=httpx.Response(404)
-        )
+        respx.get("https://api.github.com/repos/owner/name").mock(return_value=httpx.Response(404))
         respx.get("https://api.github.com/users/owner").mock(
             return_value=httpx.Response(200, json={"type": "Organization"})
         )
@@ -259,9 +247,7 @@ class TestEnsureDestinationRepo:
             ensure_destination_repo(_publish_cfg(), cfg(reports_token=""))
 
     @respx.mock
-    def test_verify_param_honored(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_verify_param_honored(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # When ssl_cert_path is set, resolve_verify should return that path,
         # which httpx then uses; we just verify resolve_verify gets the cfg.
         seen: list[TLSConfig] = []
@@ -359,7 +345,7 @@ class TestPublishResults:
             _publish_cfg(),
             cfg(),
             source_repo_url=self.SOURCE_URL,
-                source_commit_hash=self.COMMIT,
+            source_commit_hash=self.COMMIT,
         )
         assert sha == "abcdef1234567890"
         # New flow: init -> remote add -> fetch -> reset -> add -> status
@@ -403,10 +389,7 @@ class TestPublishResults:
             source_commit_hash="",
         )
         add_cmd = next(c["cmd"] for c in captured_run if c["cmd"][:2] == ["git", "add"])
-        assert (
-            add_cmd[-1]
-            == f"source-org/source-repo/2026-01-01-141824/unknown/{results_dir.name}"
-        )
+        assert add_cmd[-1] == f"source-org/source-repo/2026-01-01-141824/unknown/{results_dir.name}"
 
     @respx.mock
     def test_results_dir_without_timestamp_lands_under_unknown_segment(
@@ -430,10 +413,7 @@ class TestPublishResults:
             source_commit_hash=self.COMMIT,
         )
         add_cmd = next(c["cmd"] for c in captured_run if c["cmd"][:2] == ["git", "add"])
-        assert (
-            add_cmd[-1]
-            == f"source-org/source-repo/unknown/{self.COMMIT}/{rd.name}"
-        )
+        assert add_cmd[-1] == f"source-org/source-repo/unknown/{self.COMMIT}/{rd.name}"
 
     @respx.mock
     def test_branch_missing_creates_with_set_upstream(
@@ -469,7 +449,7 @@ class TestPublishResults:
             _publish_cfg(),
             cfg(),
             source_repo_url=self.SOURCE_URL,
-                source_commit_hash=self.COMMIT,
+            source_commit_hash=self.COMMIT,
         )
         assert sha == "deadbeefdeadbeef"
         # No `git reset` was issued — there was nothing to reset onto.
@@ -487,6 +467,7 @@ class TestPublishResults:
         respx.get("https://api.github.com/repos/owner/name").mock(
             return_value=httpx.Response(200, json={})
         )
+
         def fake_run(cmd: list[str], **kwargs: Any) -> _FakeCompleted:
             if cmd[:2] == ["git", "status"]:
                 return _FakeCompleted(stdout="")
@@ -516,7 +497,7 @@ class TestPublishResults:
             _publish_cfg(commit_author_name="Test Bot", commit_author_email="t@x.com"),
             cfg(),
             source_repo_url=self.SOURCE_URL,
-                source_commit_hash=self.COMMIT,
+            source_commit_hash=self.COMMIT,
         )
         # Inspect any subprocess call's env (they all share the same env).
         env = captured_run[0]["kwargs"]["env"]
@@ -596,9 +577,7 @@ class TestPublishResults:
 
 
 class TestRunGitExecutableHardening:
-    def test_run_swaps_bare_git_for_absolute_path(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_run_swaps_bare_git_for_absolute_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """``_run(["git", ...])`` must replace ``cmd[0]`` with the
         absolute path resolved at module load (Bandit B607)."""
         captured: list[list[str]] = []

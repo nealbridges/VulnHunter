@@ -5,9 +5,8 @@ import os
 import subprocess
 import types
 
-import pytest
-
 import local_harness.benchmark.analyze_misses as am
+import pytest
 from local_harness.config import PHASES_DIR
 
 
@@ -16,8 +15,10 @@ def _proc(returncode=0, stdout="", stderr=""):
 
 
 def test_extract_identifiers():
-    desc = ("The endpoint /api/users/{id} in handler getUser calls "
-            "queryDatabase() in src/db/users.py without validation")
+    desc = (
+        "The endpoint /api/users/{id} in handler getUser calls "
+        "queryDatabase() in src/db/users.py without validation"
+    )
     ids = am.extract_identifiers(desc)
     assert any(i.endswith("users.py") for i in ids)
     assert "/api/users/{id}" in ids
@@ -85,7 +86,8 @@ def test_locate_loss_phase_phase2b_reject(tmp_path):
     rd = tmp_path / "rd"
     rd.mkdir()
     (rd / "phase2b_output.md").write_text(
-        "Candidate in src/app.py getUser was REJECTED as false positive\n")
+        "Candidate in src/app.py getUser was REJECTED as false positive\n"
+    )
     finding = {"description": "getUser in src/app.py", "type": "SQLi"}
     phase, ev = am.locate_loss_phase(str(rd), finding)
     assert phase == "phase2b"
@@ -98,7 +100,8 @@ def test_locate_loss_phase_phase2_non_candidate(tmp_path):
     results = rd / "results"
     results.mkdir()
     (results / "sg-1_inj_results.md").write_text(
-        "Traced getUser in src/app.py -> disposition SAFE\n")
+        "Traced getUser in src/app.py -> disposition SAFE\n"
+    )
     finding = {"description": "getUser in src/app.py", "type": "SQLi"}
     phase, ev = am.locate_loss_phase(str(rd), finding)
     assert phase == "phase2_inj"
@@ -144,8 +147,9 @@ def test_parse_diagnostic_output_invalid():
 
 def test_invoke_diagnostic_success(monkeypatch):
     monkeypatch.setenv("VULNHUNT_HOST_CMD", "host-oneshot")
-    monkeypatch.setattr(am.subprocess, "run",
-                        lambda *a, **k: _proc(0, stdout='{"root_cause":"rc"}'))
+    monkeypatch.setattr(
+        am.subprocess, "run", lambda *a, **k: _proc(0, stdout='{"root_cause":"rc"}')
+    )
     finding = {"finding_id": "F1", "type": "SQLi", "description": "d", "repo_name": "r"}
     out = am.invoke_diagnostic(finding, "phase1", "ev", "/rd", "/repo")
     assert out["root_cause"] == "rc"
@@ -153,8 +157,10 @@ def test_invoke_diagnostic_success(monkeypatch):
 
 def test_invoke_diagnostic_timeout(monkeypatch):
     monkeypatch.setenv("VULNHUNT_HOST_CMD", "host-oneshot")
+
     def boom(*a, **k):
         raise subprocess.TimeoutExpired(cmd="claude", timeout=1)
+
     monkeypatch.setattr(am.subprocess, "run", boom)
     finding = {"finding_id": "F1", "type": "SQLi", "description": "d", "repo_name": "r"}
     out = am.invoke_diagnostic(finding, "phase1", "ev", "/rd", "/repo")
@@ -163,8 +169,7 @@ def test_invoke_diagnostic_timeout(monkeypatch):
 
 def test_invoke_diagnostic_nonzero(monkeypatch):
     monkeypatch.setenv("VULNHUNT_HOST_CMD", "host-oneshot")
-    monkeypatch.setattr(am.subprocess, "run",
-                        lambda *a, **k: _proc(3, stderr="boom"))
+    monkeypatch.setattr(am.subprocess, "run", lambda *a, **k: _proc(3, stderr="boom"))
     finding = {"finding_id": "F1", "type": "SQLi", "description": "d", "repo_name": "r"}
     out = am.invoke_diagnostic(finding, "phase1", "ev", "/rd", "/repo")
     assert "diagnostic failed" in out["root_cause"]
@@ -176,14 +181,24 @@ def test_write_analysis_json_and_report(monkeypatch, tmp_path):
     md_out = tmp_path / "miss.md"
     monkeypatch.setattr(am, "ANALYSIS_JSON", str(json_out))
     monkeypatch.setattr(am, "ANALYSIS_REPORT", str(md_out))
-    analyses = [{
-        "finding_id": "F1", "type": "SQLi", "repo_name": "repo",
-        "loss_phase": "phase1", "evidence": "ev",
-        "diagnostic": {"root_cause": "rc", "prompt_file": "p",
-                       "section_to_change": "s", "suggested_change": "c",
-                       "change_type": "add", "false_positive_risk": "low",
-                       "risk_explanation": "none"},
-    }]
+    analyses = [
+        {
+            "finding_id": "F1",
+            "type": "SQLi",
+            "repo_name": "repo",
+            "loss_phase": "phase1",
+            "evidence": "ev",
+            "diagnostic": {
+                "root_cause": "rc",
+                "prompt_file": "p",
+                "section_to_change": "s",
+                "suggested_change": "c",
+                "change_type": "add",
+                "false_positive_risk": "low",
+                "risk_explanation": "none",
+            },
+        }
+    ]
     am.write_analysis_json(analyses)
     am.write_analysis_report(analyses)
     assert json.loads(json_out.read_text())[0]["finding_id"] == "F1"
@@ -192,16 +207,14 @@ def test_write_analysis_json_and_report(monkeypatch, tmp_path):
 
 def test_get_finding_description(monkeypatch, tmp_path):
     monkeypatch.setattr(am, "BENCHMARK_DIR", str(tmp_path))
-    (tmp_path / "r.json").write_text(json.dumps(
-        [{"finding_id": "F1", "description": "the desc"}]))
+    (tmp_path / "r.json").write_text(json.dumps([{"finding_id": "F1", "description": "the desc"}]))
     assert am._get_finding_description("F1", {}) == "the desc"
     assert am._get_finding_description("MISSING", {}) == ""
 
 
 def _state_file(tmp_path, judgments, scan_targets=None):
     sf = tmp_path / "state.json"
-    sf.write_text(json.dumps({"judgments": judgments,
-                              "scan_targets": scan_targets or {}}))
+    sf.write_text(json.dumps({"judgments": judgments, "scan_targets": scan_targets or {}}))
     return str(sf)
 
 
@@ -230,8 +243,7 @@ def test_main_analyzes_miss(monkeypatch, tmp_path):
     rd.mkdir()
     sf = _state_file(
         tmp_path,
-        {"F1": {"detected": False, "type": "SQLi", "repo_name": "repo",
-                "scan_target": "t1"}},
+        {"F1": {"detected": False, "type": "SQLi", "repo_name": "repo", "scan_target": "t1"}},
         {"t1": {"results_dir": str(rd)}},
     )
     monkeypatch.setattr(am, "RESULTS_DIR", str(tmp_path))
@@ -239,8 +251,9 @@ def test_main_analyzes_miss(monkeypatch, tmp_path):
     monkeypatch.setattr(am, "ANALYSIS_REPORT", str(tmp_path / "a.md"))
     monkeypatch.setattr(am, "_get_finding_description", lambda fid, st: "desc")
     monkeypatch.setattr(am, "locate_loss_phase", lambda rd_, m: ("phase1", "ev"))
-    monkeypatch.setattr(am, "invoke_diagnostic",
-                        lambda *a, **k: {"root_cause": "rc", "false_positive_risk": "low"})
+    monkeypatch.setattr(
+        am, "invoke_diagnostic", lambda *a, **k: {"root_cause": "rc", "false_positive_risk": "low"}
+    )
     monkeypatch.setattr(am.sys, "argv", ["am", "--state-file", sf, "--verbose"])
     am.main()
     assert json.loads((tmp_path / "a.json").read_text())[0]["finding_id"] == "F1"
@@ -249,8 +262,7 @@ def test_main_analyzes_miss(monkeypatch, tmp_path):
 def test_main_miss_no_results_dir(monkeypatch, tmp_path):
     sf = _state_file(
         tmp_path,
-        {"F1": {"detected": False, "type": "SQLi", "repo_name": "repo",
-                "scan_target": "t1"}},
+        {"F1": {"detected": False, "type": "SQLi", "repo_name": "repo", "scan_target": "t1"}},
         {"t1": {"results_dir": None}},
     )
     monkeypatch.setattr(am, "ANALYSIS_JSON", str(tmp_path / "a.json"))
@@ -311,23 +323,17 @@ def test_diagnostic_prompt_paths_exist(tmp_path, monkeypatch):
     # that actually exist, or the agent cannot identify the instruction gap.
     monkeypatch.setattr(am, "BENCHMARK_DIR", str(tmp_path))
     (tmp_path / "myrepo.json").write_text("[]")
-    finding = {"finding_id": "F1", "type": "SQLi", "description": "d",
-               "repo_name": "myrepo"}
-    prompt = am.build_diagnostic_prompt(
-        finding, "phase1", "evidence", "/rd", "/repo")
+    finding = {"finding_id": "F1", "type": "SQLi", "description": "d", "repo_name": "myrepo"}
+    prompt = am.build_diagnostic_prompt(finding, "phase1", "evidence", "/rd", "/repo")
     for line in prompt.splitlines():
         if "Relevant prompt file(s):" in line:
             for candidate in line.split(":", 1)[1].split(","):
                 candidate = candidate.strip()
                 if candidate and candidate != "unknown":
-                    assert os.path.isfile(candidate), (
-                        f"prompt references missing file: {candidate}"
-                    )
+                    assert os.path.isfile(candidate), f"prompt references missing file: {candidate}"
         elif "All prompt files:" in line:
             directory = line.split(":", 1)[1].strip()
-            assert os.path.isdir(directory), (
-                f"prompt references missing directory: {directory}"
-            )
+            assert os.path.isdir(directory), f"prompt references missing directory: {directory}"
 
 
 def test_diagnostic_system_prompt_names_real_directory():

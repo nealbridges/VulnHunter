@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import pytest
-
 from agent._github import (
     GitHubURLError,
     api_base,
     extract_timestamp,
     parse_owner_repo,
 )
-
 
 # ---------------------------------------------------------------------------
 # api_base
@@ -30,10 +28,7 @@ class TestApiBase:
 
     def test_ghes_host_returns_api_v3_path(self) -> None:
         # GitHub Enterprise Server uses the /api/v3 URL prefix.
-        assert (
-            api_base("github.example.com")
-            == "https://github.example.com/api/v3"
-        )
+        assert api_base("github.example.com") == "https://github.example.com/api/v3"
 
     def test_arbitrary_ghes_host(self) -> None:
         assert api_base("ghe.example.org") == "https://ghe.example.org/api/v3"
@@ -60,14 +55,16 @@ class TestParseOwnerRepo:
     def test_tree_path_still_takes_first_two_segments(self) -> None:
         # Tree URLs like /owner/repo/tree/main should still resolve to the
         # repo identity — explicit per the docstring.
-        assert parse_owner_repo(
-            "https://github.com/octocat/Hello-World/tree/main"
-        ) == ("octocat", "Hello-World")
+        assert parse_owner_repo("https://github.com/octocat/Hello-World/tree/main") == (
+            "octocat",
+            "Hello-World",
+        )
 
     def test_blob_path_still_takes_first_two_segments(self) -> None:
-        assert parse_owner_repo(
-            "https://github.com/octocat/Hello-World/blob/main/README.md"
-        ) == ("octocat", "Hello-World")
+        assert parse_owner_repo("https://github.com/octocat/Hello-World/blob/main/README.md") == (
+            "octocat",
+            "Hello-World",
+        )
 
     def test_ssh_url_with_colon_separator(self) -> None:
         assert parse_owner_repo("git@github.com:octocat/Hello-World.git") == (
@@ -85,9 +82,10 @@ class TestParseOwnerRepo:
         )
 
     def test_ghes_host(self) -> None:
-        assert parse_owner_repo(
-            "https://github.example.com/your-org/vulnhunter"
-        ) == ("your-org", "vulnhunter")
+        assert parse_owner_repo("https://github.example.com/your-org/vulnhunter") == (
+            "your-org",
+            "vulnhunter",
+        )
 
     def test_url_with_only_one_segment_raises(self) -> None:
         with pytest.raises(GitHubURLError, match="can't parse"):

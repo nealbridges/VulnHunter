@@ -10,16 +10,15 @@ Each validator loads its schema, reads the target file, and exits with:
 Covers: scripts/validate-result.py, validate-finding.py, validate-triage.py,
 validate-fix-plan.py — the four REQ-SCH-006 entry points.
 """
+
 from __future__ import annotations
 
 import importlib.util
 import json
-import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO_ROOT / "scripts"
@@ -27,9 +26,7 @@ SCRIPTS = REPO_ROOT / "scripts"
 
 def _load_module(script_name: str, module_name: str):
     """Load a hyphenated CLI script as a module for direct invocation."""
-    spec = importlib.util.spec_from_file_location(
-        module_name, SCRIPTS / script_name
-    )
+    spec = importlib.util.spec_from_file_location(module_name, SCRIPTS / script_name)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -65,6 +62,7 @@ def _write(tmp_path: Path, name: str, payload) -> str:
 
 
 # ---- validate-result.py ----
+
 
 def _valid_result():
     return {
@@ -181,7 +179,7 @@ def test_result_full_with_pre_fix_pass_rejected(mod_result, tmp_path):
     payload = _valid_result()
     payload["discrimination_evidence"] = {
         "method": "stash-and-run",
-        "pre_fix_result": "pass",   # non-discriminating
+        "pre_fix_result": "pass",  # non-discriminating
         "post_fix_result": "pass",
         "assertion_target": "tests/verify_VULN_42.py::test_it",
     }
@@ -219,7 +217,7 @@ def test_result_sweep_revised_forbids_full(mod_result, tmp_path):
     result — a sibling could ship as FULL. A result carrying sweep_revised=true
     must NOT be completeness_tier FULL."""
     payload = _valid_result()
-    payload["sweep_revised"] = True   # sweep found an unmitigated sibling
+    payload["sweep_revised"] = True  # sweep found an unmitigated sibling
     # still FULL + empty residuals → must be rejected
     assert mod_result.validate_file(_write(tmp_path, "sr.json", payload)) == 1
 
@@ -233,7 +231,6 @@ def test_result_sweep_revised_ok_for_mitigation(mod_result, tmp_path):
     payload["residual_vectors"] = ["sweep: sibling defect at other.py:caller_bad remains"]
     payload["discrimination_evidence"] = None
     assert mod_result.validate_file(_write(tmp_path, "sr2.json", payload)) == 0
-
 
 
 def test_result_missing_file(mod_result, capsys):
@@ -260,6 +257,7 @@ def test_result_main_pass(mod_result, tmp_path):
 
 
 # ---- validate-finding.py ----
+
 
 def _valid_finding():
     return {
@@ -321,6 +319,7 @@ def test_finding_main_pass(mod_finding, tmp_path):
 
 # ---- validate-triage.py ----
 
+
 def _valid_triage():
     return {
         "vuln_id": "VULN-7",
@@ -328,7 +327,7 @@ def _valid_triage():
         "sink_symbol": "src/auth.py:login",
         "callers_of_sink": ["src/handlers.py:on_login"],
         "graph_backend": "ast",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -379,6 +378,7 @@ def test_triage_main_pass(mod_triage, tmp_path):
 
 
 # ---- validate-fix-plan.py ----
+
 
 def _valid_fix_plan():
     return {

@@ -36,9 +36,7 @@ logger = logging.getLogger(__name__)
 
 # Verdicts that trigger a reopen. Order matches design §12; FIXED
 # and INVALID_INPUT are intentionally absent.
-_REOPEN_VERDICTS: frozenset[str] = frozenset(
-    {"NOT_FIXED", "PARTIAL", "INCONCLUSIVE"}
-)
+_REOPEN_VERDICTS: frozenset[str] = frozenset({"NOT_FIXED", "PARTIAL", "INCONCLUSIVE"})
 
 
 _ARCHIVAL_HEADER = (
@@ -52,9 +50,7 @@ _ARCHIVAL_HEADER = (
 )
 
 
-def _render_verdict_comment(
-    *, finding_id: str, verdict: str, issue_comment_md: str
-) -> str:
+def _render_verdict_comment(*, finding_id: str, verdict: str, issue_comment_md: str) -> str:
     """Wrap the verifier's narrative with a server-owned attribution banner
     (VULN-008, CWE-290).
 
@@ -137,9 +133,7 @@ async def post_disposition(
     ``reopen_failed`` stays False.
     """
     if not issue_comment_md.strip():
-        raise ValueError(
-            f"issue_comment for {finding_id} is empty — refusing to post"
-        )
+        raise ValueError(f"issue_comment for {finding_id} is empty — refusing to post")
 
     # The verdict comment is the audit trail. If it doesn't land,
     # subsequent steps would have no useful state to attach to —

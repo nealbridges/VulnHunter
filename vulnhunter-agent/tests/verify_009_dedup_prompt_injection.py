@@ -13,10 +13,20 @@ from agent.issues_fetch import OpenIssue
 
 def _finding():
     return Finding(
-        id="VULN-001", title="t", cwe="CWE-918", cwe_name="SSRF", severity="High",
-        location="agent/x.py:1", root_cause="rc", data_flow="df", entry_point="ep",
-        exploit_description="ed", exploit_impact="ei", fix_strategy="fs",
-        severity_rationale="sr", vulnfix_key="deadbeefdeadbeef",
+        id="VULN-001",
+        title="t",
+        cwe="CWE-918",
+        cwe_name="SSRF",
+        severity="High",
+        location="agent/x.py:1",
+        root_cause="rc",
+        data_flow="df",
+        entry_point="ep",
+        exploit_description="ed",
+        exploit_impact="ei",
+        fix_strategy="fs",
+        severity_rationale="sr",
+        vulnfix_key="deadbeefdeadbeef",
     )
 
 

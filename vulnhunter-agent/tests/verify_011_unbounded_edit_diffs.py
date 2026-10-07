@@ -37,9 +37,7 @@ def test_oversized_diff_is_truncated(monkeypatch):
 
 def test_cumulative_budget_caps_total(monkeypatch):
     one = "B" * (ghv._MAX_EDIT_DIFF_BYTES)
-    nodes = [
-        {"editedAt": "t", "editor": {"login": "a"}, "diff": one} for _ in range(100)
-    ]
+    nodes = [{"editedAt": "t", "editor": {"login": "a"}, "diff": one} for _ in range(100)]
     _install(monkeypatch, nodes)
     edits = asyncio.run(
         ghv.list_user_content_edits(object(), "github.com", ghv.IssueRef("o", "r", 42))

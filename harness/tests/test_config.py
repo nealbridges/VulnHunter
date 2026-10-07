@@ -2,14 +2,13 @@
 
 import os
 
-import pytest
-
 import local_harness.config as config
+import pytest
 
 
 def test_paths_are_absolute_and_nested():
     assert os.path.isabs(config.HARNESS_DIR)
-    assert config.REPO_ROOT == os.path.dirname(config.HARNESS_DIR)
+    assert os.path.dirname(config.HARNESS_DIR) == config.REPO_ROOT
     assert config.BENCHMARK_DIR.endswith(os.path.join("benchmark", "ground_truth"))
     assert config.STATE_FILE.endswith("state.json")
     assert config.TALLY_FILE.endswith("tally.json")
@@ -33,6 +32,7 @@ def test_batch_and_history_paths():
 
 def test_atomic_write_json_roundtrip(tmp_path):
     import json
+
     target = tmp_path / "sub" / "out.json"  # nested dir is created
     config.atomic_write_json(str(target), {"a": 1}, sort_keys=True)
     assert json.loads(target.read_text()) == {"a": 1}

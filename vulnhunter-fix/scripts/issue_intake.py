@@ -25,21 +25,14 @@ import hashlib
 import re
 from dataclasses import dataclass
 
-
 # ---- markers ---------------------------------------------------------------
 
 
 # Anchored to the HTML-comment open/close so stray prose in the body
 # can't false-match. Case-insensitive to match what verify accepts.
-_RE_VULNFIX_KEY = re.compile(
-    r"<!--\s*vulnfix-key:\s*([0-9a-f]{16})\s*-->", re.IGNORECASE
-)
-_RE_FINDING_ID = re.compile(
-    r"<!--\s*vulnhunt-finding-id:\s*(VULN-\d{3})\s*-->", re.IGNORECASE
-)
-_RE_RESULTS_DIR = re.compile(
-    r"<!--\s*vulnhunt-results-dir:\s*([^\s<>]+)\s*-->", re.IGNORECASE
-)
+_RE_VULNFIX_KEY = re.compile(r"<!--\s*vulnfix-key:\s*([0-9a-f]{16})\s*-->", re.IGNORECASE)
+_RE_FINDING_ID = re.compile(r"<!--\s*vulnhunt-finding-id:\s*(VULN-\d{3})\s*-->", re.IGNORECASE)
+_RE_RESULTS_DIR = re.compile(r"<!--\s*vulnhunt-results-dir:\s*([^\s<>]+)\s*-->", re.IGNORECASE)
 
 
 class MarkerExtractionError(ValueError):
@@ -48,9 +41,9 @@ class MarkerExtractionError(ValueError):
 
 @dataclass(frozen=True)
 class ExtractedMarkers:
-    vulnfix_key: str    # 16 lowercase hex chars — SHA-256 prefix
-    finding_id: str     # VULN-NNN
-    results_dir: str    # results-dir basename
+    vulnfix_key: str  # 16 lowercase hex chars — SHA-256 prefix
+    finding_id: str  # VULN-NNN
+    results_dir: str  # results-dir basename
 
 
 def extract_markers(body: str, *, source_label: str = "issue body") -> ExtractedMarkers:
@@ -117,8 +110,7 @@ def reconstruct_original(current_body: str, edits: list[dict]) -> str:
         )
     if not isinstance(snapshot, str):
         raise DiffApplyError(
-            f"Oldest edit's diff field is {type(snapshot).__name__}, "
-            "expected string."
+            f"Oldest edit's diff field is {type(snapshot).__name__}, expected string."
         )
     return snapshot
 
@@ -149,19 +141,13 @@ def enforce_homogeneity(records: list[IssueRecord]) -> tuple[str, str, str]:
     """
     if not records:
         raise ValueError("No issues to enforce homogeneity over")
-    keys = {
-        (r.owner.lower(), r.repo.lower(), r.markers.results_dir)
-        for r in records
-    }
+    keys = {(r.owner.lower(), r.repo.lower(), r.markers.results_dir) for r in records}
     if len(keys) == 1:
         owner, repo, results_dir = next(iter(keys))
         return owner, repo, results_dir
-    rendered = "\n".join(
-        f"  - {o}/{r} @ {rd}" for o, r, rd in sorted(keys)
-    )
+    rendered = "\n".join(f"  - {o}/{r} @ {rd}" for o, r, rd in sorted(keys))
     raise ValueError(
-        "In-place run requires all issues to share the same "
-        "(repo, scan_id). Got:\n" + rendered
+        "In-place run requires all issues to share the same (repo, scan_id). Got:\n" + rendered
     )
 
 

@@ -49,6 +49,7 @@ _REPORT_ACCESS_FALLBACK = (
 def _report_access_message() -> str:
     return _REPORT_ACCESS_FALLBACK
 
+
 # GitHub's heading-anchor algorithm (jch/html-pipeline TableOfContentsFilter):
 #   1. Lowercase
 #   2. Strip every char that is not [\w\s-]
@@ -143,13 +144,9 @@ def render_body(
         "EXPLOIT_DESCRIPTION": _sanitize_for_issue_body(
             f.exploit_description or "(not specified in report)"
         ),
-        "EXPLOIT_IMPACT": _sanitize_for_issue_body(
-            f.exploit_impact or "(not specified in report)"
-        ),
+        "EXPLOIT_IMPACT": _sanitize_for_issue_body(f.exploit_impact or "(not specified in report)"),
         "FIX_STRATEGY": _sanitize_for_issue_body(f.fix_strategy or "(see full report)"),
-        "SEVERITY_RATIONALE": _sanitize_for_issue_body(
-            f.severity_rationale or "(see full report)"
-        ),
+        "SEVERITY_RATIONALE": _sanitize_for_issue_body(f.severity_rationale or "(see full report)"),
         # Agent-derived / machine-parseable fields — NOT sanitized so the
         # footer markers stay exact.
         "SCAN_DATE": report.scan_date,
@@ -164,9 +161,7 @@ def render_body(
         body = body.replace("{" + key + "}", value)
     leftovers = _find_placeholders(body)
     if leftovers:
-        logger.warning(
-            "Template placeholders unfilled in rendered body: %s", sorted(leftovers)
-        )
+        logger.warning("Template placeholders unfilled in rendered body: %s", sorted(leftovers))
     return body
 
 
@@ -256,7 +251,5 @@ def _render_clean_scan(ctx: CleanScanContext, template_path: Path) -> str:
         body = body.replace("{" + key + "}", value)
     leftovers = _find_placeholders(body)
     if leftovers:
-        logger.warning(
-            "Clean-scan template placeholders unfilled: %s", sorted(leftovers)
-        )
+        logger.warning("Clean-scan template placeholders unfilled: %s", sorted(leftovers))
     return body

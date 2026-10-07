@@ -88,11 +88,20 @@ def _manifest_body(results: Path, exit_code: int | None) -> dict:
 
 def _validate(body: dict) -> list[str]:
     errors = []
-    for key in ("schema_version", "scan_id", "agent_exit_code", "cost_usd", "findings", "posted", "skipped", "failed"):
+    for key in (
+        "schema_version",
+        "scan_id",
+        "agent_exit_code",
+        "cost_usd",
+        "findings",
+        "posted",
+        "skipped",
+        "failed",
+    ):
         if key not in body:
             errors.append(f"missing {key}")
     if body.get("schema_version") != "1":
-        errors.append("schema_version must be \"1\"")
+        errors.append('schema_version must be "1"')
     scan_id = body.get("scan_id")
     if not isinstance(scan_id, str) or not _SCAN_ID.match(scan_id):
         errors.append("scan_id must match .+_VULNHUNT_RESULTS_.+")
@@ -155,6 +164,7 @@ def cmd_host(args: argparse.Namespace) -> int:
         print(f"prompt file not found: {prompt}", file=sys.stderr)
         return 2
     import shlex
+
     argv = shlex.split(raw) + [str(prompt.resolve())]
     return subprocess.run(argv).returncode
 

@@ -7,17 +7,13 @@ the work regardless of attacker comment/event volume.
 
 import asyncio
 
-import pytest
-
 from agent import _github_verify as ghv
 
 
 class _FakeResp:
     def __init__(self, page, more=True):
         self._page = page
-        self.headers = (
-            {"link": '<https://api.github.com/next>; rel="next"'} if more else {}
-        )
+        self.headers = {"link": '<https://api.github.com/next>; rel="next"'} if more else {}
 
     def json(self):
         return self._page
@@ -28,10 +24,14 @@ def _install_infinite_comments(monkeypatch, body="x" * 1000):
 
     async def _fake(client, method, url, **kwargs):
         calls["n"] += 1
-        page = [{
-            "id": calls["n"], "user": {"login": "a"},
-            "created_at": "", "body": body,
-        }]
+        page = [
+            {
+                "id": calls["n"],
+                "user": {"login": "a"},
+                "created_at": "",
+                "body": body,
+            }
+        ]
         # Safety stop so an unfixed (uncapped) loop still terminates the test.
         return _FakeResp(page, more=calls["n"] < 300)
 
@@ -41,9 +41,7 @@ def _install_infinite_comments(monkeypatch, body="x" * 1000):
 
 def test_list_comments_stops_at_page_cap(monkeypatch):
     calls = _install_infinite_comments(monkeypatch, body="short")
-    comments = asyncio.run(
-        ghv.list_comments(object(), "github.com", ghv.IssueRef("o", "r", 42))
-    )
+    comments = asyncio.run(ghv.list_comments(object(), "github.com", ghv.IssueRef("o", "r", 42)))
     assert calls["n"] <= ghv._MAX_COMMENT_PAGES
     assert len(comments) <= ghv._MAX_COMMENT_PAGES
 
@@ -62,8 +60,10 @@ def test_list_events_stops_at_page_cap(monkeypatch):
 
     async def _fake(client, method, url, **kwargs):
         calls["n"] += 1
-        return _FakeResp([{"event": "commented", "actor": {"login": "a"},
-                           "created_at": "", "commit_id": ""}], more=calls["n"] < 300)
+        return _FakeResp(
+            [{"event": "commented", "actor": {"login": "a"}, "created_at": "", "commit_id": ""}],
+            more=calls["n"] < 300,
+        )
 
     monkeypatch.setattr(ghv, "_request_with_retry", _fake)
     asyncio.run(ghv.list_events(object(), "github.com", ghv.IssueRef("o", "r", 42)))

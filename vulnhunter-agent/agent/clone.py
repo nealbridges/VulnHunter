@@ -36,9 +36,7 @@ def _reject_option_like(value: str, what: str) -> None:
     as an option rather than a positional argument.
     """
     if value.startswith("-"):
-        raise RuntimeError(
-            f"refusing {what} that looks like a git option: {value!r}"
-        )
+        raise RuntimeError(f"refusing {what} that looks like a git option: {value!r}")
 
 
 def _derive_repo_name(repo_url: str) -> str:
@@ -116,7 +114,16 @@ def shallow_clone(
         # validation + token injection; target is a Path the agent
         # owns. Absolute git path resolved at module load (kills B607).
         result = subprocess.run(  # nosec B603
-            [_GIT_EXECUTABLE, "clone", "--progress", "--depth", "1", "--", effective_url, str(target)],
+            [
+                _GIT_EXECUTABLE,
+                "clone",
+                "--progress",
+                "--depth",
+                "1",
+                "--",
+                effective_url,
+                str(target),
+            ],
             text=True,
             timeout=timeout_seconds,
             env=env,
@@ -203,9 +210,7 @@ def clone_at_commit(
     # or metacharacter-bearing value before it reaches the fetch / checkout
     # argv.
     if not _COMMIT_SHA_RE.match(commit):
-        raise ValueError(
-            f"commit must be a 7-40 char hex SHA, got {commit!r}"
-        )
+        raise ValueError(f"commit must be a 7-40 char hex SHA, got {commit!r}")
 
     # Step 1: ordinary shallow clone of the default branch.
     target = shallow_clone(

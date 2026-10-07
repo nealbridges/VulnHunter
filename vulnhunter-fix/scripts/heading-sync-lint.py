@@ -32,7 +32,6 @@ import re
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 GATE2 = REPO_ROOT / "scripts" / "check-body-completeness.py"
 TEMPLATES = REPO_ROOT / "templates"
@@ -54,9 +53,13 @@ def _extract_str_constant(path: Path, name: str) -> str | None:
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
             for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == name:
-                    if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
-                        return node.value.value
+                if (
+                    isinstance(target, ast.Name)
+                    and target.id == name
+                    and isinstance(node.value, ast.Constant)
+                    and isinstance(node.value.value, str)
+                ):
+                    return node.value.value
     return None
 
 
@@ -65,13 +68,16 @@ def _extract_tuple_constant(path: Path, name: str) -> tuple[str, ...] | None:
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
             for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == name:
-                    if isinstance(node.value, (ast.Tuple, ast.List)):
-                        vals = []
-                        for elt in node.value.elts:
-                            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
-                                vals.append(elt.value)
-                        return tuple(vals)
+                if (
+                    isinstance(target, ast.Name)
+                    and target.id == name
+                    and isinstance(node.value, (ast.Tuple, ast.List))
+                ):
+                    vals = []
+                    for elt in node.value.elts:
+                        if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                            vals.append(elt.value)
+                    return tuple(vals)
     return None
 
 
@@ -105,7 +111,9 @@ def main() -> int:
         text = path.read_text(encoding="utf-8")
         for heading in required_always:
             if not _heading_present(text, heading):
-                errors.append(f"{name}: missing required H2 heading {heading!r} (Gate 2 REQUIRED_ALWAYS)")
+                errors.append(
+                    f"{name}: missing required H2 heading {heading!r} (Gate 2 REQUIRED_ALWAYS)"
+                )
         if name in PR_TEMPLATES:
             for heading in conditionals:
                 if not _heading_present(text, heading):

@@ -1,15 +1,12 @@
 """Tests for local_harness.scan."""
 
 import json
-import os
-import types
-
-import pytest
+from pathlib import Path
 
 import local_harness.scan as scan
 
-
 # --- results dir helpers ---
+
 
 def test_find_results_dir_missing(tmp_path):
     assert scan.find_results_dir(str(tmp_path / "nope")) is None
@@ -50,6 +47,7 @@ def test_has_valid_results_no_results_dir(tmp_path):
 
 
 # --- clean helpers ---
+
 
 def test_clean_incomplete_results_removes_invalid(tmp_path):
     clone = tmp_path / "clone"
@@ -103,6 +101,7 @@ def test_clean_prior_results_missing_dir(tmp_path):
 
 # --- log inspection ---
 
+
 def test_is_rate_limit_failure_no_file():
     assert scan.is_rate_limit_failure(None) is False
     assert scan.is_rate_limit_failure("/does/not/exist") is False
@@ -118,9 +117,11 @@ def test_is_rate_limit_failure_false(tmp_path):
     log = tmp_path / "scan.log"
     log.write_text(
         "\n"
-        + json.dumps({"type": "system"}) + "\n"
+        + json.dumps({"type": "system"})
+        + "\n"
         + "not json\n"
-        + json.dumps({"type": "result", "api_error_status": None}) + "\n"
+        + json.dumps({"type": "result", "api_error_status": None})
+        + "\n"
     )
     assert scan.is_rate_limit_failure(str(log)) is False
 
@@ -138,8 +139,12 @@ def test_extract_cost_from_log(tmp_path):
         "duration_api_ms": 4200,
         "num_turns": 7,
         "modelUsage": {
-            "m1": {"inputTokens": 10, "outputTokens": 20,
-                   "cacheReadInputTokens": 5, "cacheCreationInputTokens": 3},
+            "m1": {
+                "inputTokens": 10,
+                "outputTokens": 20,
+                "cacheReadInputTokens": 5,
+                "cacheCreationInputTokens": 3,
+            },
             "m2": {"inputTokens": 1, "outputTokens": 2},
         },
     }
@@ -164,6 +169,7 @@ def test_ts_format():
 
 
 # --- scan_folder ---
+
 
 def test_scan_folder_skill_not_installed(monkeypatch, tmp_path):
     monkeypatch.setattr(scan.os.path, "isdir", lambda p: False)
@@ -194,22 +200,33 @@ def test_scan_folder_success(monkeypatch, tmp_path):
     (tmp_path / "skills").mkdir()
 
     events = [json.dumps({"type": "system", "n": i}) for i in range(3)]
-    events.append(json.dumps({"type": "result", "total_cost_usd": 0.5,
-                              "modelUsage": {"m": {"inputTokens": 4, "outputTokens": 6}}}))
+    events.append(
+        json.dumps(
+            {
+                "type": "result",
+                "total_cost_usd": 0.5,
+                "modelUsage": {"m": {"inputTokens": 4, "outputTokens": 6}},
+            }
+        )
+    )
     lines = [e + "\n" for e in events] + ["\n", "not-json\n"]
 
     def fake_popen(*a, **k):
         return _FakePopen(lines, returncode=0)
+
     monkeypatch.setattr(scan.subprocess, "Popen", fake_popen)
 
     # avoid real timer thread firing
     class _NoTimer:
         def __init__(self, *a, **k):
             pass
+
         def start(self):
             pass
+
         def cancel(self):
             pass
+
     monkeypatch.setattr(scan.threading, "Timer", _NoTimer)
 
     rd = folder / "x_VULNHUNT_RESULTS_1"
@@ -232,17 +249,24 @@ def test_scan_folder_readonly_appends_prompt(monkeypatch, tmp_path):
     captured = {}
 
     def fake_popen(cmd, *a, **k):
-        captured["prompt"] = cmd[2]
+        # The contract (scan.py): the prompt file path is APPENDED as the last
+        # argument of the host command, so read it back from disk to inspect
+        # the prompt text that was handed to the host.
+        captured["prompt"] = Path(cmd[-1]).read_text(encoding="utf-8")
         return _FakePopen([json.dumps({"type": "result"}) + "\n"], returncode=0)
+
     monkeypatch.setattr(scan.subprocess, "Popen", fake_popen)
 
     class _NoTimer:
         def __init__(self, *a, **k):
             pass
+
         def start(self):
             pass
+
         def cancel(self):
             pass
+
     monkeypatch.setattr(scan.threading, "Timer", _NoTimer)
 
     scan.scan_folder(str(folder), readonly=True)
@@ -264,16 +288,20 @@ def test_scan_folder_timeout(monkeypatch, tmp_path):
         p = _FakePopen([json.dumps({"type": "system"}) + "\n"], returncode=-9)
         proc_holder["p"] = p
         return p
+
     monkeypatch.setattr(scan.subprocess, "Popen", fake_popen)
 
     # Timer that fires immediately on start to simulate a timeout kill.
     class _FireTimer:
         def __init__(self, interval, fn):
             self.fn = fn
+
         def start(self):
             self.fn()
+
         def cancel(self):
             pass
+
     monkeypatch.setattr(scan.threading, "Timer", _FireTimer)
 
     result = scan.scan_folder(str(folder))
@@ -293,20 +321,32 @@ def test_scan_folder_timeout_with_valid_results_not_discarded(monkeypatch, tmp_p
     rd.mkdir()
     (rd / "README.md").write_text("x" * 200)
 
-    events = [json.dumps({"type": "result", "total_cost_usd": 0.9,
-                          "modelUsage": {"m": {"inputTokens": 1, "outputTokens": 1}}}) + "\n"]
+    events = [
+        json.dumps(
+            {
+                "type": "result",
+                "total_cost_usd": 0.9,
+                "modelUsage": {"m": {"inputTokens": 1, "outputTokens": 1}},
+            }
+        )
+        + "\n"
+    ]
 
     def fake_popen(*a, **k):
         return _FakePopen(events, returncode=0)
+
     monkeypatch.setattr(scan.subprocess, "Popen", fake_popen)
 
     class _FireTimer:
         def __init__(self, interval, fn):
             self.fn = fn
+
         def start(self):
             self.fn()  # fire immediately -> sets timed_out True
+
         def cancel(self):
             pass
+
     monkeypatch.setattr(scan.threading, "Timer", _FireTimer)
 
     result = scan.scan_folder(str(folder))
@@ -316,10 +356,16 @@ def test_scan_folder_timeout_with_valid_results_not_discarded(monkeypatch, tmp_p
 
 # --- retry wrapper ---
 
+
 def test_scan_folder_with_retry_success_first_try(monkeypatch, tmp_path):
     folder = str(tmp_path / "repo")
-    monkeypatch.setattr(scan, "scan_folder",
-                        lambda fp, log_file=None, readonly=False: scan.ScanResult(fp, "repo", 0, 3, 1.0, "rd", {"total_cost_usd": 1}))
+    monkeypatch.setattr(
+        scan,
+        "scan_folder",
+        lambda fp, log_file=None, readonly=False: scan.ScanResult(
+            fp, "repo", 0, 3, 1.0, "rd", {"total_cost_usd": 1}
+        ),
+    )
     monkeypatch.setattr(scan, "is_rate_limit_failure", lambda p: False)
     result = scan.scan_folder_with_retry(folder)
     assert result.returncode == 0
@@ -347,8 +393,11 @@ def test_scan_folder_with_retry_429_then_success(monkeypatch, tmp_path):
 
 def test_scan_folder_with_retry_429_exhausted(monkeypatch, tmp_path):
     folder = str(tmp_path / "repo")
-    monkeypatch.setattr(scan, "scan_folder",
-                        lambda fp, log_file=None, readonly=False: scan.ScanResult(fp, "repo", 1, 0, 0.5, None, {}))
+    monkeypatch.setattr(
+        scan,
+        "scan_folder",
+        lambda fp, log_file=None, readonly=False: scan.ScanResult(fp, "repo", 1, 0, 0.5, None, {}),
+    )
     monkeypatch.setattr(scan, "is_rate_limit_failure", lambda p: True)
     monkeypatch.setattr(scan, "clean_prior_results", lambda *a, **k: ["r"])
     monkeypatch.setattr(scan.time, "sleep", lambda s: None)
@@ -359,10 +408,14 @@ def test_scan_folder_with_retry_429_exhausted(monkeypatch, tmp_path):
 
 # --- scan_targets ---
 
+
 def test_scan_targets_collects_results(monkeypatch):
     targets = [{"clone_dir": "/c/a", "key": "a"}, {"clone_dir": "/c/b", "key": "b"}]
-    monkeypatch.setattr(scan, "scan_folder_with_retry",
-                        lambda cd, log_filename=None: (cd, "lbl", 0, 1, 1.0, "rd", {}))
+    monkeypatch.setattr(
+        scan,
+        "scan_folder_with_retry",
+        lambda cd, log_filename=None: (cd, "lbl", 0, 1, 1.0, "rd", {}),
+    )
     results = scan.scan_targets(targets, max_workers=2, status_interval=10_000)
     keys = {k for k, _ in results}
     assert keys == {"a", "b"}
@@ -373,6 +426,7 @@ def test_scan_targets_exception_path(monkeypatch):
 
     def boom(cd, log_filename=None):
         raise RuntimeError("kaboom")
+
     monkeypatch.setattr(scan, "scan_folder_with_retry", boom)
     # status_interval=0 forces the periodic status print branch.
     results = scan.scan_targets(targets, max_workers=1, status_interval=0)
@@ -381,7 +435,10 @@ def test_scan_targets_exception_path(monkeypatch):
 
 
 def test_scan_targets_default_workers(monkeypatch):
-    monkeypatch.setattr(scan, "scan_folder_with_retry",
-                        lambda cd, log_filename=None: (cd, "lbl", 0, 1, 1.0, "rd", {}))
+    monkeypatch.setattr(
+        scan,
+        "scan_folder_with_retry",
+        lambda cd, log_filename=None: (cd, "lbl", 0, 1, 1.0, "rd", {}),
+    )
     results = scan.scan_targets([{"clone_dir": "/c/a", "key": "a"}], status_interval=10_000)
     assert len(results) == 1

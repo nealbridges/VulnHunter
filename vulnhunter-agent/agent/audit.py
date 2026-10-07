@@ -34,9 +34,9 @@ import sys
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, IO
+from typing import IO, Any
 
 from ._url import redact as _redact
 
@@ -122,7 +122,7 @@ def event_time_now() -> str:
     collapse them all to the same ``event_time`` and force downstream
     consumers to rely solely on the ULID for order.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return now.strftime("%Y-%m-%dT%H:%M:%S.") + f"{now.microsecond // 1000:03d}Z"
 
 
@@ -173,7 +173,7 @@ class AuditPaths:
     findings: Path
 
     @classmethod
-    def from_config(cls, events_path: str, findings_path: str) -> "AuditPaths":
+    def from_config(cls, events_path: str, findings_path: str) -> AuditPaths:
         return cls(
             events=Path(events_path).expanduser().resolve(),
             findings=Path(findings_path).expanduser().resolve(),
@@ -286,9 +286,7 @@ class AuditWriter:
             os.fsync(fh.fileno())
         except OSError as exc:
             if self._strict:
-                raise AuditWriteError(
-                    f"audit {stream}: fsync failed: {exc}"
-                ) from exc
+                raise AuditWriteError(f"audit {stream}: fsync failed: {exc}") from exc
             fsync_flag = f"_{stream}_fsync_warned"
             if not getattr(self, fsync_flag, False):
                 logger.warning(
@@ -350,7 +348,10 @@ def _open_append(path: Path) -> IO[str]:
 def _serialize(record: dict[str, Any]) -> str:
     """Redact strings, drop None/empty values, emit compact JSON line."""
     cleaned = _clean(record)
-    return json.dumps(cleaned, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False) + "\n"
+    return (
+        json.dumps(cleaned, sort_keys=True, separators=(",", ":"), default=str, ensure_ascii=False)
+        + "\n"
+    )
 
 
 def _clean(value: Any) -> Any:
@@ -810,9 +811,7 @@ def writer_from_config(audit_config: Any) -> AuditWriter | None:
     """
     if not getattr(audit_config, "enabled", False):
         return None
-    paths = AuditPaths.from_config(
-        audit_config.events_path, audit_config.findings_path
-    )
+    paths = AuditPaths.from_config(audit_config.events_path, audit_config.findings_path)
     return AuditWriter(
         paths=paths,
         stdout=bool(getattr(audit_config, "stdout", False)),

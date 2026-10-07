@@ -10,9 +10,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Iterable, Iterator
-
 
 log = logging.getLogger(__name__)
 
@@ -113,7 +112,9 @@ def safe_walk_files(
     ``excluded_dir_parts`` defaults to :data:`_EXCLUDED_DIR_PARTS`. Pass
     an empty iterable to disable directory exclusion.
     """
-    excluded = frozenset(excluded_dir_parts) if excluded_dir_parts is not None else _EXCLUDED_DIR_PARTS
+    excluded = (
+        frozenset(excluded_dir_parts) if excluded_dir_parts is not None else _EXCLUDED_DIR_PARTS
+    )
     try:
         candidates = root.rglob("*")
     except OSError as exc:

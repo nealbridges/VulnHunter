@@ -43,7 +43,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 HAND_WAVE_PATTERNS = (
     "future work",
     "more work needed",
@@ -100,20 +99,28 @@ def _check_workaround_signals(diff: str, plan: dict) -> list[str]:
     added = "\n".join(_diff_added_lines(diff)).lower()
     files = _files_changed(diff)
 
-    if re.search(r"\b(ratelimit|rate_limit|token[_ ]?bucket|semaphore|circuitbreaker|circuit_breaker|throttl)", added):
-        if not re.search(r"\bdef\s+\w+\s*\(|\bfunc\s+\w+\s*\(|\breturn\s+(?:new)?", added):
-            signals.append("workaround.rate_limit_upstream_of_sink")
+    if re.search(
+        r"\b(ratelimit|rate_limit|token[_ ]?bucket|semaphore|circuitbreaker|circuit_breaker|throttl)",
+        added,
+    ) and not re.search(r"\bdef\s+\w+\s*\(|\bfunc\s+\w+\s*\(|\breturn\s+(?:new)?", added):
+        signals.append("workaround.rate_limit_upstream_of_sink")
 
-    if re.search(r"\b(feature[_ ]?flag|toggle|is_enabled\s*=\s*(false|False|0))", added):
-        if all(f.endswith((".yaml", ".yml", ".json", ".toml", ".ini", ".env", ".conf")) for f in files) and files:
-            signals.append("workaround.feature_flag_flipped_off")
+    if (
+        re.search(r"\b(feature[_ ]?flag|toggle|is_enabled\s*=\s*(false|False|0))", added)
+        and files
+        and all(
+            f.endswith((".yaml", ".yml", ".json", ".toml", ".ini", ".env", ".conf")) for f in files
+        )
+    ):
+        signals.append("workaround.feature_flag_flipped_off")
 
     if files and all(f.endswith(".md") for f in files):
         signals.append("workaround.documentation_only")
 
-    if re.search(r"logger\.(warn|error|info)|log\.(warn|error|info)|audit_log\(|x-warning", added):
-        if not re.search(r"\braise\b|\breturn\s+[45]\d\d|abort\(|reject\(", added):
-            signals.append("workaround.log_or_header_without_reject")
+    if re.search(
+        r"logger\.(warn|error|info)|log\.(warn|error|info)|audit_log\(|x-warning", added
+    ) and not re.search(r"\braise\b|\breturn\s+[45]\d\d|abort\(|reject\(", added):
+        signals.append("workaround.log_or_header_without_reject")
 
     return signals
 
@@ -122,16 +129,27 @@ def _check_mitigation_signals(diff: str, plan: dict) -> list[str]:
     signals: list[str] = []
     added = "\n".join(_diff_added_lines(diff)).lower()
 
-    if re.search(r"if\s+len\(\w+\)\s*[<>]=?\s*\d+", added) or re.search(r"maxlength\s*[:=]\s*\d+", added):
+    if re.search(r"if\s+len\(\w+\)\s*[<>]=?\s*\d+", added) or re.search(
+        r"maxlength\s*[:=]\s*\d+", added
+    ):
         signals.append("mitigation.length_or_complexity_cap")
 
-    if re.search(r"whitelist|allow[_ ]?list|allowed[_ ]?patterns", added) and re.search(r"else\s*:|elif\s", added):
+    if re.search(r"whitelist|allow[_ ]?list|allowed[_ ]?patterns", added) and re.search(
+        r"else\s*:|elif\s", added
+    ):
         signals.append("mitigation.partial_input_sanitization")
 
     if plan.get("crypto_trust_chain"):
         tc = plan["crypto_trust_chain"]
-        if any(tc.get(k) is False for k in ("algorithm_approved", "key_source_approved",
-                                             "key_rotation_present", "transport_encrypted")):
+        if any(
+            tc.get(k) is False
+            for k in (
+                "algorithm_approved",
+                "key_source_approved",
+                "key_rotation_present",
+                "transport_encrypted",
+            )
+        ):
             signals.append("mitigation.crypto_trust_chain_incomplete")
 
     return signals
@@ -144,8 +162,14 @@ def _check_full_signals(diff: str, plan: dict, result: dict) -> list[str]:
     added_text = "\n".join(added_lines)
     removed_text = "\n".join(removed_lines)
 
-    sig_change_added = re.search(r"^\s*(?:def|func|public|private|protected|fn)\s+\w+\s*\([^)]*\)", added_text, re.MULTILINE)
-    sig_change_removed = re.search(r"^\s*(?:def|func|public|private|protected|fn)\s+\w+\s*\([^)]*\)", removed_text, re.MULTILINE)
+    sig_change_added = re.search(
+        r"^\s*(?:def|func|public|private|protected|fn)\s+\w+\s*\([^)]*\)", added_text, re.MULTILINE
+    )
+    sig_change_removed = re.search(
+        r"^\s*(?:def|func|public|private|protected|fn)\s+\w+\s*\([^)]*\)",
+        removed_text,
+        re.MULTILINE,
+    )
     if sig_change_added and sig_change_removed:
         signals.append("full.sink_signature_changed")
 
@@ -161,7 +185,9 @@ def _check_full_signals(diff: str, plan: dict, result: dict) -> list[str]:
     # SCH-2: discrimination_evidence is a result-level outcome (test proof).
     # Read from result first; fall back to plan for backward compat with
     # producers that emitted it on the plan before the schema split.
-    disc = (result or {}).get("discrimination_evidence") or plan.get("discrimination_evidence") or {}
+    disc = (
+        (result or {}).get("discrimination_evidence") or plan.get("discrimination_evidence") or {}
+    )
     # A two-field {pre:fail, post:pass} stub is not proof — require the method
     # and a concrete assertion_target too, matching the schema's FULL guard
     # (12-seg review S3: a stub earned the terminal FULL signal).
@@ -228,7 +254,9 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="Deterministic completeness-tier classifier.")
     ap.add_argument("--diff", required=True, help="Path to unified-diff text, or '-' for stdin.")
     ap.add_argument("--plan", default=None, help="Path to fix_plan JSON artifact (optional).")
-    ap.add_argument("--result", default=None, help="Path to worker result JSON (optional; verify-phase only).")
+    ap.add_argument(
+        "--result", default=None, help="Path to worker result JSON (optional; verify-phase only)."
+    )
     ap.add_argument("--phase", default="plan", choices=("plan", "verify"))
     args = ap.parse_args(argv[1:])
 
@@ -244,7 +272,11 @@ def main(argv: list[str]) -> int:
         print(json.dumps({"error": f"plan read failed: {exc}"}))
         return 2
     except json.JSONDecodeError as exc:
-        print(json.dumps({"error": f"plan parse failed: line {exc.lineno} col {exc.colno}: {exc.msg}"}))
+        print(
+            json.dumps(
+                {"error": f"plan parse failed: line {exc.lineno} col {exc.colno}: {exc.msg}"}
+            )
+        )
         return 3
 
     try:
@@ -253,7 +285,11 @@ def main(argv: list[str]) -> int:
         print(json.dumps({"error": f"result read failed: {exc}"}))
         return 2
     except json.JSONDecodeError as exc:
-        print(json.dumps({"error": f"result parse failed: line {exc.lineno} col {exc.colno}: {exc.msg}"}))
+        print(
+            json.dumps(
+                {"error": f"result parse failed: line {exc.lineno} col {exc.colno}: {exc.msg}"}
+            )
+        )
         return 3
 
     classification = classify(diff, plan, args.phase, result)

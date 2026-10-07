@@ -30,7 +30,9 @@ def is_at_commit(target_dir, commit_hash):
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
             cwd=target_dir,
         )
         return result.returncode == 0 and result.stdout.strip().startswith(commit_hash[:8])
@@ -64,21 +66,33 @@ def clone_at_commit(repo_url, commit_hash, target_dir):
         os.makedirs(target_dir, exist_ok=True)
         init = subprocess.run(
             ["git", "init"],
-            capture_output=True, text=True, timeout=10, cwd=target_dir,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=target_dir,
         )
         remote = subprocess.run(
             ["git", "remote", "add", "origin", repo_url],
-            capture_output=True, text=True, timeout=10, cwd=target_dir,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=target_dir,
         )
         if init.returncode == 0 and remote.returncode == 0:
             result = subprocess.run(
                 ["git", "fetch", "--depth=1", "origin", commit_hash],
-                capture_output=True, text=True, timeout=CLONE_TIMEOUT, cwd=target_dir,
+                capture_output=True,
+                text=True,
+                timeout=CLONE_TIMEOUT,
+                cwd=target_dir,
             )
             if result.returncode == 0:
                 checkout = subprocess.run(
                     ["git", "checkout", "FETCH_HEAD"],
-                    capture_output=True, text=True, timeout=30, cwd=target_dir,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    cwd=target_dir,
                 )
                 if checkout.returncode == 0:
                     print(f"  [clone] Fast fetch succeeded: {target_dir}")
@@ -90,11 +104,13 @@ def clone_at_commit(repo_url, commit_hash, target_dir):
     if os.path.isdir(target_dir):
         shutil.rmtree(target_dir)
 
-    print(f"  [clone] Fast fetch failed, falling back to full clone ...")
+    print("  [clone] Fast fetch failed, falling back to full clone ...")
     try:
         result = subprocess.run(
             ["git", "clone", repo_url, target_dir],
-            capture_output=True, text=True, timeout=CLONE_TIMEOUT,
+            capture_output=True,
+            text=True,
+            timeout=CLONE_TIMEOUT,
         )
         if result.returncode != 0:
             error = result.stderr.strip() or f"git clone exited {result.returncode}"
@@ -102,7 +118,10 @@ def clone_at_commit(repo_url, commit_hash, target_dir):
 
         checkout = subprocess.run(
             ["git", "checkout", commit_hash],
-            capture_output=True, text=True, timeout=30, cwd=target_dir,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=target_dir,
         )
         if checkout.returncode != 0:
             error = checkout.stderr.strip() or f"git checkout exited {checkout.returncode}"
@@ -135,7 +154,9 @@ def shallow_clone(url, target_dir, re_clone=False):
     try:
         result = subprocess.run(
             ["git", "clone", "--depth", "1", url, target_dir],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
     except subprocess.TimeoutExpired:
         return (target_dir, "clone timed out after 120s")

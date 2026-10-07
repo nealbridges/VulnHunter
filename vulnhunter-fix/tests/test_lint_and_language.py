@@ -3,15 +3,14 @@
 Covers: scripts/safe-phrase-sync-lint.py (REQ-GAT-008),
 scripts/prompt-lint.py (REQ-CWE-010), scripts/language-detect.py (REQ-CWE-005).
 """
+
 from __future__ import annotations
 
 import importlib.util
 import json
-import sys
 from pathlib import Path
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO_ROOT / "scripts"
@@ -40,6 +39,7 @@ def lang_detect():
 
 
 # ---- safe-phrase-sync-lint.py ----
+
 
 def test_sync_lint_current_state_passes(sync_lint):
     """The two files should currently be in sync."""
@@ -94,6 +94,7 @@ def test_sync_lint_drift_detected(sync_lint, monkeypatch, tmp_path, capsys):
 
 # ---- prompt-lint.py ----
 
+
 def _make_prompt_stubs(dir_: Path) -> None:
     """Create a set of valid CWE-class prompt files that reference the common preamble."""
     dir_.mkdir(parents=True, exist_ok=True)
@@ -120,7 +121,8 @@ def test_prompt_lint_missing_common(prompt_lint, tmp_path, capsys):
     p.mkdir()
     for cwe in ("authz", "injection", "crypto", "resource", "config"):
         (p / f"worker_agent_{cwe}.md").write_text(
-            "no reference here\n", encoding="utf-8",
+            "no reference here\n",
+            encoding="utf-8",
         )
     rc = prompt_lint.main(["prompt-lint.py", "--prompts-dir", str(p)])
     assert rc == 1
@@ -135,7 +137,8 @@ def test_prompt_lint_missing_cwe_file(prompt_lint, tmp_path, capsys):
     # only 4 of 5 CWE classes present
     for cwe in ("authz", "injection", "crypto", "resource"):
         (p / f"worker_agent_{cwe}.md").write_text(
-            "See worker_agent_common.md.\n", encoding="utf-8",
+            "See worker_agent_common.md.\n",
+            encoding="utf-8",
         )
     rc = prompt_lint.main(["prompt-lint.py", "--prompts-dir", str(p)])
     assert rc == 1
@@ -163,6 +166,7 @@ def test_prompt_lint_stale_worker_agent_md_flagged(prompt_lint, tmp_path, capsys
 
 
 # ---- language-detect.py ----
+
 
 def test_lang_detect_go_manifest(lang_detect, tmp_path):
     (tmp_path / "go.mod").write_text("module x\n", encoding="utf-8")
@@ -247,6 +251,7 @@ def test_lang_detect_survives_permission_denied_dir(lang_detect, tmp_path):
     walker in config.py fixes it — this test pins that behavior.
     """
     import os
+
     # No manifest — force the suffix-vote path
     (tmp_path / "app.py").write_text("x = 1\n", encoding="utf-8")
     locked = tmp_path / "locked"
@@ -265,6 +270,7 @@ def test_lang_detect_survives_unreadable_manifest(lang_detect, tmp_path):
     an unreadable go.mod / Pipfile shouldn't crash detection.
     """
     import os
+
     manifest = tmp_path / "go.mod"
     manifest.write_text("module x\n", encoding="utf-8")
     try:
@@ -318,12 +324,12 @@ def test_heading_lint_em_dash_regex_catches_suffix(heading_lint):
     m = heading_lint._BREAKING_HEADING.search(bad)
     assert m is not None
     suffix = m.group("suffix").strip()
-    assert suffix and not suffix.startswith(":")   # would be flagged
+    assert suffix and not suffix.startswith(":")  # would be flagged
 
     good = "## Breaking Change\n"
     m2 = heading_lint._BREAKING_HEADING.search(good)
     assert m2 is not None
-    assert m2.group("suffix").strip() == ""         # bare — not flagged
+    assert m2.group("suffix").strip() == ""  # bare — not flagged
 
     colon = "## Breaking Change:\n"
     m3 = heading_lint._BREAKING_HEADING.search(colon)
@@ -339,19 +345,30 @@ def test_heading_lint_flags_block_placeholder_in_comment(heading_lint, tmp_path,
     marker like the vulnfix-key comment alone.
     """
     import re
+
     open_c = "<!" + "--"
     close_c = "--" + ">"
     fake_templates = tmp_path / "templates"
     fake_templates.mkdir()
     required = heading_lint._extract_tuple_constant(heading_lint.GATE2, "REQUIRED_ALWAYS")
-    conds = [heading_lint._extract_str_constant(heading_lint.GATE2, c) for c in
-             ("CONDITIONAL_TABLE", "CONDITIONAL_RESIDUAL", "CONDITIONAL_BREAKING", "CONDITIONAL_SWEEP")]
+    conds = [
+        heading_lint._extract_str_constant(heading_lint.GATE2, c)
+        for c in (
+            "CONDITIONAL_TABLE",
+            "CONDITIONAL_RESIDUAL",
+            "CONDITIONAL_BREAKING",
+            "CONDITIONAL_SWEEP",
+        )
+    ]
     headings = "\n\n".join(f"{h}\n\nbody" for h in [*required, *conds])
     # BAD: block placeholder appears as content AND inside a comment; scalar
     # marker appears only inside its own comment (must NOT be flagged).
-    bad = (headings + "\n\n{PER_FINDING_SECTIONS}\n\n"
-           + f"{open_c} refers to {{PER_FINDING_SECTIONS}} {close_c}\n"
-           + f"{open_c} vulnfix-key: {{IDEMPOTENCY_KEY}} {close_c}\n")
+    bad = (
+        headings
+        + "\n\n{PER_FINDING_SECTIONS}\n\n"
+        + f"{open_c} refers to {{PER_FINDING_SECTIONS}} {close_c}\n"
+        + f"{open_c} vulnfix-key: {{IDEMPOTENCY_KEY}} {close_c}\n"
+    )
     (fake_templates / "pr_body.md").write_text(bad, encoding="utf-8")
     (fake_templates / "pr_body_cluster.md").write_text(bad, encoding="utf-8")
     (fake_templates / "issue_body.md").write_text(headings + "\n", encoding="utf-8")

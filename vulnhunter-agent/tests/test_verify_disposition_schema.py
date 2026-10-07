@@ -23,9 +23,7 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator, ValidationError
 
-SCHEMA_PATH = (
-    Path(__file__).resolve().parents[1] / "verify_disposition.schema.json"
-)
+SCHEMA_PATH = Path(__file__).resolve().parents[1] / "verify_disposition.schema.json"
 
 
 @pytest.fixture(scope="module")
@@ -138,9 +136,7 @@ def test_clone_request_shape_rejected_by_disposition_schema(
 # -- target_repo head metadata --------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "head_commit", ["abc1234", "a3b9f12abcd5678", "0" * 40, ""]
-)
+@pytest.mark.parametrize("head_commit", ["abc1234", "a3b9f12abcd5678", "0" * 40, ""])
 def test_valid_head_commit_shapes(
     validator: Draft202012Validator,
     disposition_doc: dict[str, Any],
@@ -346,9 +342,7 @@ def test_invalid_gate_status_rejected(
         validator.validate(disposition_doc)
 
 
-@pytest.mark.parametrize(
-    "bad_id", ["VULN-1", "VULN-01", "vuln_001", "VULN-0001", "VULN-", ""]
-)
+@pytest.mark.parametrize("bad_id", ["VULN-1", "VULN-01", "vuln_001", "VULN-0001", "VULN-", ""])
 def test_unpadded_vuln_id_rejected(
     validator: Draft202012Validator,
     disposition_doc: dict[str, Any],

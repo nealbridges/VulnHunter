@@ -2,7 +2,6 @@
 
 import json
 import os
-import socket
 import time
 import urllib.error
 import urllib.request
@@ -51,7 +50,7 @@ def read_results_report(results_dir):
     readme_path = os.path.join(results_dir, "README.md")
     if not os.path.isfile(readme_path):
         return None
-    with open(readme_path, "r") as f:
+    with open(readme_path) as f:
         return f.read()
 
 
@@ -68,10 +67,12 @@ def judge_findings_batch(results_report, findings, model=None):
     if model is None:
         model = MODEL
 
-    findings_text = "\n\n".join([
-        f"### Benchmark Finding: {f['finding_id']} (Type: {f['type']})\n{f['description']}"
-        for f in findings
-    ])
+    findings_text = "\n\n".join(
+        [
+            f"### Benchmark Finding: {f['finding_id']} (Type: {f['type']})\n{f['description']}"
+            for f in findings
+        ]
+    )
 
     prompt = f"""## Scanner Results Report
 
@@ -93,27 +94,52 @@ For EACH benchmark finding above, determine if the scanner detected it. Respond 
         try:
             result = _invoke_judge(prompt, model)
         except TimeoutError:
-            return [{"finding_id": f["finding_id"], "detected": None,
-                     "confidence": None, "reasoning": "judge timed out",
-                     "matched_finding_id": None} for f in findings]
+            return [
+                {
+                    "finding_id": f["finding_id"],
+                    "detected": None,
+                    "confidence": None,
+                    "reasoning": "judge timed out",
+                    "matched_finding_id": None,
+                }
+                for f in findings
+            ]
 
         if result.returncode != 0 and _is_judge_rate_limited(result):
             if attempt < JUDGE_MAX_RETRIES:
-                print(f"    [judge] 429 rate limit on attempt {attempt + 1}, "
-                      f"retrying in {backoff:.0f}s ...", flush=True)
+                print(
+                    f"    [judge] 429 rate limit on attempt {attempt + 1}, "
+                    f"retrying in {backoff:.0f}s ...",
+                    flush=True,
+                )
                 time.sleep(backoff)
                 backoff = min(backoff * JUDGE_RETRY_BACKOFF_MULTIPLIER, JUDGE_RETRY_MAX_BACKOFF)
                 continue
-            return [{"finding_id": f["finding_id"], "detected": None,
-                     "confidence": None,
-                     "reasoning": "judge failed: 429 rate limit (retries exhausted)",
-                     "matched_finding_id": None} for f in findings]
+            return [
+                {
+                    "finding_id": f["finding_id"],
+                    "detected": None,
+                    "confidence": None,
+                    "reasoning": "judge failed: 429 rate limit (retries exhausted)",
+                    "matched_finding_id": None,
+                }
+                for f in findings
+            ]
 
         if result.returncode != 0:
-            error = result.stderr.strip()[:200] if result.stderr else f"exit code {result.returncode}"
-            return [{"finding_id": f["finding_id"], "detected": None,
-                     "confidence": None, "reasoning": f"judge failed: {error}",
-                     "matched_finding_id": None} for f in findings]
+            error = (
+                result.stderr.strip()[:200] if result.stderr else f"exit code {result.returncode}"
+            )
+            return [
+                {
+                    "finding_id": f["finding_id"],
+                    "detected": None,
+                    "confidence": None,
+                    "reasoning": f"judge failed: {error}",
+                    "matched_finding_id": None,
+                }
+                for f in findings
+            ]
 
         return _parse_judge_output(result.stdout, findings)
 
@@ -126,19 +152,25 @@ def _invoke_judge(prompt, model):
     """
     base = os.environ.get("VULNHUNT_BASE_URL", "").rstrip("/")
     if not base:
-        return type("R", (), {"returncode": 2, "stdout": "", "stderr": "VULNHUNT_BASE_URL is not set"})()
+        return type(
+            "R", (), {"returncode": 2, "stdout": "", "stderr": "VULNHUNT_BASE_URL is not set"}
+        )()
     if not model:
         model = os.environ.get("VULNHUNT_MODEL", "")
     if not model:
-        return type("R", (), {"returncode": 2, "stdout": "", "stderr": "VULNHUNT_MODEL is not set"})()
-    payload = json.dumps({
-        "model": model,
-        "messages": [
-            {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": 0,
-    }).encode()
+        return type(
+            "R", (), {"returncode": 2, "stdout": "", "stderr": "VULNHUNT_MODEL is not set"}
+        )()
+    payload = json.dumps(
+        {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0,
+        }
+    ).encode()
     request = urllib.request.Request(
         base + "/chat/completions",
         data=payload,
@@ -151,16 +183,20 @@ def _invoke_judge(prompt, model):
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode(errors="replace")[:200]
         return type("R", (), {"returncode": 1, "stdout": "", "stderr": f"{exc.code} {detail}"})()
-    except (TimeoutError, socket.timeout) as exc:
+    except TimeoutError as exc:
         raise TimeoutError(str(exc)) from exc
     except urllib.error.URLError as exc:
         if isinstance(getattr(exc, "reason", None), TimeoutError):
-            raise TimeoutError(str(exc.reason))
+            raise TimeoutError(str(exc.reason)) from exc
         return type("R", (), {"returncode": 1, "stdout": "", "stderr": str(exc.reason)})()
     try:
         text = body["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError):
-        return type("R", (), {"returncode": 1, "stdout": "", "stderr": "judge response had no message content"})()
+        return type(
+            "R",
+            (),
+            {"returncode": 1, "stdout": "", "stderr": "judge response had no message content"},
+        )()
     return type("R", (), {"returncode": 0, "stdout": text, "stderr": ""})()
 
 
@@ -178,7 +214,7 @@ def _parse_judge_output(raw_output, findings):
     start = text.find("[")
     end = text.rfind("]")
     if start != -1 and end != -1:
-        text = text[start:end + 1]
+        text = text[start : end + 1]
 
     try:
         judgments = json.loads(text)
@@ -188,6 +224,13 @@ def _parse_judge_output(raw_output, findings):
         pass
 
     # If parsing fails, return error judgments
-    return [{"finding_id": f["finding_id"], "detected": None,
-             "confidence": None, "reasoning": "failed to parse judge output",
-             "matched_finding_id": None} for f in findings]
+    return [
+        {
+            "finding_id": f["finding_id"],
+            "detected": None,
+            "confidence": None,
+            "reasoning": "failed to parse judge output",
+            "matched_finding_id": None,
+        }
+        for f in findings
+    ]

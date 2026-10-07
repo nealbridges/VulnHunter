@@ -20,7 +20,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 VALIDATOR = REPO_ROOT / "scripts" / "validate-result.py"
 
@@ -93,7 +92,9 @@ def test_validator_accepts_valid_mitigation(tmp_path):
     assert result.returncode == 0, f"expected pass, got: {result.stderr}"
 
 
-@pytest.mark.skip(reason="harness pending task-23 (repair-loop routing lands with phase-prompt wiring)")
+@pytest.mark.skip(
+    reason="harness pending task-23 (repair-loop routing lands with phase-prompt wiring)"
+)
 def test_third_failure_routes_to_needs_manual_review():
     """On the third consecutive schema-validation failure, the executor shall
     mark the finding as NEEDS_MANUAL_REVIEW rather than looping indefinitely.
@@ -103,7 +104,9 @@ def test_third_failure_routes_to_needs_manual_review():
     """
 
 
-@pytest.mark.skip(reason="harness pending task-23 (repair-loop routing lands with phase-prompt wiring)")
+@pytest.mark.skip(
+    reason="harness pending task-23 (repair-loop routing lands with phase-prompt wiring)"
+)
 def test_schema_mismatch_does_not_crash_executor():
     """A malformed worker output must not raise unhandled exceptions; it must
     be caught by the phase orchestrator and routed to the repair phase

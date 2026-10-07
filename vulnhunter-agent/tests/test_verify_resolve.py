@@ -11,7 +11,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from agent import verify_resolve
 from agent.verify_resolve import (
     ResolveError,
@@ -19,7 +18,6 @@ from agent.verify_resolve import (
     clone_target_repo,
     resolve_repo_hint,
 )
-
 
 # ---------- resolve_repo_hint -----------------------------------------------
 
@@ -64,12 +62,12 @@ def test_resolve_repo_hint_resolves_via_alias() -> None:
 @pytest.mark.parametrize(
     "hint",
     [
-        "platform-validators",         # alias not in dict → None
-        "../sibling-repo",              # path-like, not an alias
-        "github.com/org/repo",          # missing scheme → not a URL match
-        "some-bare-name",               # no scheme, no alias
-        "",                             # empty
-        "   ",                          # whitespace
+        "platform-validators",  # alias not in dict → None
+        "../sibling-repo",  # path-like, not an alias
+        "github.com/org/repo",  # missing scheme → not a URL match
+        "some-bare-name",  # no scheme, no alias
+        "",  # empty
+        "   ",  # whitespace
     ],
 )
 def test_resolve_repo_hint_unresolvable_returns_none(hint: str) -> None:
@@ -93,10 +91,7 @@ def test_resolve_repo_hint_handles_whitespace_padding() -> None:
     """Hints may arrive with surrounding whitespace from the verifier's
     free-form payload; .strip() normalizes."""
     aliases = {"foo": "https://github.com/org/foo.git"}
-    assert (
-        resolve_repo_hint("  foo  ", aliases)
-        == "https://github.com/org/foo.git"
-    )
+    assert resolve_repo_hint("  foo  ", aliases) == "https://github.com/org/foo.git"
 
 
 # ---------- clone_additional_repo (wiring with monkeypatch) ----------------

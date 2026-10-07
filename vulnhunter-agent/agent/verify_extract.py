@@ -28,7 +28,6 @@ from pathlib import Path
 
 from ._github_verify import FetchedIssue, IssueComment, IssueEvent
 
-
 # Fixed delimiter strings — also referenced by the skill's
 # phase 0 procedure. Changing either side requires updating both.
 BEGIN_UNTRUSTED = "<!-- /vulnhunt-fix-verify agent: BEGIN UNTRUSTED USER CONTENT -->"
@@ -74,12 +73,8 @@ def _neutralize_markers(text: str) -> str:
 # fixed text. Anchored to the comment open/close so stray prose in
 # the body can't false-match (we require the literal `<!-- ` and
 # ` -->` boundaries).
-_RE_VULNFIX_KEY = re.compile(
-    r"<!--\s*vulnfix-key:\s*([0-9a-f]{16})\s*-->", re.IGNORECASE
-)
-_RE_FINDING_ID = re.compile(
-    r"<!--\s*vulnhunt-finding-id:\s*(VULN-\d{3})\s*-->", re.IGNORECASE
-)
+_RE_VULNFIX_KEY = re.compile(r"<!--\s*vulnfix-key:\s*([0-9a-f]{16})\s*-->", re.IGNORECASE)
+_RE_FINDING_ID = re.compile(r"<!--\s*vulnhunt-finding-id:\s*(VULN-\d{3})\s*-->", re.IGNORECASE)
 # The results-dir marker names a published scan directory. Constrain it to
 # the canonical /vulnhunt shape (``<prefix>_VULNHUNT_RESULTS_<ts>``) so path
 # metacharacters can never enter the value (CWE-22). The prefix class
@@ -101,9 +96,9 @@ class MarkerExtractionError(ValueError):
 
 @dataclass(frozen=True)
 class ExtractedMarkers:
-    vulnfix_key: str    # 16 lowercase hex chars
-    finding_id: str     # VULN-NNN
-    results_dir: str    # basename matching ^.+_VULNHUNT_RESULTS_.+$
+    vulnfix_key: str  # 16 lowercase hex chars
+    finding_id: str  # VULN-NNN
+    results_dir: str  # basename matching ^.+_VULNHUNT_RESULTS_.+$
 
 
 def extract_markers(body: str, *, source_label: str = "issue body") -> ExtractedMarkers:
@@ -135,8 +130,7 @@ def extract_markers(body: str, *, source_label: str = "issue body") -> Extracted
     # character class (``..`` is composed of allowed '.' characters).
     if any(tok in results_dir for tok in _RESULTS_DIR_FORBIDDEN):
         raise MarkerExtractionError(
-            f"{source_label}: vulnhunt-results-dir contains a forbidden path "
-            f"token: {results_dir!r}"
+            f"{source_label}: vulnhunt-results-dir contains a forbidden path token: {results_dir!r}"
         )
     return ExtractedMarkers(
         vulnfix_key=m_key.group(1).lower(),
@@ -227,9 +221,7 @@ def build_narrative(
         # @ prefix is preserved.
         author = _neutralize_markers(comment.author or "(unknown)")
         ts_label = comment.created_at or "(no timestamp)"
-        sections.append(
-            f"### Comment from @{author} ({ts_label})\n\n{body}\n"
-        )
+        sections.append(f"### Comment from @{author} ({ts_label})\n\n{body}\n")
     return IssueNarrative(
         issue_number=issue.number,
         finding_id=finding_id,
@@ -271,9 +263,7 @@ def render_comments_file(
             "number so claims can be attributed."
         )
     else:
-        lines.append(
-            "(No issues in this run produced any closure narrative.)"
-        )
+        lines.append("(No issues in this run produced any closure narrative.)")
     lines.append("")
     lines.append(BEGIN_UNTRUSTED)
     lines.append(
@@ -291,9 +281,7 @@ def render_comments_file(
         lines.append("(No fix narrative provided by the developer.)")
     for narrative in narratives:
         lines.append("")
-        lines.append(
-            f"## {narrative.finding_id} — issue #{narrative.issue_number}"
-        )
+        lines.append(f"## {narrative.finding_id} — issue #{narrative.issue_number}")
         lines.append("")
         if narrative.sections:
             for section in narrative.sections:
@@ -306,9 +294,7 @@ def render_comments_file(
         lines.append("")
         lines.append("---")
         lines.append("")
-        lines.append(
-            "<!-- /vulnhunt-fix-verify agent annotations -->"
-        )
+        lines.append("<!-- /vulnhunt-fix-verify agent annotations -->")
         lines.append("## /vulnhunt-fix-verify agent annotations")
         lines.append("")
         lines.append(

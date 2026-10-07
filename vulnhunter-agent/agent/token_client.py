@@ -106,7 +106,5 @@ def _read_token_field(path: Path) -> str:
     data = json.loads(path.read_text())
     token = data.get("token")
     if not isinstance(token, str) or not token:
-        raise ValueError(
-            f"broker token file at {path} missing or has empty 'token' field"
-        )
+        raise ValueError(f"broker token file at {path} missing or has empty 'token' field")
     return token

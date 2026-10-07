@@ -35,15 +35,22 @@ from local_harness.config import (
     STATE_FILE,
     atomic_write_json,
 )
+from local_harness.scan import (
+    clean_prior_results,
+    extract_cost_from_log,
+    find_results_dir,
+    has_valid_results,
+    scan_targets,
+)
+
+from .finding_history import get_stable_findings, update_history
 from .judge import judge_findings_batch, read_results_report
-from local_harness.scan import clean_prior_results, extract_cost_from_log, find_results_dir, has_valid_results, scan_targets
 from .tally import (
     generate_tally,
     print_summary,
     write_tally_json,
     write_tally_markdown,
 )
-from .finding_history import get_stable_findings, update_history
 
 
 def load_all_benchmarks():
@@ -84,12 +91,14 @@ def deduplicate_targets(benchmarks):
                     "clone_dir": os.path.join(CLONE_BASE_DIR, key),
                     "findings": [],
                 }
-            targets[key]["findings"].append({
-                "finding_id": finding["finding_id"],
-                "type": finding["type"],
-                "description": finding["description"],
-                "benchmark_file": filename,
-            })
+            targets[key]["findings"].append(
+                {
+                    "finding_id": finding["finding_id"],
+                    "type": finding["type"],
+                    "description": finding["description"],
+                    "benchmark_file": filename,
+                }
+            )
     return targets
 
 
@@ -111,15 +120,18 @@ def save_state(state):
 
 def phase_clone(targets, state):
     """Phase 1: Clone all repos at specific commits."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"PHASE 1: CLONE ({len(targets)} targets)")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     for key, target in targets.items():
-        if key in state["scan_targets"] and state["scan_targets"][key].get("status") in ("cloned", "scanned"):
-            if os.path.isdir(target["clone_dir"]):
-                print(f"  [skip] {key} — already cloned")
-                continue
+        if (
+            key in state["scan_targets"]
+            and state["scan_targets"][key].get("status") in ("cloned", "scanned")
+            and os.path.isdir(target["clone_dir"])
+        ):
+            print(f"  [skip] {key} — already cloned")
+            continue
 
         target_dir, error = clone_at_commit(
             target["repo_url"], target["commit_hash"], target["clone_dir"]
@@ -171,7 +183,7 @@ def phase_scan(targets, state, force_rescan=False, max_workers=MAX_SCAN_WORKERS)
         to_scan.append(target)
 
     if not to_scan:
-        print(f"\n  All targets already scanned. Use --force-rescan to re-run.")
+        print("\n  All targets already scanned. Use --force-rescan to re-run.")
         return
 
     # Clean prior results for targets about to be scanned
@@ -190,9 +202,9 @@ def phase_scan(targets, state, force_rescan=False, max_workers=MAX_SCAN_WORKERS)
             state["judgments"].pop(finding["finding_id"], None)
     save_state(state)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"PHASE 2: SCAN ({len(to_scan)} targets, {max_workers} workers)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     results = scan_targets(to_scan, max_workers=max_workers)
 
@@ -222,9 +234,9 @@ def phase_scan(targets, state, force_rescan=False, max_workers=MAX_SCAN_WORKERS)
 
 def phase_judge(targets, state, force_rejudge=False):
     """Phase 3: Judge each benchmark finding against scan results."""
-    print(f"\n{'='*60}")
-    print(f"PHASE 3: JUDGE")
-    print(f"{'='*60}\n")
+    print(f"\n{'=' * 60}")
+    print("PHASE 3: JUDGE")
+    print(f"{'=' * 60}\n")
 
     total_judged = 0
     total_skipped = 0
@@ -306,13 +318,13 @@ def phase_judge(targets, state, force_rejudge=False):
 
 def phase_tally(state):
     """Phase 4: Generate tally report."""
-    print(f"\n{'='*60}")
-    print(f"PHASE 4: TALLY")
-    print(f"{'='*60}\n")
+    print(f"\n{'=' * 60}")
+    print("PHASE 4: TALLY")
+    print(f"{'=' * 60}\n")
 
     # Backfill cost data from logs for any scans missing it
     backfilled = 0
-    for key, target_data in state.get("scan_targets", {}).items():
+    for _key, target_data in state.get("scan_targets", {}).items():
         if target_data.get("scan_total_cost_usd"):
             continue
         clone_dir = target_data.get("clone_dir")
@@ -346,24 +358,43 @@ def filter_targets_by_findings(targets, finding_ids):
 
 def main():
     parser = argparse.ArgumentParser(description="VulnHunter Benchmark Test Harness")
-    parser.add_argument("--scan-only", action="store_true",
-                        help="Clone and scan only, skip judging")
-    parser.add_argument("--judge-only", action="store_true",
-                        help="Skip scanning, only judge already-scanned results")
-    parser.add_argument("--tally-only", action="store_true",
-                        help="Regenerate tally from existing state")
-    parser.add_argument("--force-rescan", action="store_true",
-                        help="Re-scan repos even if results exist")
-    parser.add_argument("--force-rejudge", action="store_true",
-                        help="Re-judge findings even if judgments exist")
-    parser.add_argument("--repos", type=str, default=None,
-                        help="Only process repos matching this substring")
-    parser.add_argument("--findings", type=str, default=None,
-                        help="Re-run specific finding IDs (comma-separated, e.g. VULN-001,VULN-002)")
-    parser.add_argument("--max-workers", type=int, default=MAX_SCAN_WORKERS,
-                        help=f"Parallel scan workers (default: {MAX_SCAN_WORKERS})")
-    parser.add_argument("--skip-stable", action="store_true",
-                        help="Skip findings detected in every one of the last 3 runs")
+    parser.add_argument(
+        "--scan-only", action="store_true", help="Clone and scan only, skip judging"
+    )
+    parser.add_argument(
+        "--judge-only",
+        action="store_true",
+        help="Skip scanning, only judge already-scanned results",
+    )
+    parser.add_argument(
+        "--tally-only", action="store_true", help="Regenerate tally from existing state"
+    )
+    parser.add_argument(
+        "--force-rescan", action="store_true", help="Re-scan repos even if results exist"
+    )
+    parser.add_argument(
+        "--force-rejudge", action="store_true", help="Re-judge findings even if judgments exist"
+    )
+    parser.add_argument(
+        "--repos", type=str, default=None, help="Only process repos matching this substring"
+    )
+    parser.add_argument(
+        "--findings",
+        type=str,
+        default=None,
+        help="Re-run specific finding IDs (comma-separated, e.g. VULN-001,VULN-002)",
+    )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=MAX_SCAN_WORKERS,
+        help=f"Parallel scan workers (default: {MAX_SCAN_WORKERS})",
+    )
+    parser.add_argument(
+        "--skip-stable",
+        action="store_true",
+        help="Skip findings detected in every one of the last 3 runs",
+    )
     args = parser.parse_args()
 
     # Load benchmarks
@@ -395,7 +426,7 @@ def main():
             if unknown:
                 print(f"Error: Unknown finding IDs: {', '.join(sorted(unknown))}")
             else:
-                print(f"No targets remain after filtering (check --repos combination)")
+                print("No targets remain after filtering (check --repos combination)")
             sys.exit(1)
         args.force_rescan = True
         args.force_rejudge = True
@@ -408,8 +439,7 @@ def main():
         if stable_ids:
             for key in list(targets.keys()):
                 targets[key]["findings"] = [
-                    f for f in targets[key]["findings"]
-                    if f["finding_id"] not in stable_ids
+                    f for f in targets[key]["findings"] if f["finding_id"] not in stable_ids
                 ]
                 if not targets[key]["findings"]:
                     del targets[key]

@@ -11,13 +11,9 @@ from __future__ import annotations
 import httpx
 import pytest
 import respx
-
 from agent._github_verify import (
     GitHubVerifyError,
-    IssueComment,
-    IssueEvent,
     IssueRef,
-    UserContentEdit,
     get_issue,
     issue_host,
     list_comments,
@@ -28,7 +24,6 @@ from agent._github_verify import (
     post_comment,
     reopen_issue,
 )
-
 
 # ---------- parse_issue_url -------------------------------------------------
 
@@ -47,18 +42,14 @@ def test_parse_issue_url_api_form() -> None:
 def test_parse_issue_url_ghe_api_form() -> None:
     """GitHub Enterprise API URLs include a versioned ``/api/vN/`` prefix
     that ``parse_issue_url`` must strip before locating ``repos``."""
-    ref = parse_issue_url(
-        "https://ghe.example.com/api/v3/repos/org/svc/issues/7"
-    )
+    ref = parse_issue_url("https://ghe.example.com/api/v3/repos/org/svc/issues/7")
     assert ref == IssueRef(owner="org", repo="svc", number=7)
 
 
 def test_parse_issue_url_ghe_api_form_v4() -> None:
     """Future GHE API versions use ``/api/v4/`` or similar — the
     parser accepts any ``vN`` where N is digits."""
-    ref = parse_issue_url(
-        "https://ghe.example.com/api/v4/repos/org/svc/issues/12"
-    )
+    ref = parse_issue_url("https://ghe.example.com/api/v4/repos/org/svc/issues/12")
     assert ref == IssueRef(owner="org", repo="svc", number=12)
 
 
@@ -66,15 +57,11 @@ def test_parse_issue_url_rejects_non_versioned_api_prefix() -> None:
     """``/api/version/repos/...`` (non-digit suffix) is not a valid
     GHE API URL and must not be silently accepted by the parser."""
     with pytest.raises(GitHubVerifyError):
-        parse_issue_url(
-            "https://ghe.example.com/api/version/repos/org/svc/issues/7"
-        )
+        parse_issue_url("https://ghe.example.com/api/version/repos/org/svc/issues/7")
 
 
 def test_parse_issue_url_ghec_host() -> None:
-    ref = parse_issue_url(
-        "https://github.cloud.example.com/org/svc/issues/7"
-    )
+    ref = parse_issue_url("https://github.cloud.example.com/org/svc/issues/7")
     assert ref == IssueRef(owner="org", repo="svc", number=7)
 
 
@@ -96,9 +83,7 @@ def test_parse_issue_url_accepts_pr_api_alias() -> None:
 
 
 def test_parse_issue_url_accepts_pr_ghe_api_alias() -> None:
-    ref = parse_issue_url(
-        "https://ghe.example.com/api/v3/repos/o/r/pulls/9"
-    )
+    ref = parse_issue_url("https://ghe.example.com/api/v3/repos/o/r/pulls/9")
     assert ref == IssueRef(owner="o", repo="r", number=9, kind="pull")
 
 
@@ -113,12 +98,12 @@ def test_parse_issue_url_issue_kind_defaults() -> None:
 @pytest.mark.parametrize(
     "url",
     [
-        "ftp://github.com/o/r/issues/42",          # bad scheme
-        "https://github.com/o/r",                    # no /issues/
-        "https://github.com/o",                       # too few segments
-        "https://github.com/o/r/issues/",            # missing number
-        "https://github.com/o/r/issues/abc",         # non-numeric
-        "https://github.com/o/r/issues/-1",          # negative
+        "ftp://github.com/o/r/issues/42",  # bad scheme
+        "https://github.com/o/r",  # no /issues/
+        "https://github.com/o",  # too few segments
+        "https://github.com/o/r/issues/",  # missing number
+        "https://github.com/o/r/issues/abc",  # non-numeric
+        "https://github.com/o/r/issues/-1",  # negative
     ],
 )
 def test_parse_issue_url_rejects_malformed(url: str) -> None:
@@ -128,10 +113,7 @@ def test_parse_issue_url_rejects_malformed(url: str) -> None:
 
 def test_issue_host_extracts_bare_host() -> None:
     assert issue_host("https://github.com/o/r/issues/1") == "github.com"
-    assert (
-        issue_host("https://github.cloud.example.com/o/r/issues/1")
-        == "github.cloud.example.com"
-    )
+    assert issue_host("https://github.cloud.example.com/o/r/issues/1") == "github.cloud.example.com"
 
 
 def test_issue_host_rejects_empty() -> None:
@@ -160,9 +142,7 @@ async def test_get_issue_parses_response(respx_mock: respx.MockRouter) -> None:
         return_value=httpx.Response(200, json=_issue_payload(body="hello"))
     )
     async with make_client("tok") as client:
-        issue = await get_issue(
-            client, "github.com", IssueRef("o", "r", 42)
-        )
+        issue = await get_issue(client, "github.com", IssueRef("o", "r", 42))
     assert issue.number == 42
     assert issue.state == "closed"
     assert issue.body == "hello"
@@ -182,11 +162,10 @@ async def test_get_issue_retries_on_503(
     # via ``import asyncio``). Restoration happens automatically at
     # fixture teardown.
     import asyncio as _asyncio
+
     monkeypatch.setattr(_asyncio, "sleep", fast_sleep)
 
-    route = respx_mock.get(
-        "https://api.github.com/repos/o/r/issues/42"
-    ).mock(
+    route = respx_mock.get("https://api.github.com/repos/o/r/issues/42").mock(
         side_effect=[
             httpx.Response(503, json={"message": "rate"}),
             httpx.Response(200, json=_issue_payload()),
@@ -234,9 +213,7 @@ async def test_list_comments_paginates(respx_mock: respx.MockRouter) -> None:
     # calls. Both requests share the same base URL (the page-2 fetch
     # follows the Link header from page 1), so a single route is the
     # cleanest way to express the pagination dance.
-    respx_mock.get(
-        url__startswith="https://api.github.com/repos/o/r/issues/42/comments"
-    ).mock(
+    respx_mock.get(url__startswith="https://api.github.com/repos/o/r/issues/42/comments").mock(
         side_effect=[
             httpx.Response(
                 200,
@@ -267,9 +244,9 @@ async def test_list_events_includes_close_event(respx_mock: respx.MockRouter) ->
             "commit_id": None,
         },
     ]
-    respx_mock.get(
-        "https://api.github.com/repos/o/r/issues/42/events"
-    ).mock(return_value=httpx.Response(200, json=payload))
+    respx_mock.get("https://api.github.com/repos/o/r/issues/42/events").mock(
+        return_value=httpx.Response(200, json=payload)
+    )
     async with make_client("tok") as client:
         events = await list_events(client, "github.com", IssueRef("o", "r", 42))
     assert len(events) == 2
@@ -287,21 +264,11 @@ async def test_list_user_content_edits_empty(respx_mock: respx.MockRouter) -> No
     respx_mock.post("https://api.github.com/graphql").mock(
         return_value=httpx.Response(
             200,
-            json={
-                "data": {
-                    "repository": {
-                        "issue": {
-                            "userContentEdits": {"nodes": []}
-                        }
-                    }
-                }
-            },
+            json={"data": {"repository": {"issue": {"userContentEdits": {"nodes": []}}}}},
         )
     )
     async with make_client("tok") as client:
-        edits = await list_user_content_edits(
-            client, "github.com", IssueRef("o", "r", 42)
-        )
+        edits = await list_user_content_edits(client, "github.com", IssueRef("o", "r", 42))
     assert edits == []
 
 
@@ -337,9 +304,7 @@ async def test_list_user_content_edits_parses_nodes(
         )
     )
     async with make_client("tok") as client:
-        edits = await list_user_content_edits(
-            client, "github.com", IssueRef("o", "r", 42)
-        )
+        edits = await list_user_content_edits(client, "github.com", IssueRef("o", "r", 42))
     assert len(edits) == 2
     assert edits[0].editor == "alice"
     assert edits[1].editor == ""  # null actor → empty string
@@ -379,9 +344,7 @@ async def test_list_user_content_edits_skips_null_diff(
         )
     )
     async with make_client("tok") as client:
-        edits = await list_user_content_edits(
-            client, "github.com", IssueRef("o", "r", 42)
-        )
+        edits = await list_user_content_edits(client, "github.com", IssueRef("o", "r", 42))
     assert len(edits) == 1
     assert edits[0].diff.startswith("@@ -1 +1 @@")
 
@@ -398,9 +361,7 @@ async def test_list_user_content_edits_errors_response(
     )
     async with make_client("tok") as client:
         with pytest.raises(GitHubVerifyError, match="permission denied"):
-            await list_user_content_edits(
-                client, "github.com", IssueRef("o", "r", 42)
-            )
+            await list_user_content_edits(client, "github.com", IssueRef("o", "r", 42))
 
 
 @pytest.mark.asyncio
@@ -416,18 +377,11 @@ async def test_list_user_content_edits_uses_pull_request_resolver_for_pr_ref(
 
     def handler(request: httpx.Request) -> httpx.Response:
         import json
+
         captured["body"] = json.loads(request.content)
         return httpx.Response(
             200,
-            json={
-                "data": {
-                    "repository": {
-                        "pullRequest": {
-                            "userContentEdits": {"nodes": []}
-                        }
-                    }
-                }
-            },
+            json={"data": {"repository": {"pullRequest": {"userContentEdits": {"nodes": []}}}}},
         )
 
     respx_mock.post("https://api.github.com/graphql").mock(side_effect=handler)
@@ -455,26 +409,17 @@ async def test_list_user_content_edits_uses_issue_resolver_for_issue_ref(
 
     def handler(request: httpx.Request) -> httpx.Response:
         import json
+
         captured["body"] = json.loads(request.content)
         return httpx.Response(
             200,
-            json={
-                "data": {
-                    "repository": {
-                        "issue": {
-                            "userContentEdits": {"nodes": []}
-                        }
-                    }
-                }
-            },
+            json={"data": {"repository": {"issue": {"userContentEdits": {"nodes": []}}}}},
         )
 
     respx_mock.post("https://api.github.com/graphql").mock(side_effect=handler)
 
     async with make_client("tok") as client:
-        await list_user_content_edits(
-            client, "github.com", IssueRef("o", "r", 42)
-        )
+        await list_user_content_edits(client, "github.com", IssueRef("o", "r", 42))
     assert "issue(number:" in captured["body"]["query"]
     assert "pullRequest(number:" not in captured["body"]["query"]
 
@@ -484,9 +429,7 @@ async def test_list_user_content_edits_uses_issue_resolver_for_issue_ref(
 
 @pytest.mark.asyncio
 async def test_post_comment_returns_html_url(respx_mock: respx.MockRouter) -> None:
-    respx_mock.post(
-        "https://api.github.com/repos/o/r/issues/42/comments"
-    ).mock(
+    respx_mock.post("https://api.github.com/repos/o/r/issues/42/comments").mock(
         return_value=httpx.Response(
             201,
             json={
@@ -497,9 +440,7 @@ async def test_post_comment_returns_html_url(respx_mock: respx.MockRouter) -> No
         )
     )
     async with make_client("tok") as client:
-        url = await post_comment(
-            client, "github.com", IssueRef("o", "r", 42), "body content"
-        )
+        url = await post_comment(client, "github.com", IssueRef("o", "r", 42), "body content")
     assert "issuecomment-100" in url
 
 
@@ -513,9 +454,7 @@ async def test_reopen_issue_patches_state(respx_mock: respx.MockRouter) -> None:
         captured["body"] = json.loads(request.content)
         return httpx.Response(200, json={"state": "open", "state_reason": "reopened"})
 
-    respx_mock.patch(
-        "https://api.github.com/repos/o/r/issues/42"
-    ).mock(side_effect=capture)
+    respx_mock.patch("https://api.github.com/repos/o/r/issues/42").mock(side_effect=capture)
     async with make_client("tok") as client:
         await reopen_issue(client, "github.com", IssueRef("o", "r", 42))
     assert captured["body"] == {
@@ -530,11 +469,9 @@ async def test_reopen_issue_patches_state(respx_mock: respx.MockRouter) -> None:
 @pytest.mark.asyncio
 async def test_get_issue_uses_ghe_api_base(respx_mock: respx.MockRouter) -> None:
     """Non-github.com hosts hit /api/v3 instead of api.github.com."""
-    respx_mock.get(
-        "https://ghe.example.com/api/v3/repos/o/r/issues/42"
-    ).mock(return_value=httpx.Response(200, json=_issue_payload()))
+    respx_mock.get("https://ghe.example.com/api/v3/repos/o/r/issues/42").mock(
+        return_value=httpx.Response(200, json=_issue_payload())
+    )
     async with make_client("tok") as client:
-        issue = await get_issue(
-            client, "ghe.example.com", IssueRef("o", "r", 42)
-        )
+        issue = await get_issue(client, "ghe.example.com", IssueRef("o", "r", 42))
     assert issue.number == 42

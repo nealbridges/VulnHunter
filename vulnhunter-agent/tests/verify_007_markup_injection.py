@@ -10,10 +10,20 @@ from agent.issues_render import render_body
 
 def _render(**overrides):
     base = dict(
-        id="VULN-001", title="t", cwe="CWE-79", cwe_name="XSS", severity="Low",
-        location="agent/x.py", root_cause="rc", data_flow="df", entry_point="ep",
-        exploit_description="ed", exploit_impact="ei", fix_strategy="fs",
-        severity_rationale="sr", vulnfix_key="deadbeefdeadbeef",
+        id="VULN-001",
+        title="t",
+        cwe="CWE-79",
+        cwe_name="XSS",
+        severity="Low",
+        location="agent/x.py",
+        root_cause="rc",
+        data_flow="df",
+        entry_point="ep",
+        exploit_description="ed",
+        exploit_impact="ei",
+        fix_strategy="fs",
+        severity_rationale="sr",
+        vulnfix_key="deadbeefdeadbeef",
     )
     base.update(overrides)
     finding = Finding(**base)
@@ -41,9 +51,7 @@ def test_html_comment_is_neutralized():
 
 
 def test_markdown_link_is_neutralized():
-    body = _render(
-        exploit_description="[click me](https://attacker.example/phish?t=OP)"
-    )
+    body = _render(exploit_description="[click me](https://attacker.example/phish?t=OP)")
     assert "[click me](https://attacker.example/phish?t=OP)" not in body
 
 

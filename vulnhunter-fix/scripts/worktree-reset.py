@@ -18,9 +18,8 @@ import json
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
 
 PROTECTED_PATTERNS = ("manifest.json", "graph_context/", "result_history/")
 
@@ -40,15 +39,20 @@ def _git(cwd: str, *args: str, timeout: float = 120.0) -> subprocess.CompletedPr
     try:
         return subprocess.run(  # nosec B603
             [git, "-C", cwd, *args],
-            capture_output=True, text=True, check=False, timeout=timeout,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
         )
     except subprocess.TimeoutExpired as exc:
         # Fabricate a CompletedProcess-shaped return so callers can inspect
         # returncode uniformly. rc=-1 is our convention for timeout.
         return subprocess.CompletedProcess(
-            args=[git, "-C", cwd, *args], returncode=-1,
+            args=[git, "-C", cwd, *args],
+            returncode=-1,
             stdout=(exc.stdout or "") if isinstance(exc.stdout, str) else "",
-            stderr=((exc.stderr or "") if isinstance(exc.stderr, str) else "") + f"\ntimeout after {timeout}s",
+            stderr=((exc.stderr or "") if isinstance(exc.stderr, str) else "")
+            + f"\ntimeout after {timeout}s",
         )
 
 
@@ -70,19 +74,25 @@ def _unsafe_worktree_reason(worktree: Path) -> str | None:
     if top.returncode != 0:
         return f"{worktree} is not inside a git work tree"
     if Path(top.stdout.strip()).resolve() != worktree.resolve():
-        return (f"{worktree} is not a git worktree root (toplevel is "
-                f"{top.stdout.strip()}) — reset would walk up to the enclosing repo")
+        return (
+            f"{worktree} is not a git worktree root (toplevel is "
+            f"{top.stdout.strip()}) — reset would walk up to the enclosing repo"
+        )
     git_dir = _git(str(worktree), "rev-parse", "--git-dir")
     common = _git(str(worktree), "rev-parse", "--git-common-dir")
     if git_dir.returncode == 0 and common.returncode == 0:
+
         def _abs(p: str) -> Path:
             path = Path(p)
             return path.resolve() if path.is_absolute() else (worktree / path).resolve()
+
         # In the MAIN worktree, --git-dir and --git-common-dir are the same
         # `.git`; in a linked worktree they differ (.git/worktrees/<name> vs .git).
         if _abs(git_dir.stdout.strip()) == _abs(common.stdout.strip()):
-            return (f"{worktree} is the MAIN worktree, not a linked worktree — "
-                    f"reset would destroy the primary checkout")
+            return (
+                f"{worktree} is the MAIN worktree, not a linked worktree — "
+                f"reset would destroy the primary checkout"
+            )
     return None
 
 
@@ -92,7 +102,9 @@ def reset(args) -> int:
         print(f"error: not a directory: {worktree}", file=sys.stderr)
         return 2
     if not _looks_like_sha_or_ref(args.branch_baseline):
-        print(f"error: --branch-baseline looks like a flag: {args.branch_baseline!r}", file=sys.stderr)
+        print(
+            f"error: --branch-baseline looks like a flag: {args.branch_baseline!r}", file=sys.stderr
+        )
         return 2
 
     unsafe = _unsafe_worktree_reason(worktree)
@@ -120,7 +132,7 @@ def reset(args) -> int:
         return 2
 
     entry = {
-        "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "ts": datetime.now(UTC).isoformat(timespec="seconds"),
         "vuln_id": args.vuln_id,
         "retry": args.retry_number,
         "worktree": str(worktree),
@@ -135,7 +147,16 @@ def reset(args) -> int:
     with log_path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
 
-    print(json.dumps({"status": "ok", "reset_to": args.branch_baseline, "aborted_files": len(dirty_files), "log": str(log_path)}))
+    print(
+        json.dumps(
+            {
+                "status": "ok",
+                "reset_to": args.branch_baseline,
+                "aborted_files": len(dirty_files),
+                "log": str(log_path),
+            }
+        )
+    )
     return 0
 
 

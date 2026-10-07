@@ -49,13 +49,21 @@ SKILLS = sorted(_discover_skills())
 
 # Per-skill files that must ship (README optional for operator skills).
 REQUIRED_TOP_LEVEL: dict[str, set[str]] = {
-    "vulnhunt": {"phases/phase1_recon.md", "phases/phase2_shared.md",
-                 "phases/phase2b_verify.md", "phases/phase4_report.md",
-                 "README.md"},
+    "vulnhunt": {
+        "phases/phase1_recon.md",
+        "phases/phase2_shared.md",
+        "phases/phase2b_verify.md",
+        "phases/phase4_report.md",
+        "README.md",
+    },
     "vulnhunter-fix": {"README.md"},
-    "vulnhunt-fix-verify": {"README.md", "phases/phase0_preflight.md",
-                            "phases/phase1_extract.md",
-                            "phases/phase2_verify.md", "phases/phase4_emit.md"},
+    "vulnhunt-fix-verify": {
+        "README.md",
+        "phases/phase0_preflight.md",
+        "phases/phase1_extract.md",
+        "phases/phase2_verify.md",
+        "phases/phase4_emit.md",
+    },
     "vulnhunter-run": set(),
     "runtime-provisioner": set(),
 }
@@ -187,8 +195,7 @@ class TestHarnessNeutrality:
         (re.compile(r"\bthe Claude CLI\b"), "Claude CLI as the only CLI"),
     ]
 
-    @pytest.mark.parametrize("skill", ["vulnhunt", "vulnhunt-fix-verify",
-                                       "vulnhunter-run"])
+    @pytest.mark.parametrize("skill", ["vulnhunt", "vulnhunt-fix-verify", "vulnhunter-run"])
     def test_procedure_files_stay_harness_neutral(self, skill: str) -> None:
         """Prompt-only skills must not hardcode one harness in procedure text."""
         offenders: list[str] = []
@@ -197,7 +204,9 @@ class TestHarnessNeutrality:
             for pattern, why in self.FORBIDDEN:
                 for match in pattern.finditer(text):
                     line_no = text[: match.start()].count("\n") + 1
-                    offenders.append(f"{md.relative_to(REPO_ROOT)}:{line_no} {why}: {match.group(0)!r}")
+                    offenders.append(
+                        f"{md.relative_to(REPO_ROOT)}:{line_no} {why}: {match.group(0)!r}"
+                    )
         assert not offenders, f"{skill}: harness-isms in procedure files: {offenders}"
 
     def test_vulnhunter_fix_env_contract_documented(self) -> None:
@@ -211,11 +220,14 @@ class TestHarnessNeutrality:
             used |= set(re.findall(r"VULNHUNT_[A-Z_]+", md.read_text(encoding="utf-8")))
         used.discard("VULNHUNT_")  # bare prefix mention
         # The core contract every consumer needs (README "Environment contract"):
-        core = {"VULNHUNT_SKILLS_DIR", "VULNHUNT_AGENTS_DIR", "VULNHUNT_BIN_DIR",
-                "VULNHUNT_HOST_CMD", "VULNHUNT_MODEL"}
-        undocumented = {var for var in used
-                        if var not in core
-                        and not self._mentioned_in_docs(var)}
+        core = {
+            "VULNHUNT_SKILLS_DIR",
+            "VULNHUNT_AGENTS_DIR",
+            "VULNHUNT_BIN_DIR",
+            "VULNHUNT_HOST_CMD",
+            "VULNHUNT_MODEL",
+        }
+        undocumented = {var for var in used if var not in core and not self._mentioned_in_docs(var)}
         assert not undocumented, (
             f"vulnhunter-fix: VULNHUNT_* vars used but not documented: {sorted(undocumented)}"
         )
@@ -231,8 +243,8 @@ class TestSchemaContracts:
 
     def test_schemas_are_valid_json_with_fork_home(self) -> None:
         import json
-        for schema_name in ("scan_manifest.schema.json",
-                            "verify_disposition.schema.json"):
+
+        for schema_name in ("scan_manifest.schema.json", "verify_disposition.schema.json"):
             path = REPO_ROOT / "vulnhunter-agent" / schema_name
             schema = json.loads(path.read_text(encoding="utf-8"))
             assert schema.get("$id"), f"{schema_name}: missing $id"

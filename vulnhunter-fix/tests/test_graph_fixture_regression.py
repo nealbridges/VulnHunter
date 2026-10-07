@@ -17,7 +17,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = REPO_ROOT / "tests" / "graph_fixtures"
 
@@ -41,6 +40,7 @@ def _normalize(doc_dict: dict) -> dict:
 @pytest.mark.parametrize("lang", ["python", "go"])
 def test_graph_fixture_matches_golden(lang):
     import sys
+
     sys.path.insert(0, str(REPO_ROOT))
     from vulnhunter_fix.graph.build import build_graph
 
@@ -66,7 +66,7 @@ def test_graph_fixture_matches_golden(lang):
             f"d = build_graph('tests/graph_fixtures/{lang}').to_dict(); "
             f"d['generated_at']=''; d['content_hash']=''; d['root_dir']='tests/graph_fixtures/{lang}'; "
             f"json.dump(d, open('tests/graph_fixtures/{lang}/golden.graph.json','w'), "
-            f"indent=2, sort_keys=True)\"`"
+            f'indent=2, sort_keys=True)"`'
         )
 
     actual_nodes = set(actual["nodes"].keys())

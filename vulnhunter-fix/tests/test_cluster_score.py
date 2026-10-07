@@ -68,7 +68,7 @@ class TestSortClusters:
         )
 
     def test_descending_by_score(self):
-        a = self._c("a", {"High": 3}, 3)   # 12
+        a = self._c("a", {"High": 3}, 3)  # 12
         b = self._c("b", {"Critical": 2}, 2)  # 16
         c = self._c("c", {"Medium": 4}, 4)  # 8
         result = sort_clusters([a, b, c])
@@ -78,7 +78,7 @@ class TestSortClusters:
         # Both score 8 — Medium*4 (4 members) vs Critical (1 member).
         # Tie broken by member count desc — the 4-member cluster goes first.
         a = self._c("a", {"Critical": 1}, 1)  # 8, 1 member
-        b = self._c("b", {"Medium": 4}, 4)    # 8, 4 members
+        b = self._c("b", {"Medium": 4}, 4)  # 8, 4 members
         result = sort_clusters([a, b])
         assert [x.name for x in result] == ["b", "a"]
 
@@ -96,14 +96,18 @@ class TestAnnotateClustersJson:
     def test_writes_score_and_recommended(self):
         payload = {
             "clusters": [
-                {"name": "Authn",
-                 "rationale": "missing authz",
-                 "members": [{"vuln": "VULN-001"}, {"vuln": "VULN-002"}],
-                 "severity_breakdown": {"High": 7, "Medium": 1}},
-                {"name": "TLS",
-                 "rationale": "outbound TLS",
-                 "members": [{"vuln": "VULN-005"}],
-                 "severity_breakdown": {"High": 3, "Medium": 2}},
+                {
+                    "name": "Authn",
+                    "rationale": "missing authz",
+                    "members": [{"vuln": "VULN-001"}, {"vuln": "VULN-002"}],
+                    "severity_breakdown": {"High": 7, "Medium": 1},
+                },
+                {
+                    "name": "TLS",
+                    "rationale": "outbound TLS",
+                    "members": [{"vuln": "VULN-005"}],
+                    "severity_breakdown": {"High": 3, "Medium": 2},
+                },
             ]
         }
         out = annotate_clusters_json(payload)
@@ -117,8 +121,12 @@ class TestAnnotateClustersJson:
     def test_preserves_unknown_fields(self):
         payload = {
             "clusters": [
-                {"name": "x", "extra_field": "preserve me", "members": [],
-                 "severity_breakdown": {"High": 1}}
+                {
+                    "name": "x",
+                    "extra_field": "preserve me",
+                    "members": [],
+                    "severity_breakdown": {"High": 1},
+                }
             ],
             "top_level_extra": "also preserve",
         }
@@ -162,17 +170,24 @@ class TestAnnotateClustersJson:
 class TestCli:
     def test_round_trip_via_file(self, tmp_path):
         import subprocess
+
         script = Path(__file__).resolve().parents[1] / "scripts" / "cluster_score.py"
         clusters = tmp_path / "clusters.json"
-        clusters.write_text(json.dumps({
-            "clusters": [
-                {"name": "a", "members": [], "severity_breakdown": {"Critical": 1}},
-                {"name": "b", "members": [], "severity_breakdown": {"High": 5}},
-            ]
-        }))
+        clusters.write_text(
+            json.dumps(
+                {
+                    "clusters": [
+                        {"name": "a", "members": [], "severity_breakdown": {"Critical": 1}},
+                        {"name": "b", "members": [], "severity_breakdown": {"High": 5}},
+                    ]
+                }
+            )
+        )
         result = subprocess.run(
             [sys.executable, str(script), str(clusters)],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         )
         out = json.loads(result.stdout)
         # b's 5-High (20) outranks a's 1-Critical (8); b is recommended.

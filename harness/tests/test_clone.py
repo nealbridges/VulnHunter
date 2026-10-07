@@ -3,8 +3,6 @@
 import subprocess
 import types
 
-import pytest
-
 import local_harness.clone as clone
 
 
@@ -32,26 +30,24 @@ def test_target_dir_name_truncates_commit():
 
 
 def test_is_at_commit_match(monkeypatch):
-    monkeypatch.setattr(clone.subprocess, "run",
-                        lambda *a, **k: _proc(0, stdout="0123456789\n"))
+    monkeypatch.setattr(clone.subprocess, "run", lambda *a, **k: _proc(0, stdout="0123456789\n"))
     assert clone.is_at_commit("/tmp/x", "01234567abc") is True
 
 
 def test_is_at_commit_mismatch(monkeypatch):
-    monkeypatch.setattr(clone.subprocess, "run",
-                        lambda *a, **k: _proc(0, stdout="ffffffff\n"))
+    monkeypatch.setattr(clone.subprocess, "run", lambda *a, **k: _proc(0, stdout="ffffffff\n"))
     assert clone.is_at_commit("/tmp/x", "01234567") is False
 
 
 def test_is_at_commit_nonzero(monkeypatch):
-    monkeypatch.setattr(clone.subprocess, "run",
-                        lambda *a, **k: _proc(1, stdout=""))
+    monkeypatch.setattr(clone.subprocess, "run", lambda *a, **k: _proc(1, stdout=""))
     assert clone.is_at_commit("/tmp/x", "01234567") is False
 
 
 def test_is_at_commit_timeout(monkeypatch):
     def boom(*a, **k):
         raise subprocess.TimeoutExpired(cmd="git", timeout=10)
+
     monkeypatch.setattr(clone.subprocess, "run", boom)
     assert clone.is_at_commit("/tmp/x", "01234567") is False
 
@@ -59,6 +55,7 @@ def test_is_at_commit_timeout(monkeypatch):
 def test_is_at_commit_git_missing(monkeypatch):
     def boom(*a, **k):
         raise FileNotFoundError()
+
     monkeypatch.setattr(clone.subprocess, "run", boom)
     assert clone.is_at_commit("/tmp/x", "01234567") is False
 
@@ -158,6 +155,7 @@ def test_clone_at_commit_git_unavailable(monkeypatch, tmp_path):
 
     def boom(*a, **k):
         raise FileNotFoundError("git not on PATH")
+
     monkeypatch.setattr(clone.subprocess, "run", boom)
     result_dir, err = clone.clone_at_commit("url", "abcdef12", target)
     assert "git unavailable" in err
@@ -208,8 +206,11 @@ def test_clone_at_commit_wrong_commit_removed(monkeypatch, tmp_path):
     removed = {}
     monkeypatch.setattr(clone.shutil, "rmtree", lambda p: removed.setdefault("r", p))
     monkeypatch.setattr(clone.os, "makedirs", lambda *a, **k: None)
-    monkeypatch.setattr(clone.subprocess, "run",
-                        lambda cmd, **k: _proc(0) if cmd[:2] == ["git", "fetch"] else _proc(0))
+    monkeypatch.setattr(
+        clone.subprocess,
+        "run",
+        lambda cmd, **k: _proc(0) if cmd[:2] == ["git", "fetch"] else _proc(0),
+    )
     result_dir, err = clone.clone_at_commit("url", "abcdef12", target)
     assert removed["r"] == target
 
@@ -245,8 +246,7 @@ def test_shallow_clone_fails(monkeypatch, tmp_path):
     target = str(tmp_path / "c")
     monkeypatch.setattr(clone.os.path, "isdir", lambda p: False)
     monkeypatch.setattr(clone.os, "makedirs", lambda *a, **k: None)
-    monkeypatch.setattr(clone.subprocess, "run",
-                        lambda *a, **k: _proc(1, stderr="no such repo"))
+    monkeypatch.setattr(clone.subprocess, "run", lambda *a, **k: _proc(1, stderr="no such repo"))
     result_dir, err = clone.shallow_clone("url", target)
     assert "no such repo" in err
 
@@ -258,6 +258,7 @@ def test_shallow_clone_timeout(monkeypatch, tmp_path):
 
     def boom(*a, **k):
         raise subprocess.TimeoutExpired(cmd="git", timeout=120)
+
     monkeypatch.setattr(clone.subprocess, "run", boom)
     result_dir, err = clone.shallow_clone("url", target)
     assert "timed out" in err
@@ -270,6 +271,7 @@ def test_shallow_clone_git_unavailable(monkeypatch, tmp_path):
 
     def boom(*a, **k):
         raise FileNotFoundError("git not on PATH")
+
     monkeypatch.setattr(clone.subprocess, "run", boom)
     result_dir, err = clone.shallow_clone("url", target)
     assert "git unavailable" in err

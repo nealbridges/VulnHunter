@@ -9,7 +9,6 @@ other heavy dependency. The same logic is exercised end-to-end via the
 from __future__ import annotations
 
 import pytest
-
 from agent._transient import classify, is_transient_status, is_transient_text
 
 
@@ -107,9 +106,7 @@ class TestClassify:
     """Typed-first composite — short-circuits on authoritative status."""
 
     @pytest.mark.parametrize("status", [429, 500, 502, 503, 504])
-    def test_transient_status_returns_true_regardless_of_text(
-        self, status: int
-    ) -> None:
+    def test_transient_status_returns_true_regardless_of_text(self, status: int) -> None:
         assert classify(status, "")
         assert classify(status, "unrelated message")
 

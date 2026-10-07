@@ -14,13 +14,12 @@ Usage:
     python3 scripts/preflight.py
 """
 
-import _skill_bootstrap  # noqa: F401  — adds bundled .venv site-packages to sys.path
-
 import os
 import shutil
 import subprocess
 import sys
 
+import _skill_bootstrap  # noqa: F401  — adds bundled .venv site-packages to sys.path
 
 REQUIRED_PYTHON = (3, 11)
 REQUIRED_GIT = (2, 30)
@@ -108,7 +107,10 @@ def check_agent_cli():
             # `<harness> --version` may shell out through the CLI's own network
             # path; cap at 5s so a hung network call doesn't wedge preflight.
             out = subprocess.check_output(
-                [harness, "--version"], text=True, stderr=subprocess.DEVNULL, timeout=5,
+                [harness, "--version"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+                timeout=5,
             ).strip()
             check(f"agent CLI ({harness}: {out})" if out else f"agent CLI ({harness})", True)
             return
@@ -145,7 +147,7 @@ def _free_disk_bytes(path: str) -> int:
 
 def check_disk_space():
     try:
-        free_gb = _free_disk_bytes(".") / (1024 ** 3)
+        free_gb = _free_disk_bytes(".") / (1024**3)
     except (OSError, AttributeError):
         check("Disk space", True, "cannot determine — skipping check")
         return
@@ -188,7 +190,7 @@ def _total_memory_bytes() -> int:
 
 def check_memory():
     try:
-        mem_gb = _total_memory_bytes() / (1024 ** 3)
+        mem_gb = _total_memory_bytes() / (1024**3)
         cpus = os.cpu_count() or 1
         slots = max(1, min(cpus, int(mem_gb // 4), 8))
         check(f"Memory ({mem_gb:.1f} GB, {cpus} CPUs → {slots} parallel slots)", True)
@@ -217,7 +219,10 @@ def check_git_clone_writable():
         env["GIT_TEMPLATE_DIR"] = ""
         result = subprocess.run(
             ["git", "-c", "init.templateDir=", "init", "-q", probe_dir],
-            env=env, capture_output=True, text=True, timeout=15,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         if result.returncode != 0:
             check(
@@ -252,7 +257,8 @@ def _detect_in_place_root() -> str | None:
     try:
         top = subprocess.check_output(
             ["git", "rev-parse", "--show-toplevel"],
-            text=True, stderr=subprocess.DEVNULL,
+            text=True,
+            stderr=subprocess.DEVNULL,
         ).strip()
     except subprocess.CalledProcessError:
         return None
@@ -261,7 +267,8 @@ def _detect_in_place_root() -> str | None:
     try:
         origin = subprocess.check_output(
             ["git", "-C", top, "remote", "get-url", "origin"],
-            text=True, stderr=subprocess.DEVNULL,
+            text=True,
+            stderr=subprocess.DEVNULL,
         ).strip()
     except subprocess.CalledProcessError:
         return None
@@ -300,15 +307,15 @@ def check_in_place_mode(repo_root: str | None = None):
     check(
         "Working tree is clean",
         clean,
-        "uncommitted changes detected; commit or stash before running"
-        if not clean else "",
+        "uncommitted changes detected; commit or stash before running" if not clean else "",
     )
 
     # Prune any stale worktrees from prior crashed runs.
     try:
         subprocess.run(
             ["git", "-C", top, "worktree", "prune"],
-            capture_output=True, check=True,
+            capture_output=True,
+            check=True,
         )
         check("git worktree prune", True)
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
@@ -332,7 +339,8 @@ def check_graphifyy():
         check("graphifyy (module import)", False, f"cannot import 'graphify': {exc}")
         return
     try:
-        from importlib.metadata import version, PackageNotFoundError
+        from importlib.metadata import version
+
         version_str = version("graphifyy")
     except (ImportError, Exception) as exc:
         check("graphifyy version", False, f"cannot resolve distribution version: {exc}")
@@ -369,6 +377,7 @@ def check_jsonschema():
         return
     try:
         from importlib.metadata import version as _version
+
         version_str = _version("jsonschema")
     except Exception as exc:
         check("jsonschema version", False, f"cannot resolve distribution version: {exc}")

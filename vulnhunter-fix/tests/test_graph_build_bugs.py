@@ -10,6 +10,7 @@ Covers:
   and the grep fallback.
 - ``build_fallback_graph`` doesn't crash on unreadable subdirs.
 """
+
 from __future__ import annotations
 
 import os
@@ -112,7 +113,9 @@ def test_build_graph_returns_nodes_on_python_fixture(tmp_path):
     doc = build_graph(tmp_path)
     if len(doc.nodes) == 0 and doc.backend == "grep":
         pytest.skip("both graphify and grep fallback returned 0 nodes in this env")
-    assert len(doc.nodes) > 0, f"expected graph nodes from a 2-function fixture, got {len(doc.nodes)}"
+    assert len(doc.nodes) > 0, (
+        f"expected graph nodes from a 2-function fixture, got {len(doc.nodes)}"
+    )
 
 
 def test_fallback_graph_survives_permission_denied_dir(tmp_path):
@@ -145,7 +148,6 @@ def test_ast_path_uses_graphify_detect_not_rglob(monkeypatch, tmp_path):
     the resulting file list on to graphify.extract().
     """
     graphify = pytest.importorskip("graphify")
-    from graphify.detect import detect as real_detect
 
     (tmp_path / "a.py").write_text("def x(): pass\n", encoding="utf-8")
     calls = {"detect_count": 0, "extract_args": None, "extract_kwargs": None}
@@ -178,6 +180,7 @@ def test_graphify_parallel_defaults_to_sequential_on_darwin(monkeypatch):
     defaulting to sequential on Darwin.
     """
     import sys as _sys
+
     from vulnhunter_fix.graph.build import _graphify_parallel
 
     monkeypatch.delenv("GRAPHIFY_PARALLEL", raising=False)

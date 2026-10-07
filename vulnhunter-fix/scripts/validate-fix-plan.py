@@ -10,16 +10,14 @@ Usage:
 
 from __future__ import annotations
 
-import _skill_bootstrap  # noqa: F401  — adds bundled .venv site-packages to sys.path
-
 import json
 import sys
 from pathlib import Path
 
+import _skill_bootstrap  # noqa: F401  — adds bundled .venv site-packages to sys.path
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REFERENCES_DIR = REPO_ROOT / "references"

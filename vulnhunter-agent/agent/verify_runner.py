@@ -49,8 +49,6 @@ from claude_agent_sdk import (
 )
 from jsonschema import Draft202012Validator
 
-from .build_settings import build_claude_settings
-from .config import AgentConfig
 from ._stream_events import (
     SessionTotals,
     _agent_name_from_started,
@@ -65,6 +63,8 @@ from ._stream_events import (
     get_verbosity,
     log_session_totals,
 )
+from .build_settings import build_claude_settings
+from .config import AgentConfig
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ def _schema_root() -> Path:
 
 class OutputKind(str, Enum):
     DISPOSITION = "disposition"
-    EMPTY = "empty"            # disposition file missing (infra failure)
+    EMPTY = "empty"  # disposition file missing (infra failure)
     SCHEMA_INVALID = "schema_invalid"
 
 
@@ -110,9 +110,9 @@ class VerifySessionResult:
     """
 
     kind: OutputKind
-    output_path: Path | None      # path to the disposition file
+    output_path: Path | None  # path to the disposition file
     parsed: dict[str, Any] | None  # parsed + validated disposition payload
-    error_detail: str = ""        # populated when kind == SCHEMA_INVALID or EMPTY
+    error_detail: str = ""  # populated when kind == SCHEMA_INVALID or EMPTY
 
 
 def build_kickoff_prompt(
@@ -146,9 +146,7 @@ def build_kickoff_prompt(
         f"  comments: {comments}",
     ]
     if additional_repos:
-        lines.append(
-            "  additional_repos: " + ",".join(str(p) for p in additional_repos)
-        )
+        lines.append("  additional_repos: " + ",".join(str(p) for p in additional_repos))
     lines.append("")
     return "\n".join(lines)
 
@@ -173,9 +171,7 @@ def classify_output(out_dir: Path) -> VerifySessionResult:
         kind=OutputKind.EMPTY,
         output_path=None,
         parsed=None,
-        error_detail=(
-            f"verify_disposition.json did not appear in {out_dir}"
-        ),
+        error_detail=(f"verify_disposition.json did not appear in {out_dir}"),
     )
 
 
@@ -215,16 +211,13 @@ def _load_and_validate(
     errors = sorted(validator.iter_errors(payload), key=lambda e: e.path)
     if errors:
         detail = "; ".join(
-            f"{'/'.join(str(p) for p in err.path) or '<root>'}: {err.message}"
-            for err in errors[:5]
+            f"{'/'.join(str(p) for p in err.path) or '<root>'}: {err.message}" for err in errors[:5]
         )
         return VerifySessionResult(
             kind=OutputKind.SCHEMA_INVALID,
             output_path=path,
             parsed=None,
-            error_detail=(
-                f"{path.name} failed {schema_filename} validation: {detail}"
-            ),
+            error_detail=(f"{path.name} failed {schema_filename} validation: {detail}"),
         )
     return VerifySessionResult(
         kind=success_kind,
@@ -260,9 +253,7 @@ async def run_verify_session(
     model = model_override or config.anthropic.model
     scan_id = out_dir.parent.name  # one level up from out/iter-N — readable run id
 
-    settings_json = build_claude_settings(
-        config, auth_token, model=model, scan_id=scan_id
-    )
+    settings_json = build_claude_settings(config, auth_token, model=model, scan_id=scan_id)
     options = ClaudeAgentOptions(
         # Locked allow-list — verify mode is always read-only; no
         # CLI flag widens this set. The skill is responsible for
@@ -297,9 +288,7 @@ async def run_verify_session(
                 async for event in client.receive_response():
                     message_count += 1
                     # File log: terse one-line summary survives crashes.
-                    log_fh.write(
-                        f"{type(event).__name__}: {_event_summary(event)}\n"
-                    )
+                    log_fh.write(f"{type(event).__name__}: {_event_summary(event)}\n")
                     # Stdout/structured log: routed through the shared
                     # verbosity-tiered helpers so verify-mode -v/-vv
                     # behave the same as scan-mode.
@@ -383,9 +372,7 @@ def _dispatch_event(
             last_turn_ts[tool_use_id] = time.time()
         _log_task_started(event)
     elif isinstance(event, (TaskUpdatedMessage, TaskNotificationMessage)):
-        _log_task_status(
-            event, agent_name=agent_names_by_task_id.get(event.task_id)
-        )
+        _log_task_status(event, agent_name=agent_names_by_task_id.get(event.task_id))
     elif isinstance(event, AssistantMessage):
         if log_per_turn_usage:
             _log_per_turn_usage(

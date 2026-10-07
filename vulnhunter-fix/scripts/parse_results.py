@@ -54,22 +54,24 @@ def parse_summary_table(content: str) -> list[dict]:
     # CWE column accepts: `CWE-918`, `CWE-918 / CWE-74`, `CWE-22, CWE-23`,
     # `CWE-918 | CWE-74` — anything word-y plus `/` and `,` between codes.
     table_pattern = re.compile(
-        r'\|\s*\[?(VULN-\d+)\]?(?:\([^)]*\))?\s*\|'
-        r'\s*(.+?)\s*\|'
-        r'\s*(CWE-[\d,\s\w/-]+?)\s*\|'
-        r'\s*(\w+\+?)\s*\|'
-        r'\s*(.+?)\s*\|'
-        r'\s*(\w+)\s*\|'
+        r"\|\s*\[?(VULN-\d+)\]?(?:\([^)]*\))?\s*\|"
+        r"\s*(.+?)\s*\|"
+        r"\s*(CWE-[\d,\s\w/-]+?)\s*\|"
+        r"\s*(\w+\+?)\s*\|"
+        r"\s*(.+?)\s*\|"
+        r"\s*(\w+)\s*\|"
     )
     for match in table_pattern.finditer(content):
-        findings.append({
-            "id": match.group(1),
-            "title": match.group(2).strip(),
-            "cwe": match.group(3).strip(),
-            "severity": match.group(4),
-            "exploit_test": match.group(5).strip(),
-            "status": match.group(6),
-        })
+        findings.append(
+            {
+                "id": match.group(1),
+                "title": match.group(2).strip(),
+                "cwe": match.group(3).strip(),
+                "severity": match.group(4),
+                "exploit_test": match.group(5).strip(),
+                "status": match.group(6),
+            }
+        )
     return findings
 
 
@@ -78,14 +80,12 @@ def parse_finding_detail(content: str, vuln_id: str) -> dict:
     detail = {}
 
     section_pattern = re.compile(
-        rf'##\s*\[?{re.escape(vuln_id)}\]?[:\s]*(.+?)(?=\n##\s|\Z)',
-        re.DOTALL
+        rf"##\s*\[?{re.escape(vuln_id)}\]?[:\s]*(.+?)(?=\n##\s|\Z)", re.DOTALL
     )
     match = section_pattern.search(content)
     if not match:
         section_pattern = re.compile(
-            rf'##\s*{re.escape(vuln_id)}[:\s]*(.+?)(?=\n##\s|\Z)',
-            re.DOTALL
+            rf"##\s*{re.escape(vuln_id)}[:\s]*(.+?)(?=\n##\s|\Z)", re.DOTALL
         )
         match = section_pattern.search(content)
 
@@ -94,28 +94,28 @@ def parse_finding_detail(content: str, vuln_id: str) -> dict:
 
     section = match.group(0)
 
-    location_match = re.search(r'\*\*Location\*\*\s*\|\s*`?([^`|]+)`?', section)
+    location_match = re.search(r"\*\*Location\*\*\s*\|\s*`?([^`|]+)`?", section)
     if location_match:
         detail["location"] = location_match.group(1).strip()
 
-    root_cause_match = re.search(r'\*\*Root Cause\*\*\s*\|\s*(.+)', section)
+    root_cause_match = re.search(r"\*\*Root Cause\*\*\s*\|\s*(.+)", section)
     if root_cause_match:
         detail["root_cause"] = root_cause_match.group(1).strip()
 
-    entry_match = re.search(r'\*\*Entry Point\*\*\s*\|\s*(.+)', section)
+    entry_match = re.search(r"\*\*Entry Point\*\*\s*\|\s*(.+)", section)
     if entry_match:
         detail["entry_point"] = entry_match.group(1).strip()
 
-    flow_match = re.search(r'\*\*Data Flow\*\*\s*\|\s*(.+)', section)
+    flow_match = re.search(r"\*\*Data Flow\*\*\s*\|\s*(.+)", section)
     if flow_match:
         detail["data_flow"] = flow_match.group(1).strip()
 
-    fix_section = re.search(r'###\s*Proposed Fix(.+?)(?=\n###|\Z)', section, re.DOTALL)
+    fix_section = re.search(r"###\s*Proposed Fix(.+?)(?=\n###|\Z)", section, re.DOTALL)
     if fix_section:
         fix_text = fix_section.group(1)
-        strategy_match = re.search(r'\*\*Strategy\*\*:\s*(.+)', fix_text)
-        files_match = re.search(r'\*\*Files to change\*\*:\s*(.+)', fix_text)
-        why_match = re.search(r'\*\*Why this works\*\*:\s*(.+)', fix_text)
+        strategy_match = re.search(r"\*\*Strategy\*\*:\s*(.+)", fix_text)
+        files_match = re.search(r"\*\*Files to change\*\*:\s*(.+)", fix_text)
+        why_match = re.search(r"\*\*Why this works\*\*:\s*(.+)", fix_text)
 
         detail["proposed_fix"] = {
             "strategy": strategy_match.group(1).strip() if strategy_match else "",
@@ -255,6 +255,7 @@ def _parse_smells_table_format(section: str) -> list[dict]:
         return smells
 
     header = [c.strip().strip("*").lower() for c in lines[table_start].split("|")[1:-1]]
+
     # Find column positions
     def col_idx(*names):
         for n in names:

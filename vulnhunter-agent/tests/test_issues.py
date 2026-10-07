@@ -11,7 +11,6 @@ from typing import Any
 import httpx
 import pytest
 import respx
-
 from agent import issues as issues_mod
 from agent import issues_dedup as dedup_mod
 from agent import issues_extract as extract_mod
@@ -36,6 +35,7 @@ from agent.issues import (
 from agent.issues_dedup import DedupDecision
 from agent.issues_extract import ExtractedReport, Finding
 from agent.issues_fetch import OpenIssue
+
 from tests._helpers import FakeTokenManager as _TM
 
 
@@ -73,20 +73,18 @@ def _stub_resolve_verify(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _client() -> httpx.AsyncClient:
-    return httpx.AsyncClient(
-        verify=True, timeout=10, headers=_github_default_headers()
-    )
+    return httpx.AsyncClient(verify=True, timeout=10, headers=_github_default_headers())
 
 
 class TestEnsureLabel:
     @respx.mock
     async def test_existing_label_no_create(self) -> None:
-        get_route = respx.get(
-            "https://api.github.com/repos/o/r/labels/security"
-        ).mock(return_value=httpx.Response(200, json={"name": "security"}))
-        post_route = respx.post(
-            "https://api.github.com/repos/o/r/labels"
-        ).mock(return_value=httpx.Response(201, json={}))
+        get_route = respx.get("https://api.github.com/repos/o/r/labels/security").mock(
+            return_value=httpx.Response(200, json={"name": "security"})
+        )
+        post_route = respx.post("https://api.github.com/repos/o/r/labels").mock(
+            return_value=httpx.Response(201, json={})
+        )
         async with _client() as client:
             await _ensure_label(
                 client,
@@ -103,9 +101,9 @@ class TestEnsureLabel:
         respx.get("https://api.github.com/repos/o/r/labels/security").mock(
             return_value=httpx.Response(404, text="not found")
         )
-        post_route = respx.post(
-            "https://api.github.com/repos/o/r/labels"
-        ).mock(return_value=httpx.Response(201, json={}))
+        post_route = respx.post("https://api.github.com/repos/o/r/labels").mock(
+            return_value=httpx.Response(201, json={})
+        )
         async with _client() as client:
             await _ensure_label(
                 client,
@@ -154,9 +152,9 @@ class TestEnsureLabel:
         respx.get("https://api.github.com/repos/o/r/labels/custom-x").mock(
             return_value=httpx.Response(404)
         )
-        post_route = respx.post(
-            "https://api.github.com/repos/o/r/labels"
-        ).mock(return_value=httpx.Response(201, json={}))
+        post_route = respx.post("https://api.github.com/repos/o/r/labels").mock(
+            return_value=httpx.Response(201, json={})
+        )
         async with _client() as client:
             await _ensure_label(
                 client,
@@ -172,9 +170,9 @@ class TestEnsureLabel:
     async def test_url_encodes_label_with_special_chars(self) -> None:
         # Labels can contain spaces; the GET path must URL-encode the
         # label so the request hits the right endpoint.
-        respx.get(
-            "https://api.github.com/repos/o/r/labels/needs%20triage"
-        ).mock(return_value=httpx.Response(200, json={"name": "needs triage"}))
+        respx.get("https://api.github.com/repos/o/r/labels/needs%20triage").mock(
+            return_value=httpx.Response(200, json={"name": "needs triage"})
+        )
         async with _client() as client:
             await _ensure_label(
                 client,
@@ -258,9 +256,7 @@ class TestEnsureAllLabels:
             )
 
     @respx.mock
-    async def test_creates_each_missing_label(
-        self, populated_agent_config: Any
-    ) -> None:
+    async def test_creates_each_missing_label(self, populated_agent_config: Any) -> None:
         cfg = replace(
             populated_agent_config,
             github=replace(populated_agent_config.github, scan_token="t"),
@@ -291,9 +287,7 @@ class TestCreateIssue:
     @respx.mock
     async def test_201_returns_url(self) -> None:
         respx.post("https://api.github.com/repos/o/r/issues").mock(
-            return_value=httpx.Response(
-                201, json={"html_url": "https://github.com/o/r/issues/42"}
-            )
+            return_value=httpx.Response(201, json={"html_url": "https://github.com/o/r/issues/42"})
         )
         async with _client() as client:
             url = await _create_issue(
@@ -327,21 +321,15 @@ class TestCreateIssue:
                 )
 
     @respx.mock
-    async def test_5xx_retries_then_succeeds(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_5xx_retries_then_succeeds(self, monkeypatch: pytest.MonkeyPatch) -> None:
         async def _no_sleep(_seconds: float) -> None:
             return None
 
         monkeypatch.setattr(issues_mod.asyncio, "sleep", _no_sleep)
-        route = respx.post(
-            "https://api.github.com/repos/o/r/issues"
-        ).mock(
+        route = respx.post("https://api.github.com/repos/o/r/issues").mock(
             side_effect=[
                 httpx.Response(503, text="busy"),
-                httpx.Response(
-                    201, json={"html_url": "https://github.com/o/r/issues/9"}
-                ),
+                httpx.Response(201, json={"html_url": "https://github.com/o/r/issues/9"}),
             ]
         )
         async with _client() as client:
@@ -363,9 +351,7 @@ class TestCreateIssue:
             return None
 
         monkeypatch.setattr(issues_mod.asyncio, "sleep", _no_sleep)
-        route = respx.post(
-            "https://api.github.com/repos/o/r/issues"
-        ).mock(
+        route = respx.post("https://api.github.com/repos/o/r/issues").mock(
             side_effect=[
                 httpx.Response(429, text="rate"),
                 httpx.Response(201, json={"html_url": "u"}),
@@ -457,16 +443,14 @@ class TestCreateIssue:
         assert "retrying once" not in msgs
 
     @respx.mock
-    async def test_4xx_no_retry_raises(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_4xx_no_retry_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
         async def _no_sleep(_seconds: float) -> None:
             return None
 
         monkeypatch.setattr(issues_mod.asyncio, "sleep", _no_sleep)
-        route = respx.post(
-            "https://api.github.com/repos/o/r/issues"
-        ).mock(return_value=httpx.Response(422, text="bad"))
+        route = respx.post("https://api.github.com/repos/o/r/issues").mock(
+            return_value=httpx.Response(422, text="bad")
+        )
         with pytest.raises(IssuePostError, match="422"):
             async with _client() as client:
                 await _create_issue(
@@ -481,9 +465,7 @@ class TestCreateIssue:
         assert route.call_count == 1  # no retry on 4xx
 
     @respx.mock
-    async def test_5xx_persistent_raises(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_5xx_persistent_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
         async def _no_sleep(_seconds: float) -> None:
             return None
 
@@ -550,16 +532,10 @@ class TestBuildReportUrl:
 
 
 class TestPrintSummary:
-    def test_full_summary_lines(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_full_summary_lines(self, capsys: pytest.CaptureFixture[str]) -> None:
         s = PostSummary(
             posted=[PostedIssue(finding_id="V1", title="t", url="u1")],
-            skipped=[
-                SkippedIssue(
-                    finding_id="V2", matched_issue_numbers=[1, 2], via="key"
-                )
-            ],
+            skipped=[SkippedIssue(finding_id="V2", matched_issue_numbers=[1, 2], via="key")],
             failed=[FailedIssue(finding_id="V3", title="t3", error="boom")],
         )
         print_summary(s)
@@ -571,9 +547,7 @@ class TestPrintSummary:
         assert "Failed:  1" in out
         assert "V3: boom" in out
 
-    def test_empty_with_note(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_empty_with_note(self, capsys: pytest.CaptureFixture[str]) -> None:
         s = PostSummary(note="no findings")
         print_summary(s)
         out = capsys.readouterr().out
@@ -584,13 +558,9 @@ class TestPrintSummary:
 
     def test_any_failed_property(self) -> None:
         assert not PostSummary().any_failed
-        assert PostSummary(
-            failed=[FailedIssue("x", "y", "z")]
-        ).any_failed
+        assert PostSummary(failed=[FailedIssue("x", "y", "z")]).any_failed
 
-    def test_cost_line_when_calls_made(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_cost_line_when_calls_made(self, capsys: pytest.CaptureFixture[str]) -> None:
         from agent._llm import CostStats
 
         s = PostSummary(
@@ -608,9 +578,7 @@ class TestPrintSummary:
         assert "4 turn(s)" in out
         assert "API duration=1500ms" in out
 
-    def test_cost_line_omitted_when_no_calls(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_cost_line_omitted_when_no_calls(self, capsys: pytest.CaptureFixture[str]) -> None:
         # Default CostStats has calls=0 → no cost line.
         s = PostSummary()
         print_summary(s)
@@ -647,9 +615,7 @@ class TestPostIssues:
             return decisions
 
         monkeypatch.setattr(extract_mod, "extract_findings", _fake_extract)
-        monkeypatch.setattr(
-            fetch_mod, "fetch_open_issues_with_label", lambda *a, **k: open_issues
-        )
+        monkeypatch.setattr(fetch_mod, "fetch_open_issues_with_label", lambda *a, **k: open_issues)
         monkeypatch.setattr(dedup_mod, "dedup", _fake_dedup)
 
     def _cfg_with_token(self, populated_agent_config: Any) -> Any:
@@ -672,9 +638,7 @@ class TestPostIssues:
         populated_agent_config: Any,
         tmp_path: Path,
     ) -> None:
-        self._stub_pipeline(
-            monkeypatch, findings=[], open_issues=[], decisions=[]
-        )
+        self._stub_pipeline(monkeypatch, findings=[], open_issues=[], decisions=[])
         out = await post_issues(
             results_dir=tmp_path,
             report_url="u",
@@ -692,9 +656,7 @@ class TestPostIssues:
         respx.get("https://api.github.com/repos/o/r/labels/security").mock(
             return_value=httpx.Response(200, json={"name": "security"})
         )
-        respx.get(
-            "https://api.github.com/repos/o/r/labels/vulnhunter"
-        ).mock(
+        respx.get("https://api.github.com/repos/o/r/labels/vulnhunter").mock(
             return_value=httpx.Response(200, json={"name": "vulnhunter"})
         )
 
@@ -711,11 +673,7 @@ class TestPostIssues:
             monkeypatch,
             findings=[f],
             open_issues=[],
-            decisions=[
-                DedupDecision(
-                    finding_id="VULN-001", matched_issues=[42], via="key"
-                )
-            ],
+            decisions=[DedupDecision(finding_id="VULN-001", matched_issues=[42], via="key")],
         )
         out = await post_issues(
             results_dir=tmp_path,
@@ -739,20 +697,14 @@ class TestPostIssues:
     ) -> None:
         self._stub_labels_existing()
         respx.post("https://api.github.com/repos/o/r/issues").mock(
-            return_value=httpx.Response(
-                201, json={"html_url": "https://github.com/o/r/issues/9"}
-            )
+            return_value=httpx.Response(201, json={"html_url": "https://github.com/o/r/issues/9"})
         )
         f = _finding("VULN-001")
         self._stub_pipeline(
             monkeypatch,
             findings=[f],
             open_issues=[],
-            decisions=[
-                DedupDecision(
-                    finding_id="VULN-001", matched_issues=[], via=""
-                )
-            ],
+            decisions=[DedupDecision(finding_id="VULN-001", matched_issues=[], via="")],
         )
         out = await post_issues(
             results_dir=tmp_path,
@@ -775,9 +727,7 @@ class TestPostIssues:
     ) -> None:
         self._stub_labels_existing()
         # First POST fails (422, no retry); second succeeds (201).
-        respx.post(
-            "https://api.github.com/repos/o/r/issues"
-        ).mock(
+        respx.post("https://api.github.com/repos/o/r/issues").mock(
             side_effect=[
                 httpx.Response(422, text="bad"),
                 httpx.Response(201, json={"html_url": "u2"}),
@@ -790,12 +740,8 @@ class TestPostIssues:
             findings=[f1, f2],
             open_issues=[],
             decisions=[
-                DedupDecision(
-                    finding_id="VULN-001", matched_issues=[], via=""
-                ),
-                DedupDecision(
-                    finding_id="VULN-002", matched_issues=[], via=""
-                ),
+                DedupDecision(finding_id="VULN-001", matched_issues=[], via=""),
+                DedupDecision(finding_id="VULN-002", matched_issues=[], via=""),
             ],
         )
         out = await post_issues(
@@ -863,12 +809,8 @@ class TestCleanScanNotice:
         monkeypatch.setattr(extract_mod, "extract_findings", _fake_extract)
 
     def _stub_label_exists(self) -> None:
-        respx.get(
-            f"https://api.github.com/repos/o/r/labels/{self._CLEAN_LABEL_ENC}"
-        ).mock(
-            return_value=httpx.Response(
-                200, json={"name": "VulnHunter: clean-scan"}
-            )
+        respx.get(f"https://api.github.com/repos/o/r/labels/{self._CLEAN_LABEL_ENC}").mock(
+            return_value=httpx.Response(200, json={"name": "VulnHunter: clean-scan"})
         )
 
     def _results_dir(self, tmp_path: Path) -> Path:
@@ -893,11 +835,9 @@ class TestCleanScanNotice:
         path = tmp_path / "audit.jsonl"
         assert path.is_file(), "audit writer did not create the events file"
         lines = path.read_text().splitlines()
-        events = [json.loads(l) for l in lines]
+        events = [json.loads(line) for line in lines]
         clean = [e for e in events if e.get("event_type") == "clean_scan_notified"]
-        assert len(clean) == 1, (
-            f"expected exactly one clean_scan_notified event; got {len(clean)}"
-        )
+        assert len(clean) == 1, f"expected exactly one clean_scan_notified event; got {len(clean)}"
         return clean[0]
 
     # ---- happy paths -----------------------------------------------------
@@ -911,19 +851,13 @@ class TestCleanScanNotice:
     ) -> None:
         self._stub_zero_findings(monkeypatch)
         self._stub_label_exists()
-        monkeypatch.setattr(
-            fetch_mod, "fetch_open_issues_with_label", lambda *a, **k: []
+        monkeypatch.setattr(fetch_mod, "fetch_open_issues_with_label", lambda *a, **k: [])
+        post_route = respx.post("https://api.github.com/repos/o/r/issues").mock(
+            return_value=httpx.Response(201, json={"html_url": "https://github.com/o/r/issues/42"})
         )
-        post_route = respx.post(
-            "https://api.github.com/repos/o/r/issues"
-        ).mock(
-            return_value=httpx.Response(
-                201, json={"html_url": "https://github.com/o/r/issues/42"}
-            )
+        patch_route = respx.patch("https://api.github.com/repos/o/r/issues/42").mock(
+            return_value=httpx.Response(200, json={"state": "closed"})
         )
-        patch_route = respx.patch(
-            "https://api.github.com/repos/o/r/issues/42"
-        ).mock(return_value=httpx.Response(200, json={"state": "closed"}))
         writer = self._audit_writer(tmp_path)
 
         out = await post_issues(
@@ -981,19 +915,13 @@ class TestCleanScanNotice:
             "fetch_open_issues_with_label",
             lambda *a, **k: [existing],
         )
-        comment_route = respx.post(
-            "https://api.github.com/repos/o/r/issues/7/comments"
-        ).mock(
+        comment_route = respx.post("https://api.github.com/repos/o/r/issues/7/comments").mock(
             return_value=httpx.Response(
                 201,
-                json={
-                    "html_url": "https://github.com/o/r/issues/7#issuecomment-1"
-                },
+                json={"html_url": "https://github.com/o/r/issues/7#issuecomment-1"},
             )
         )
-        issue_post_route = respx.post(
-            "https://api.github.com/repos/o/r/issues"
-        )
+        issue_post_route = respx.post("https://api.github.com/repos/o/r/issues")
         writer = self._audit_writer(tmp_path)
 
         out = await post_issues(
@@ -1046,15 +974,9 @@ class TestCleanScanNotice:
             )
             for n in (17, 3, 42)  # deliberately out of order
         ]
-        monkeypatch.setattr(
-            fetch_mod, "fetch_open_issues_with_label", lambda *a, **k: strays
-        )
-        comment_route = respx.post(
-            "https://api.github.com/repos/o/r/issues/3/comments"
-        ).mock(
-            return_value=httpx.Response(
-                201, json={"html_url": "https://github.com/o/r/issues/3#c"}
-            )
+        monkeypatch.setattr(fetch_mod, "fetch_open_issues_with_label", lambda *a, **k: strays)
+        comment_route = respx.post("https://api.github.com/repos/o/r/issues/3/comments").mock(
+            return_value=httpx.Response(201, json={"html_url": "https://github.com/o/r/issues/3#c"})
         )
         # If the tiebreak regressed to max/first-in-list, these would
         # get hit; leave them unmocked so respx would blow up.
@@ -1080,7 +1002,8 @@ class TestCleanScanNotice:
         assert comment_route.called
         # WARN message names the target (#3) and lists the strays.
         drift_warnings = [
-            r for r in caplog.records
+            r
+            for r in caplog.records
             if r.levelname == "WARNING" and "3 open clean-scan issues" in r.getMessage()
         ]
         assert len(drift_warnings) == 1
@@ -1097,21 +1020,15 @@ class TestCleanScanNotice:
     ) -> None:
         self._stub_zero_findings(monkeypatch)
         self._stub_label_exists()
-        monkeypatch.setattr(
-            fetch_mod, "fetch_open_issues_with_label", lambda *a, **k: []
-        )
+        monkeypatch.setattr(fetch_mod, "fetch_open_issues_with_label", lambda *a, **k: [])
         respx.post("https://api.github.com/repos/o/r/issues").mock(
-            return_value=httpx.Response(
-                201, json={"html_url": "https://github.com/o/r/issues/99"}
-            )
+            return_value=httpx.Response(201, json={"html_url": "https://github.com/o/r/issues/99"})
         )
         # PATCH fails twice (retry + final). 500 is retryable so
         # _close_issue burns its one retry, then raises. Assert the
         # retry actually happened — a regression that skips the retry
         # would silently pass otherwise.
-        patch_route = respx.patch(
-            "https://api.github.com/repos/o/r/issues/99"
-        ).mock(
+        patch_route = respx.patch("https://api.github.com/repos/o/r/issues/99").mock(
             side_effect=[
                 httpx.Response(500, text="boom"),
                 httpx.Response(500, text="boom"),
@@ -1182,10 +1099,8 @@ class TestCleanScanNotice:
         # No clean_scan_notified event on the audit stream.
         audit_path = tmp_path / "audit.jsonl"
         if audit_path.is_file():
-            events = [json.loads(l) for l in audit_path.read_text().splitlines()]
-            assert not any(
-                e.get("event_type") == "clean_scan_notified" for e in events
-            )
+            events = [json.loads(line) for line in audit_path.read_text().splitlines()]
+            assert not any(e.get("event_type") == "clean_scan_notified" for e in events)
 
     # ---- skipped sub-cases ---------------------------------------------
 
@@ -1234,9 +1149,9 @@ class TestCleanScanNotice:
         escape the try/except and fail the whole issues stage.
         """
         self._stub_zero_findings(monkeypatch)
-        respx.get(
-            f"https://api.github.com/repos/o/r/labels/{self._CLEAN_LABEL_ENC}"
-        ).mock(side_effect=httpx.ConnectError("dns down"))
+        respx.get(f"https://api.github.com/repos/o/r/labels/{self._CLEAN_LABEL_ENC}").mock(
+            side_effect=httpx.ConnectError("dns down")
+        )
         # If containment regressed, this call would raise and
         # post_issues would abort with an unhandled exception.
         writer = self._audit_writer(tmp_path)
@@ -1321,9 +1236,7 @@ class TestCleanScanNotice:
             lambda *a, **k: [existing],
         )
         # POST fails twice (retry + final).
-        respx.post(
-            "https://api.github.com/repos/o/r/issues/7/comments"
-        ).mock(
+        respx.post("https://api.github.com/repos/o/r/issues/7/comments").mock(
             side_effect=[
                 httpx.Response(500, text="boom"),
                 httpx.Response(500, text="boom"),
@@ -1356,9 +1269,7 @@ class TestCleanScanNotice:
         """POST /issues fail (no existing receipt) → skipped, no PATCH attempted."""
         self._stub_zero_findings(monkeypatch)
         self._stub_label_exists()
-        monkeypatch.setattr(
-            fetch_mod, "fetch_open_issues_with_label", lambda *a, **k: []
-        )
+        monkeypatch.setattr(fetch_mod, "fetch_open_issues_with_label", lambda *a, **k: [])
         respx.post("https://api.github.com/repos/o/r/issues").mock(
             side_effect=[
                 httpx.Response(500, text="boom"),
@@ -1399,15 +1310,9 @@ class TestCleanScanNotice:
         """
         self._stub_zero_findings(monkeypatch)
         self._stub_label_exists()
-        monkeypatch.setattr(
-            fetch_mod, "fetch_open_issues_with_label", lambda *a, **k: []
-        )
-        post_route = respx.post(
-            "https://api.github.com/repos/o/r/issues"
-        ).mock(
-            return_value=httpx.Response(
-                201, json={"html_url": "https://github.com/o/r/issues/1"}
-            )
+        monkeypatch.setattr(fetch_mod, "fetch_open_issues_with_label", lambda *a, **k: [])
+        post_route = respx.post("https://api.github.com/repos/o/r/issues").mock(
+            return_value=httpx.Response(201, json={"html_url": "https://github.com/o/r/issues/1"})
         )
         respx.patch("https://api.github.com/repos/o/r/issues/1").mock(
             return_value=httpx.Response(200, json={"state": "closed"})
@@ -1449,9 +1354,7 @@ class TestCleanScanNotice:
         """
         self._stub_zero_findings(monkeypatch)
         self._stub_label_exists()
-        monkeypatch.setattr(
-            fetch_mod, "fetch_open_issues_with_label", lambda *a, **k: []
-        )
+        monkeypatch.setattr(fetch_mod, "fetch_open_issues_with_label", lambda *a, **k: [])
         respx.post("https://api.github.com/repos/o/r/issues").mock(
             return_value=httpx.Response(
                 201, json={"html_url": "https://github.com/o/r/issues/oops"}

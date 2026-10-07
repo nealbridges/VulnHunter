@@ -11,7 +11,6 @@ rather than presenting it as an authoritative agent assertion.
 from agent.verify_extract import IssueNarrative, render_comments_file
 from agent.verify_post import _render_verdict_comment
 
-
 # ---- B: posted-comment attribution ----------------------------------------
 
 
@@ -46,9 +45,7 @@ def test_banner_precedes_narrative():
 def test_banner_phrase_is_pinned():
     # Pin the exact attribution wording so a refactor can't silently drop the
     # "not an authoritative agent assertion" framing that is the fix.
-    body = _render_verdict_comment(
-        finding_id="VULN-001", verdict="FIXED", issue_comment_md="x"
-    )
+    body = _render_verdict_comment(finding_id="VULN-001", verdict="FIXED", issue_comment_md="x")
     assert "not an authoritative agent assertion" in body
     assert "evidence" in body.lower()
 

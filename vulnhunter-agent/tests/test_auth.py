@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 import logging
-import sys
-from types import SimpleNamespace
 
 import httpx
 import pytest
 import respx
-
 from agent import auth as auth_mod
 from agent.auth import (
     ApiKeyTokenManager,
@@ -68,13 +65,9 @@ def token_manager(monkeypatch: pytest.MonkeyPatch) -> OAuthTokenManager:
 
 class TestOAuthTokenManager:
     @respx.mock
-    def test_first_call_triggers_refresh(
-        self, token_manager: OAuthTokenManager
-    ) -> None:
+    def test_first_call_triggers_refresh(self, token_manager: OAuthTokenManager) -> None:
         route = respx.post("https://oauth.example.com/token").mock(
-            return_value=httpx.Response(
-                200, json={"access_token": "tok-1", "expires_in": 3600}
-            )
+            return_value=httpx.Response(200, json={"access_token": "tok-1", "expires_in": 3600})
         )
         assert token_manager.get_valid_token() == "tok-1"
         assert route.called
@@ -87,9 +80,7 @@ class TestOAuthTokenManager:
     ) -> None:
         monkeypatch.setattr(auth_mod.time, "time", lambda: 1000.0)
         route = respx.post("https://oauth.example.com/token").mock(
-            return_value=httpx.Response(
-                200, json={"access_token": "tok-1", "expires_in": 3600}
-            )
+            return_value=httpx.Response(200, json={"access_token": "tok-1", "expires_in": 3600})
         )
         token_manager.get_valid_token()
         # Advance time but stay under expiry (< 1000 + 3600*0.9).
@@ -123,18 +114,14 @@ class TestOAuthTokenManager:
     ) -> None:
         monkeypatch.setattr(auth_mod.time, "time", lambda: 1000.0)
         respx.post("https://oauth.example.com/token").mock(
-            return_value=httpx.Response(
-                200, json={"access_token": "abc", "expires_in": 200}
-            )
+            return_value=httpx.Response(200, json={"access_token": "abc", "expires_in": 200})
         )
         token_manager.get_valid_token()
         # expiry = now + lifetime * factor = 1000 + 200*0.9 = 1180
         assert token_manager._token_expiry == pytest.approx(1180.0)
 
     @respx.mock
-    def test_200_missing_access_token_raises(
-        self, token_manager: OAuthTokenManager
-    ) -> None:
+    def test_200_missing_access_token_raises(self, token_manager: OAuthTokenManager) -> None:
         respx.post("https://oauth.example.com/token").mock(
             return_value=httpx.Response(200, json={"expires_in": 60})
         )
@@ -142,9 +129,7 @@ class TestOAuthTokenManager:
             token_manager.get_valid_token()
 
     @respx.mock
-    def test_non_200_raises_with_status_and_body(
-        self, token_manager: OAuthTokenManager
-    ) -> None:
+    def test_non_200_raises_with_status_and_body(self, token_manager: OAuthTokenManager) -> None:
         respx.post("https://oauth.example.com/token").mock(
             return_value=httpx.Response(403, text="forbidden-detail")
         )
@@ -155,9 +140,7 @@ class TestOAuthTokenManager:
         assert "forbidden-detail" in msg
 
     @respx.mock
-    def test_timeout_exception_raises(
-        self, token_manager: OAuthTokenManager
-    ) -> None:
+    def test_timeout_exception_raises(self, token_manager: OAuthTokenManager) -> None:
         respx.post("https://oauth.example.com/token").mock(
             side_effect=httpx.TimeoutException("timed out")
         )
@@ -165,9 +148,7 @@ class TestOAuthTokenManager:
             token_manager.get_valid_token()
 
     @respx.mock
-    def test_request_error_raises(
-        self, token_manager: OAuthTokenManager
-    ) -> None:
+    def test_request_error_raises(self, token_manager: OAuthTokenManager) -> None:
         respx.post("https://oauth.example.com/token").mock(
             side_effect=httpx.ConnectError("connection refused")
         )
@@ -250,13 +231,9 @@ class TestMakeTokenManager:
         base.update(overrides)
         return AnthropicConfig(**base)  # type: ignore[arg-type]
 
-    def test_sigv4_mode_returns_sigv4_manager(
-        self, agent_config
-    ) -> None:
+    def test_sigv4_mode_returns_sigv4_manager(self, agent_config) -> None:
         cfg = agent_config(
-            anthropic=self._anthropic(
-                auth_mode="bedrock_sigv4", aws_region="us-east-1"
-            )
+            anthropic=self._anthropic(auth_mode="bedrock_sigv4", aws_region="us-east-1")
         )
         assert isinstance(make_token_manager(cfg), SigV4TokenManager)
 
@@ -270,7 +247,5 @@ class TestMakeTokenManager:
         assert isinstance(make_token_manager(cfg), OAuthTokenManager)
 
     def test_api_key_mode_returns_api_key_manager(self, agent_config) -> None:
-        cfg = agent_config(
-            anthropic=self._anthropic(auth_mode="api_key", api_key="sk-x")
-        )
+        cfg = agent_config(anthropic=self._anthropic(auth_mode="api_key", api_key="sk-x"))
         assert isinstance(make_token_manager(cfg), ApiKeyTokenManager)

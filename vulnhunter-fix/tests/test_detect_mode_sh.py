@@ -12,7 +12,6 @@ import os
 import subprocess
 from pathlib import Path
 
-
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "detect_mode.sh"
 
 
@@ -38,9 +37,7 @@ def _init_repo(tmp_path: Path, origin: str | None = None) -> Path:
     subprocess.run(["git", "config", "user.email", "t@t.t"], cwd=repo, check=True)
     subprocess.run(["git", "config", "user.name", "t"], cwd=repo, check=True)
     if origin:
-        subprocess.run(
-            ["git", "remote", "add", "origin", origin], cwd=repo, check=True
-        )
+        subprocess.run(["git", "remote", "add", "origin", origin], cwd=repo, check=True)
     return repo
 
 
@@ -60,9 +57,7 @@ class TestInPlace:
         assert "owner_repo=acme/widgets" in result.stdout
 
     def test_github_enterprise_origin(self, tmp_path):
-        repo = _init_repo(
-            tmp_path, origin="https://github.example.com/team/repo.git"
-        )
+        repo = _init_repo(tmp_path, origin="https://github.example.com/team/repo.git")
         result = _run(repo)
         assert result.returncode == 0
         assert "mode=in_place" in result.stdout
@@ -74,7 +69,8 @@ class TestFork:
         # CWD has no .git/ — fork mode required to make any sense.
         result = _run(
             tmp_path,
-            "https://github.com/acme/widgets", "/tmp/results",
+            "https://github.com/acme/widgets",
+            "/tmp/results",
         )
         assert result.returncode == 0
         assert "mode=fork" in result.stdout
@@ -96,7 +92,8 @@ class TestAmbiguous:
         repo = _init_repo(tmp_path, origin="https://github.com/acme/widgets.git")
         result = _run(
             repo,
-            "https://github.com/other/repo", "/tmp/r",
+            "https://github.com/other/repo",
+            "/tmp/r",
         )
         # Exit 2 = caller must resolve.
         assert result.returncode == 2
@@ -169,9 +166,7 @@ class TestNone:
         # Regression: the previous `*github*` glob over-matched paths
         # like `gitlab.com/<org>/github-mirror` and routed them through
         # in-place mode by mistake. The host check now rejects them.
-        repo = _init_repo(
-            tmp_path, origin="https://gitlab.com/myorg/github-mirror.git"
-        )
+        repo = _init_repo(tmp_path, origin="https://gitlab.com/myorg/github-mirror.git")
         result = _run(repo)
         assert result.returncode == 0
         assert "mode=none" in result.stdout

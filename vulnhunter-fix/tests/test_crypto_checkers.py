@@ -1,4 +1,5 @@
 """Coverage tests for crypto-trust-chain-checkers.py (REQ-CWE-009)."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -7,7 +8,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO_ROOT / "scripts"
@@ -26,6 +26,7 @@ def crypto():
 
 # ---- helpers ----
 
+
 def test_unquote_strips_matching_double(crypto):
     assert crypto._unquote('"hello"') == "hello"
 
@@ -35,7 +36,7 @@ def test_unquote_strips_matching_single(crypto):
 
 
 def test_unquote_preserves_mismatched(crypto):
-    assert crypto._unquote('"hello\'') == '"hello\''
+    assert crypto._unquote("\"hello'") == "\"hello'"
 
 
 def test_unquote_preserves_short(crypto):
@@ -85,9 +86,20 @@ def test_added_lines_extracts_pluses_ignores_header(crypto):
 
 # ---- check_algorithm_approved ----
 
+
 def test_algorithm_approved_hit(crypto):
-    ref = {"symmetric": ["AES-GCM"], "asymmetric": [], "hash": [], "kdf": [], "mac": [],
-           "symmetric_denied": [], "asymmetric_denied": [], "hash_denied": [], "kdf_denied": [], "mac_denied": []}
+    ref = {
+        "symmetric": ["AES-GCM"],
+        "asymmetric": [],
+        "hash": [],
+        "kdf": [],
+        "mac": [],
+        "symmetric_denied": [],
+        "asymmetric_denied": [],
+        "hash_denied": [],
+        "kdf_denied": [],
+        "mac_denied": [],
+    }
     diff = "+key = AES-GCM(key)\n"
     ok, evidence = crypto.check_algorithm_approved(diff, ref)
     assert ok is True
@@ -95,9 +107,18 @@ def test_algorithm_approved_hit(crypto):
 
 
 def test_algorithm_denied_wins(crypto):
-    ref = {"symmetric": ["AES-GCM"], "symmetric_denied": ["DES"],
-           "asymmetric": [], "asymmetric_denied": [],
-           "hash": [], "hash_denied": [], "kdf": [], "kdf_denied": [], "mac": [], "mac_denied": []}
+    ref = {
+        "symmetric": ["AES-GCM"],
+        "symmetric_denied": ["DES"],
+        "asymmetric": [],
+        "asymmetric_denied": [],
+        "hash": [],
+        "hash_denied": [],
+        "kdf": [],
+        "kdf_denied": [],
+        "mac": [],
+        "mac_denied": [],
+    }
     diff = "+cipher = DES.new(key)\n+other = AES-GCM(k)\n"
     ok, evidence = crypto.check_algorithm_approved(diff, ref)
     assert ok is False
@@ -105,9 +126,18 @@ def test_algorithm_denied_wins(crypto):
 
 
 def test_algorithm_no_match(crypto):
-    ref = {"symmetric": ["AES-GCM"], "symmetric_denied": ["DES"],
-           "asymmetric": [], "asymmetric_denied": [],
-           "hash": [], "hash_denied": [], "kdf": [], "kdf_denied": [], "mac": [], "mac_denied": []}
+    ref = {
+        "symmetric": ["AES-GCM"],
+        "symmetric_denied": ["DES"],
+        "asymmetric": [],
+        "asymmetric_denied": [],
+        "hash": [],
+        "hash_denied": [],
+        "kdf": [],
+        "kdf_denied": [],
+        "mac": [],
+        "mac_denied": [],
+    }
     diff = "+something unrelated\n"
     ok, evidence = crypto.check_algorithm_approved(diff, ref)
     assert ok is False
@@ -118,10 +148,18 @@ def test_algorithm_ecdsa_not_flagged_by_dsa_substring(crypto):
     """Allow-path guard (peer review major): `DSA` is denied and is a
     substring of the approved `ECDSA-P256`. Word-boundary matching must
     approve the ECDSA fix rather than falsely deny it."""
-    ref = {"symmetric": [], "asymmetric": ["ECDSA-P256", "ECDSA-P384"],
-           "hash": [], "kdf": [], "mac": [],
-           "symmetric_denied": [], "asymmetric_denied": ["DSA", "ECDSA-P224"],
-           "hash_denied": [], "kdf_denied": [], "mac_denied": []}
+    ref = {
+        "symmetric": [],
+        "asymmetric": ["ECDSA-P256", "ECDSA-P384"],
+        "hash": [],
+        "kdf": [],
+        "mac": [],
+        "symmetric_denied": [],
+        "asymmetric_denied": ["DSA", "ECDSA-P224"],
+        "hash_denied": [],
+        "kdf_denied": [],
+        "mac_denied": [],
+    }
     diff = "+sig = ecdsa.sign(key, ECDSA-P256)\n"
     ok, evidence = crypto.check_algorithm_approved(diff, ref)
     assert ok is True, f"ECDSA-P256 wrongly denied: {evidence}"
@@ -131,10 +169,18 @@ def test_algorithm_ecdsa_not_flagged_by_dsa_substring(crypto):
 def test_algorithm_standalone_dsa_still_denied(crypto):
     """The word-boundary fix must NOT weaken detection of a genuine
     standalone DSA token."""
-    ref = {"symmetric": [], "asymmetric": ["ECDSA-P256"],
-           "hash": [], "kdf": [], "mac": [],
-           "symmetric_denied": [], "asymmetric_denied": ["DSA"],
-           "hash_denied": [], "kdf_denied": [], "mac_denied": []}
+    ref = {
+        "symmetric": [],
+        "asymmetric": ["ECDSA-P256"],
+        "hash": [],
+        "kdf": [],
+        "mac": [],
+        "symmetric_denied": [],
+        "asymmetric_denied": ["DSA"],
+        "hash_denied": [],
+        "kdf_denied": [],
+        "mac_denied": [],
+    }
     diff = "+key = dsa.generate_private_key()\n"
     ok, evidence = crypto.check_algorithm_approved(diff, ref)
     assert ok is False
@@ -142,6 +188,7 @@ def test_algorithm_standalone_dsa_still_denied(crypto):
 
 
 # ---- check_key_source_approved ----
+
 
 def test_key_source_chamber_approved(crypto):
     ref = {"chamber": ["ChamberClient"], "denied": []}
@@ -181,17 +228,31 @@ def test_algorithm_denied_punctuation_patterns(crypto):
     punctuation) which is where the \\b-wrap actually fails, and asserts the
     DENIED evidence (not just ok is False, which 'no approved algo' also
     returns)."""
-    ref = {"symmetric": [], "asymmetric": [], "kdf": [], "mac": [],
-           "symmetric_denied": [], "asymmetric_denied": [], "kdf_denied": [], "mac_denied": [],
-           "hash": [],
-           "hash_denied": ['.MD5(', 'MessageDigest.getInstance("MD5"',
-                           'MessageDigest.getInstance("SHA1"']}
-    for snippet in ('+digest = .MD5(data)\n',
-                    '+md = MessageDigest.getInstance("MD5")\n',
-                    '+md = MessageDigest.getInstance("SHA1")\n'):
+    ref = {
+        "symmetric": [],
+        "asymmetric": [],
+        "kdf": [],
+        "mac": [],
+        "symmetric_denied": [],
+        "asymmetric_denied": [],
+        "kdf_denied": [],
+        "mac_denied": [],
+        "hash": [],
+        "hash_denied": [
+            ".MD5(",
+            'MessageDigest.getInstance("MD5"',
+            'MessageDigest.getInstance("SHA1"',
+        ],
+    }
+    for snippet in (
+        "+digest = .MD5(data)\n",
+        '+md = MessageDigest.getInstance("MD5")\n',
+        '+md = MessageDigest.getInstance("SHA1")\n',
+    ):
         ok, evidence = crypto.check_algorithm_approved(snippet, ref)
-        assert ok is False and "denied algorithm present" in evidence, \
+        assert ok is False and "denied algorithm present" in evidence, (
             f"punctuation denied pattern missed in {snippet!r}: {evidence}"
+        )
 
 
 def test_key_source_denied_case_insensitive(crypto):
@@ -199,10 +260,11 @@ def test_key_source_denied_case_insensitive(crypto):
     (unlike the algorithm check), so a lowercased bare env var bypassed the
     deny. RED guard for the .lower() fix — asserts the DENIED evidence."""
     ref = {"denied": ["SECRET_KEY = os.getenv"]}
-    diff = "+secret_key = os.getenv('K')\n"   # lowercased — must still be denied
+    diff = "+secret_key = os.getenv('K')\n"  # lowercased — must still be denied
     ok, evidence = crypto.check_key_source_approved(diff, ref)
-    assert ok is False and "denied key source" in evidence, \
+    assert ok is False and "denied key source" in evidence, (
         f"lowercased bare env var bypassed the deny: {evidence}"
+    )
 
 
 def test_key_source_annotation_requires_window(crypto):
@@ -225,15 +287,14 @@ def test_key_source_annotation_within_window_approves(crypto):
     """The window fix must still approve a properly-placed annotation."""
     ref = {"annotation": ["KEY_SOURCE_APPROVED:"], "denied": []}
     diff = (
-        "+# KEY_SOURCE_APPROVED: custom HSM read, reviewed\n"
-        "+secret_key = hsm.read_key('signing')\n"
+        "+# KEY_SOURCE_APPROVED: custom HSM read, reviewed\n+secret_key = hsm.read_key('signing')\n"
     )
     ok, evidence = crypto.check_key_source_approved(diff, ref)
     assert ok is True, f"properly-annotated key source wrongly rejected: {evidence}"
 
 
-
 # ---- check_key_rotation_present ----
+
 
 def test_rotation_rotate_key(crypto):
     ok, ev = crypto.check_key_rotation_present("+rotate_key(kid=1)\n")
@@ -263,6 +324,7 @@ def test_rotation_missing(crypto):
 
 
 # ---- check_transport_encrypted ----
+
 
 def test_transport_https_approved(crypto):
     ok, ev = crypto.check_transport_encrypted("+url = 'https://example.com'\n")
@@ -302,6 +364,7 @@ def test_transport_missing(crypto):
 
 # ---- run_checkers integration ----
 
+
 def test_run_checkers_end_to_end(crypto):
     # Uses the actual repo YAML files
     diff = (
@@ -323,6 +386,7 @@ def test_run_checkers_end_to_end(crypto):
 
 
 # ---- main() CLI ----
+
 
 def test_main_writes_json(crypto, tmp_path, capsys):
     diff = tmp_path / "d.diff"
@@ -350,19 +414,28 @@ def test_main_missing_diff_file(crypto, tmp_path, capsys):
 
 def test_read_diff_stdin(crypto, monkeypatch):
     import io
+
     monkeypatch.setattr("sys.stdin", io.StringIO("+from stdin\n"))
     assert crypto._read_diff("-") == "+from stdin\n"
 
 
 # ---- weak key parameters (synthesized review S8, B3) ----
 
+
 def _ref_with_constants(**consts):
     """A ref whose only approved identifier is RSA-OAEP-SHA256, plus the
     constants block that _load_yaml_flat used to drop."""
     return {
-        "symmetric": [], "asymmetric": ["RSA-OAEP-SHA256"], "hash": [], "kdf": [], "mac": [],
-        "symmetric_denied": [], "asymmetric_denied": [], "hash_denied": [],
-        "kdf_denied": [], "mac_denied": [],
+        "symmetric": [],
+        "asymmetric": ["RSA-OAEP-SHA256"],
+        "hash": [],
+        "kdf": [],
+        "mac": [],
+        "symmetric_denied": [],
+        "asymmetric_denied": [],
+        "hash_denied": [],
+        "kdf_denied": [],
+        "mac_denied": [],
         "constants": consts,
     }
 
@@ -415,8 +488,10 @@ def test_strong_rsa_4096_still_approved(crypto):
     the bit check must not over-deny. Identifier is code-grounded (a string
     literal), not a comment, since comment-based approval is now rejected."""
     ref = _ref_with_constants(rsa_min_bits=3072)
-    diff = ('+priv = rsa.generate_private_key(public_exponent=65537, key_size=4096)\n'
-            '+algo_id = "RSA-OAEP-SHA256"\n')
+    diff = (
+        "+priv = rsa.generate_private_key(public_exponent=65537, key_size=4096)\n"
+        '+algo_id = "RSA-OAEP-SHA256"\n'
+    )
     ok, evidence = crypto.check_algorithm_approved(diff, ref)
     assert ok is True, f"strong RSA wrongly denied: {evidence}"
 
@@ -425,13 +500,19 @@ def test_aes_256_not_flagged_as_weak_rsa(crypto):
     """Allow-path guard: 256 is a valid AES key length; without RSA context it
     must not trip the weak-RSA-bits check (256 < 3072)."""
     ref = {
-        "symmetric": ["AES-256-GCM"], "asymmetric": [], "hash": [], "kdf": [], "mac": [],
-        "symmetric_denied": [], "asymmetric_denied": [], "hash_denied": [],
-        "kdf_denied": [], "mac_denied": [],
+        "symmetric": ["AES-256-GCM"],
+        "asymmetric": [],
+        "hash": [],
+        "kdf": [],
+        "mac": [],
+        "symmetric_denied": [],
+        "asymmetric_denied": [],
+        "hash_denied": [],
+        "kdf_denied": [],
+        "mac_denied": [],
         "constants": {"rsa_min_bits": 3072},
     }
-    diff = ('+key = AESGCM.generate_key(bit_length=256)\n'
-            '+algo = "AES-256-GCM"\n')
+    diff = '+key = AESGCM.generate_key(bit_length=256)\n+algo = "AES-256-GCM"\n'
     ok, evidence = crypto.check_algorithm_approved(diff, ref)
     assert ok is True, f"AES-256 misflagged as weak RSA: {evidence}"
 
@@ -448,13 +529,24 @@ def test_weak_pbkdf2_iterations_denied(crypto):
 
 # --- S7 (12-seg review): crypto checker must default-deny ------------------
 
+
 def test_approved_identifier_in_comment_does_not_approve(crypto):
     """S7a: an approved identifier sitting in a COMMENT green-lit weak code
     (no comment stripping). `weak_custom_xor(key)  # migrated to AES-256-GCM`
     must NOT count as an approved algorithm."""
-    ref = {"symmetric": ["AES-256-GCM"], "asymmetric": [], "hash": [], "kdf": [], "mac": [],
-           "symmetric_denied": [], "asymmetric_denied": [], "hash_denied": [],
-           "kdf_denied": [], "mac_denied": [], "constants": {}}
+    ref = {
+        "symmetric": ["AES-256-GCM"],
+        "asymmetric": [],
+        "hash": [],
+        "kdf": [],
+        "mac": [],
+        "symmetric_denied": [],
+        "asymmetric_denied": [],
+        "hash_denied": [],
+        "kdf_denied": [],
+        "mac_denied": [],
+        "constants": {},
+    }
     diff = "+cipher = weak_custom_xor(key)  # migrated to AES-256-GCM\n"
     ok, evidence = crypto.check_algorithm_approved(diff, ref)
     assert ok is False, f"comment green-lit weak code: {evidence}"
@@ -508,7 +600,8 @@ def test_strong_ecc_and_rsa_still_approved(crypto):
     ref["asymmetric"] = ["ECDSA-P256", "RSA-OAEP-SHA256"]
     ecc_diff = '+key = ec.generate_private_key(ec.SECP256R1())\n+algo = "ECDSA-P256"\n'
     assert crypto.check_algorithm_approved(ecc_diff, ref)[0] is True
-    rsa_diff = ('+key = rsa.generate_private_key(public_exponent=65537, key_size=4096)\n'
-                '+algo = "RSA-OAEP-SHA256"\n')
+    rsa_diff = (
+        "+key = rsa.generate_private_key(public_exponent=65537, key_size=4096)\n"
+        '+algo = "RSA-OAEP-SHA256"\n'
+    )
     assert crypto.check_algorithm_approved(rsa_diff, ref)[0] is True
-

@@ -1,8 +1,7 @@
 """Tests for local_harness.batch.run."""
 
-import pytest
-
 import local_harness.batch.run as brun
+import pytest
 from local_harness.scan import ScanResult
 
 
@@ -55,20 +54,24 @@ def test_cmd_scan_all_clone_fail(monkeypatch):
 
 
 def test_cmd_scan_success(monkeypatch, tmp_path):
-    monkeypatch.setattr(brun, "parse_repo_list",
-                        lambda: ["https://github.com/a/b", "https://github.com/a/c"])
+    monkeypatch.setattr(
+        brun, "parse_repo_list", lambda: ["https://github.com/a/b", "https://github.com/a/c"]
+    )
     monkeypatch.setattr(brun, "BATCH_CLONE_BASE_DIR", str(tmp_path))
-    monkeypatch.setattr(brun, "shallow_clone",
-                        lambda url, td, re_clone=False: (td, None))
+    monkeypatch.setattr(brun, "shallow_clone", lambda url, td, re_clone=False: (td, None))
 
     def fake_scan_targets(targets, max_workers=None, log_filename=None, readonly=False):
         return [
-            (t["key"], ScanResult(t["clone_dir"], t["key"], 0, 5, 10.0, "rd", {"total_cost_usd": 1.5}))
+            (
+                t["key"],
+                ScanResult(t["clone_dir"], t["key"], 0, 5, 10.0, "rd", {"total_cost_usd": 1.5}),
+            )
             for t in targets[:1]
         ] + [
             (t["key"], ScanResult(t["clone_dir"], t["key"], 1, 0, 2.0, None, {}))
             for t in targets[1:]
         ]
+
     monkeypatch.setattr(brun, "scan_targets", fake_scan_targets)
     brun.cmd_scan(_Args(re_clone=False, resume=False, max_workers=2, readonly=False))
 
@@ -118,17 +121,21 @@ def test_cmd_scan_resume_all_have_results(monkeypatch, tmp_path):
 
 
 def test_cmd_scan_resume_partial(monkeypatch, tmp_path):
-    monkeypatch.setattr(brun, "parse_repo_list",
-                        lambda: ["https://github.com/a/b", "https://github.com/a/c"])
+    monkeypatch.setattr(
+        brun, "parse_repo_list", lambda: ["https://github.com/a/b", "https://github.com/a/c"]
+    )
     monkeypatch.setattr(brun, "BATCH_CLONE_BASE_DIR", str(tmp_path))
     monkeypatch.setattr(brun, "shallow_clone", lambda url, td, re_clone=False: (td, None))
     monkeypatch.setattr(brun, "clean_incomplete_results", lambda f, log_filename=None: ["x"])
     # first folder has results (skipped), second doesn't
     monkeypatch.setattr(brun, "has_valid_results", lambda f: f.endswith("b"))
-    monkeypatch.setattr(brun, "scan_targets",
-                        lambda targets, max_workers=None, log_filename=None, readonly=False: [
-                            (t["key"], ScanResult(t["clone_dir"], t["key"], 0, 1, 1.0, "rd", {}))
-                            for t in targets])
+    monkeypatch.setattr(
+        brun,
+        "scan_targets",
+        lambda targets, max_workers=None, log_filename=None, readonly=False: [
+            (t["key"], ScanResult(t["clone_dir"], t["key"], 0, 1, 1.0, "rd", {})) for t in targets
+        ],
+    )
     brun.cmd_scan(_Args(re_clone=False, resume=True, max_workers=1, readonly=False))
 
 
@@ -141,7 +148,9 @@ def test_cmd_scan_readonly_propagates(monkeypatch, tmp_path):
 
     def fake_scan_targets(targets, max_workers=None, log_filename=None, readonly=False):
         seen["readonly"] = readonly
-        return [(t["key"], ScanResult(t["clone_dir"], t["key"], 0, 1, 1.0, "rd", {})) for t in targets]
+        return [
+            (t["key"], ScanResult(t["clone_dir"], t["key"], 0, 1, 1.0, "rd", {})) for t in targets
+        ]
 
     monkeypatch.setattr(brun, "scan_targets", fake_scan_targets)
     brun.cmd_scan(_Args(re_clone=False, resume=False, max_workers=1, readonly=True))
@@ -157,8 +166,9 @@ def test_cmd_status(monkeypatch):
 
 def test_cmd_collect(monkeypatch):
     got = {}
-    monkeypatch.setattr(brun, "collect_results",
-                        lambda upload_dir=None: got.setdefault("dir", upload_dir))
+    monkeypatch.setattr(
+        brun, "collect_results", lambda upload_dir=None: got.setdefault("dir", upload_dir)
+    )
     brun.cmd_collect(_Args(upload_dir="/tmp/up"))
     assert got["dir"] == "/tmp/up"
 

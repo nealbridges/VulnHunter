@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ._url import redact as _redact
@@ -135,7 +135,7 @@ def _result_brief(content: object) -> str:
 def _render_block(block: object) -> str:
     """One-line summary of a content block, used at -v / -vv verbosity."""
     block_type = type(block).__name__
-    if hasattr(block, "text") and isinstance(getattr(block, "text"), str):
+    if hasattr(block, "text") and isinstance(block.text, str):
         return f"{block_type}: {_truncate(block.text)}"
     if hasattr(block, "name") and hasattr(block, "input"):
         # ToolUseBlock / ServerToolUseBlock
@@ -144,7 +144,7 @@ def _render_block(block: object) -> str:
         return f"{block_type}({name}): {_truncate(repr(tool_input))}"
     if hasattr(block, "content"):
         # ToolResultBlock — content can be a str or list of blocks.
-        content = getattr(block, "content")
+        content = block.content
         if isinstance(content, str):
             return f"{block_type}: {_truncate(content)}"
         if isinstance(content, list):
@@ -153,7 +153,7 @@ def _render_block(block: object) -> str:
     return f"{block_type}: {_truncate(repr(block))}"
 
 
-def _agent_name_from_started(message: "TaskStartedMessage") -> str:
+def _agent_name_from_started(message: TaskStartedMessage) -> str:
     """Derive a short label for a subagent from a TaskStartedMessage.
 
     Prefers the orchestrator-supplied ``description`` (the prompt's first
@@ -175,7 +175,7 @@ def _agent_name_from_started(message: "TaskStartedMessage") -> str:
 
 
 def _log_per_turn_usage(
-    message: "AssistantMessage",
+    message: AssistantMessage,
     last_turn_ts: dict[str | None, float],
     run_start: float,
     agent_names: dict[str, str],
@@ -226,7 +226,7 @@ def _log_per_turn_usage(
     )
 
 
-def _log_assistant_message(message: "AssistantMessage") -> None:
+def _log_assistant_message(message: AssistantMessage) -> None:
     """Verbosity-tiered assistant logging.
 
     v=0: print TextBlock prose verbatim, ToolUse as ``Tool(name): brief``,
@@ -279,7 +279,7 @@ def _log_assistant_message(message: "AssistantMessage") -> None:
             logger.info("  assistant [model=%s] %s", model, _render_block(block))
 
 
-def _log_user_message(message: "UserMessage") -> None:
+def _log_user_message(message: UserMessage) -> None:
     """Tool-result feedback ('user' role). Brief at v=0, fuller at v>=1."""
     content = getattr(message, "content", None)
     if content is None:
@@ -313,7 +313,7 @@ def _log_user_message(message: "UserMessage") -> None:
         logger.info("  user: %s", _truncate(repr(content)))
 
 
-def _log_task_started(message: "TaskStartedMessage") -> None:
+def _log_task_started(message: TaskStartedMessage) -> None:
     desc = getattr(message, "description", "") or ""
     task_type = getattr(message, "task_type", "") or "?"
     # Show task starts at v=0 — they're load-bearing for understanding the
@@ -325,7 +325,7 @@ def _log_task_started(message: "TaskStartedMessage") -> None:
 
 
 def _log_task_status(
-    message: "TaskUpdatedMessage | TaskNotificationMessage",
+    message: TaskUpdatedMessage | TaskNotificationMessage,
     *,
     agent_name: str | None = None,
 ) -> None:
@@ -355,7 +355,7 @@ def _log_task_status(
     log("  %s task %s%s: id=%s%s", icon, status, name_suffix, message.task_id, suffix)
 
 
-def _log_system_message(message: "SystemMessage") -> None:
+def _log_system_message(message: SystemMessage) -> None:
     """Log SystemMessage contents.
 
     At v=0 we only surface the things a user genuinely needs to see:
@@ -403,15 +403,13 @@ def _log_system_message(message: "SystemMessage") -> None:
             log("  system [%s]: <no data>", subtype)
         return
 
-    if is_error:
-        log("  system [%s]: %s", subtype, _truncate(repr(data), 800))
-    elif _verbosity >= 2:
+    if is_error or _verbosity >= 2:
         log("  system [%s]: %s", subtype, _truncate(repr(data), 800))
     elif _verbosity >= 1:
         log("  system [%s]: %s", subtype, _truncate(repr(data), 200))
 
 
-def _log_result(message: "ResultMessage") -> None:
+def _log_result(message: ResultMessage) -> None:
     is_error = getattr(message, "is_error", False)
     if is_error:
         errors = getattr(message, "errors", None)
@@ -456,7 +454,7 @@ class SessionTotals:
     result_messages: int = 0
 
 
-def accumulate_result(totals: SessionTotals, message: "ResultMessage") -> None:
+def accumulate_result(totals: SessionTotals, message: ResultMessage) -> None:
     """Fold one ResultMessage's stats into ``totals``."""
     cost_now = float(getattr(message, "total_cost_usd", 0.0) or 0.0)
     if cost_now > totals.cost_usd:
@@ -473,8 +471,7 @@ def log_session_totals(totals: SessionTotals, label: str) -> None:
     ``"Verify"`` → ``"Verify totals:"``).
     """
     logger.info(
-        "%s totals: %d turn(s) across %d ResultMessage(s), "
-        "API duration=%dms, cost_usd=$%.4f",
+        "%s totals: %d turn(s) across %d ResultMessage(s), API duration=%dms, cost_usd=$%.4f",
         label,
         totals.num_turns,
         totals.result_messages,

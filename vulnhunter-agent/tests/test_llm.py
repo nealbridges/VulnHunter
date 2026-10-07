@@ -12,7 +12,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from agent import _llm
 from agent._llm import (
     LLMError,
@@ -25,6 +24,7 @@ from agent._llm import (
     call_json_with_fallback,
     estimate_tokens,
 )
+
 from tests._helpers import FakeTokenManager as _TM
 
 
@@ -521,7 +521,7 @@ class TestSendPrompt:
             def __init__(self, options: Any) -> None:
                 captured["options"] = options
 
-            async def __aenter__(self) -> "_FakeClient":
+            async def __aenter__(self) -> _FakeClient:
                 return self
 
             async def __aexit__(self, *a: Any) -> None:
@@ -570,7 +570,7 @@ class TestSendPrompt:
             def __init__(self, options: Any) -> None:
                 pass
 
-            async def __aenter__(self) -> "_FakeClient":
+            async def __aenter__(self) -> _FakeClient:
                 return self
 
             async def __aexit__(self, *a: Any) -> None:
@@ -624,7 +624,7 @@ class TestSendPrompt:
             def __init__(self, options: Any) -> None:
                 pass
 
-            async def __aenter__(self) -> "_FakeClient":
+            async def __aenter__(self) -> _FakeClient:
                 return self
 
             async def __aexit__(self, *a: Any) -> None:
@@ -676,7 +676,7 @@ class TestSendPrompt:
             def __init__(self, options: Any) -> None:
                 pass
 
-            async def __aenter__(self) -> "_FakeClient":
+            async def __aenter__(self) -> _FakeClient:
                 return self
 
             async def __aexit__(self, *a: Any) -> None:
@@ -768,9 +768,7 @@ class TestLooksTransientAtBoundary:
         assert _looks_transient_at_boundary(RuntimeError("rate_limit_exceeded"))
 
     def test_message_contains_overloaded(self) -> None:
-        assert _looks_transient_at_boundary(
-            RuntimeError("model is overloaded, try again")
-        )
+        assert _looks_transient_at_boundary(RuntimeError("model is overloaded, try again"))
 
     def test_walks_cause_chain(self) -> None:
         inner = _HasStatus(429)
@@ -819,14 +817,10 @@ class TestLooksTransientAtBoundary:
         )
 
     def test_token_count_4290_not_transient(self) -> None:
-        assert not _looks_transient_at_boundary(
-            RuntimeError("4290 tokens used of 4096 budget")
-        )
+        assert not _looks_transient_at_boundary(RuntimeError("4290 tokens used of 4096 budget"))
 
     def test_token_count_5031_not_transient(self) -> None:
-        assert not _looks_transient_at_boundary(
-            RuntimeError("5031 tokens, max 4096")
-        )
+        assert not _looks_transient_at_boundary(RuntimeError("5031 tokens, max 4096"))
 
 
 class TestClassifyBoundaryError:
@@ -876,7 +870,7 @@ class TestIsTransient:
             try:
                 raise TransientLLMError("inner")
             except TransientLLMError:
-                raise LLMError("outer")
+                raise LLMError("outer")  # noqa: B904 — implicit __context__ chaining IS the test
         except LLMError as e:
             assert _is_transient(e)
 
@@ -1062,18 +1056,17 @@ class TestCallJsonRetry:
                 _HasStatus(429, "throttle 2"),
             ],
         )
-        with caplog.at_level(_logging.WARNING, logger="agent._llm"):
-            with pytest.raises(LLMError):
-                await call_json(
-                    model="haiku",
-                    system="s",
-                    user="u",
-                    config=populated_agent_config,
-                    token_manager=_TM(),
-                    backoffs=(0.0,),
-                    log_retries=False,
-                    stage="extract",
-                )
+        with caplog.at_level(_logging.WARNING, logger="agent._llm"), pytest.raises(LLMError):
+            await call_json(
+                model="haiku",
+                system="s",
+                user="u",
+                config=populated_agent_config,
+                token_manager=_TM(),
+                backoffs=(0.0,),
+                log_retries=False,
+                stage="extract",
+            )
         msgs = "\n".join(r.getMessage() for r in caplog.records)
         assert "exhausted 1 transient" in msgs
         assert "[extract]" in msgs
@@ -1090,16 +1083,15 @@ class TestCallJsonRetry:
         import logging as _logging
 
         _stub_send(monkeypatch, side_effect=ValueError("bad prompt"))
-        with caplog.at_level(_logging.WARNING, logger="agent._llm"):
-            with pytest.raises(LLMError):
-                await call_json(
-                    model="haiku",
-                    system="s",
-                    user="u",
-                    config=populated_agent_config,
-                    token_manager=_TM(),
-                    backoffs=(0.0,),
-                )
+        with caplog.at_level(_logging.WARNING, logger="agent._llm"), pytest.raises(LLMError):
+            await call_json(
+                model="haiku",
+                system="s",
+                user="u",
+                config=populated_agent_config,
+                token_manager=_TM(),
+                backoffs=(0.0,),
+            )
         msgs = "\n".join(r.getMessage() for r in caplog.records)
         assert "exhausted" not in msgs
 
@@ -1115,16 +1107,15 @@ class TestCallJsonRetry:
         import logging as _logging
 
         _stub_send(monkeypatch, side_effect=_HasStatus(429))
-        with caplog.at_level(_logging.WARNING, logger="agent._llm"):
-            with pytest.raises(LLMError):
-                await call_json(
-                    model="haiku",
-                    system="s",
-                    user="u",
-                    config=populated_agent_config,
-                    token_manager=_TM(),
-                    backoffs=(),
-                )
+        with caplog.at_level(_logging.WARNING, logger="agent._llm"), pytest.raises(LLMError):
+            await call_json(
+                model="haiku",
+                system="s",
+                user="u",
+                config=populated_agent_config,
+                token_manager=_TM(),
+                backoffs=(),
+            )
         msgs = "\n".join(r.getMessage() for r in caplog.records)
         assert "exhausted" not in msgs
 
@@ -1188,8 +1179,10 @@ class TestCallJsonWithFallbackRetry:
         _stub_send(
             monkeypatch,
             side_effect=[
-                _HasStatus(429), _HasStatus(429),
-                _HasStatus(503), _HasStatus(503),
+                _HasStatus(429),
+                _HasStatus(429),
+                _HasStatus(503),
+                _HasStatus(503),
             ],
         )
         with pytest.raises(LLMError):
@@ -1217,9 +1210,7 @@ class TestCallJsonWithFallbackRetry:
         from agent.config import LoggingConfig
 
         base = agent_config()
-        cfg = dataclasses.replace(
-            base, logging=LoggingConfig(per_turn_usage=False, retries=True)
-        )
+        cfg = dataclasses.replace(base, logging=LoggingConfig(per_turn_usage=False, retries=True))
         _stub_send(
             monkeypatch,
             side_effect=[_HasStatus(429), '{"v": 1}'],

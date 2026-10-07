@@ -13,9 +13,6 @@ that enumeration honest:
 from __future__ import annotations
 
 import re
-from pathlib import Path
-
-import pytest
 
 from agent._skill_contract import (
     REPO_ROOT,
@@ -35,9 +32,7 @@ def test_register_exists_and_is_current() -> None:
     register update together with the skill change.
     """
     path = register_path()
-    assert path.is_file(), (
-        f"{path} missing — generate it: `python -m agent._skill_contract`"
-    )
+    assert path.is_file(), f"{path} missing — generate it: `python -m agent._skill_contract`"
     fresh = render_register(extract_requirements())
     committed = path.read_text(encoding="utf-8")
     assert committed == fresh, (
@@ -56,9 +51,7 @@ def test_register_ids_are_unique_and_well_formed() -> None:
 
 def test_every_requirement_names_its_source_file() -> None:
     for r in extract_requirements():
-        assert (REPO_ROOT / r.source).is_file(), (
-            f"{r.req_id} cites {r.source} which does not exist"
-        )
+        assert (REPO_ROOT / r.source).is_file(), f"{r.req_id} cites {r.source} which does not exist"
 
 
 def test_register_contains_headline_contracts() -> None:
@@ -68,15 +61,13 @@ def test_register_contains_headline_contracts() -> None:
     provability, verification independence, and the runtime/impact record.
     """
     ids_text = "\n".join(f"{r.req_id} {r.text}" for r in extract_requirements())
-    for needle in (["MUST"], ["FULL"], ["INCONCLUSIVE"]):
+    for _needle in (["MUST"], ["FULL"], ["INCONCLUSIVE"]):
         pass  # replaced below by direct searches
     # (a) the scan manifest contract is registered somewhere in the tree:
-    assert "scan_manifest" not in ids_text or True  # presence asserted in
+    assert True  # presence asserted in
     # test_skill_structure.py::TestSchemaContracts; here we check the skill-side
     # invariants:
-    assert re.search(r"VH-HUNT-\d{3}.*MUST", ids_text), (
-        "no HUNT-area MUST requirements registered"
-    )
+    assert re.search(r"VH-HUNT-\d{3}.*MUST", ids_text), "no HUNT-area MUST requirements registered"
     assert re.search(r"VH-VER-\d{3}.*(FULL|INCONCLUSIVE)", ids_text), (
         "no VER-area verdict vocabulary registered"
     )
@@ -85,8 +76,6 @@ def test_register_contains_headline_contracts() -> None:
 def test_no_requirement_mentions_customer_or_internal_names() -> None:
     """Anonymization rule (FORK_PLAN §9.14): no customer/client/target names,
     ever — including inside the skills' normative text."""
-    banned = re.compile(
-        r"\b(queryai|query\.ai|blackwire|worker-agents|go\.dev\.query)\b", re.I
-    )
+    banned = re.compile(r"\b(queryai|query\.ai|blackwire|worker-agents|go\.dev\.query)\b", re.I)
     hits = [r for r in extract_requirements() if banned.search(r.text)]
     assert not hits, f"normative text leaks internal names: {[(h.req_id, h.source) for h in hits]}"

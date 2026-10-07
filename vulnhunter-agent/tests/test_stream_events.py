@@ -16,7 +16,6 @@ import logging
 from types import SimpleNamespace
 
 import pytest
-
 from agent._stream_events import (
     SessionTotals,
     accumulate_result,
@@ -24,7 +23,6 @@ from agent._stream_events import (
     log_session_totals,
     set_verbosity,
 )
-
 
 # ---------- SessionTotals + accumulate_result -------------------------------
 
@@ -82,9 +80,7 @@ def test_accumulate_result_counts_messages() -> None:
 def test_log_session_totals_emits_rollup_line(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    t = SessionTotals(
-        cost_usd=1.2345, num_turns=7, duration_api_ms=4200, result_messages=3
-    )
+    t = SessionTotals(cost_usd=1.2345, num_turns=7, duration_api_ms=4200, result_messages=3)
     with caplog.at_level(logging.INFO, logger="agent.runner"):
         log_session_totals(t, "Scan")
     joined = "\n".join(r.getMessage() for r in caplog.records)

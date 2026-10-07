@@ -13,21 +13,16 @@ import logging
 from pathlib import Path
 
 import pytest
-from claude_agent_sdk import (
-    AssistantMessage,
-    ResultMessage,
-    TaskStartedMessage,
-    TextBlock,
-)
-
-from agent import verify_runner
 from agent.verify_runner import (
     OutputKind,
-    VerifySessionResult,
     build_kickoff_prompt,
     classify_output,
 )
-
+from claude_agent_sdk import (
+    AssistantMessage,
+    ResultMessage,
+    TextBlock,
+)
 
 # ---------- build_kickoff_prompt --------------------------------------------
 
@@ -156,18 +151,14 @@ def test_classify_output_empty_returns_empty_kind(tmp_path: Path) -> None:
 def test_classify_output_schema_invalid_disposition(tmp_path: Path) -> None:
     bad = _valid_disposition_doc()
     bad["dispositions"][0]["verdict"] = "DEFINITELY_NOT_A_VALID_VERDICT"
-    (tmp_path / "verify_disposition.json").write_text(
-        json.dumps(bad), encoding="utf-8"
-    )
+    (tmp_path / "verify_disposition.json").write_text(json.dumps(bad), encoding="utf-8")
     result = classify_output(tmp_path)
     assert result.kind is OutputKind.SCHEMA_INVALID
     assert "validation" in result.error_detail.lower()
 
 
 def test_classify_output_malformed_json(tmp_path: Path) -> None:
-    (tmp_path / "verify_disposition.json").write_text(
-        "{ not valid json", encoding="utf-8"
-    )
+    (tmp_path / "verify_disposition.json").write_text("{ not valid json", encoding="utf-8")
     result = classify_output(tmp_path)
     assert result.kind is OutputKind.SCHEMA_INVALID
     assert "Could not parse" in result.error_detail
@@ -178,9 +169,7 @@ def test_classify_output_missing_issue_comment_rejected(tmp_path: Path) -> None:
     entry. Smoke-test that the validator catches its absence."""
     bad = _valid_disposition_doc()
     del bad["dispositions"][0]["issue_comment"]
-    (tmp_path / "verify_disposition.json").write_text(
-        json.dumps(bad), encoding="utf-8"
-    )
+    (tmp_path / "verify_disposition.json").write_text(json.dumps(bad), encoding="utf-8")
     result = classify_output(tmp_path)
     assert result.kind is OutputKind.SCHEMA_INVALID
 
@@ -230,9 +219,8 @@ def _stub_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     """build_claude_settings has its own deep config dependencies;
     stub it so run_verify_session tests don't drag those in."""
     from agent import verify_runner as vr
-    monkeypatch.setattr(
-        vr, "build_claude_settings", lambda *a, **k: "{}"
-    )
+
+    monkeypatch.setattr(vr, "build_claude_settings", lambda *a, **k: "{}")
 
 
 def _fresh_fake_client():
@@ -259,6 +247,7 @@ async def test_run_verify_session_disposition_path(
     ]
     _stub_settings(monkeypatch)
     from agent import verify_runner as vr
+
     monkeypatch.setattr(vr, "ClaudeSDKClient", _FakeSDKClient)
 
     result = await vr.run_verify_session(
@@ -271,12 +260,19 @@ async def test_run_verify_session_disposition_path(
     )
     assert result.kind is OutputKind.DISPOSITION
     assert result.output_path == out_dir / "verify_disposition.json"
-    assert (tmp_path / "agent.log").read_text(encoding="utf-8").startswith(
-        "\n--- verify session begin"
+    assert (
+        (tmp_path / "agent.log")
+        .read_text(encoding="utf-8")
+        .startswith("\n--- verify session begin")
     )
     # Tool allow-list is locked.
     assert sorted(_FakeSDKClient._recorded_options.allowed_tools) == [
-        "Agent", "Edit", "Glob", "Grep", "Read", "Write",
+        "Agent",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Read",
+        "Write",
     ]
     assert _FakeSDKClient._query_calls == ["/vulnhunt-fix-verify\nfoo"]
 
@@ -294,6 +290,7 @@ async def test_run_verify_session_empty_when_no_output(
     out_dir.mkdir(parents=True)
     _stub_settings(monkeypatch)
     from agent import verify_runner as vr
+
     monkeypatch.setattr(vr, "ClaudeSDKClient", _FakeSDKClient)
 
     result = await vr.run_verify_session(
@@ -326,6 +323,7 @@ async def test_run_verify_session_sdk_exception_returns_empty(
     out_dir.mkdir(parents=True)
     _stub_settings(monkeypatch)
     from agent import verify_runner as vr
+
     monkeypatch.setattr(vr, "ClaudeSDKClient", _ExplodingClient)
 
     result = await vr.run_verify_session(
@@ -359,6 +357,7 @@ async def test_run_verify_session_uses_model_override(
     ]
     _stub_settings(monkeypatch)
     from agent import verify_runner as vr
+
     monkeypatch.setattr(vr, "ClaudeSDKClient", _FakeSDKClient)
 
     await vr.run_verify_session(
@@ -410,6 +409,7 @@ async def test_run_verify_session_emits_totals_rollup(
     ]
     _stub_settings(monkeypatch)
     from agent import verify_runner as vr
+
     monkeypatch.setattr(vr, "ClaudeSDKClient", _FakeSDKClient)
 
     with caplog.at_level(logging.INFO, logger="agent.runner"):
@@ -461,6 +461,7 @@ async def test_run_verify_session_routes_assistant_prose_through_shared_logger(
     ]
     _stub_settings(monkeypatch)
     from agent import verify_runner as vr
+
     monkeypatch.setattr(vr, "ClaudeSDKClient", _FakeSDKClient)
 
     with caplog.at_level(logging.INFO, logger="agent.runner"):

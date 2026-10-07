@@ -19,14 +19,12 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 from jsonschema import Draft202012Validator
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO_ROOT / "scripts"
@@ -37,6 +35,7 @@ PROMPTS = REPO_ROOT / "prompts"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _extract_first_json_block(md_path: Path, near_marker: str) -> str:
     """Return the raw JSON block appearing right after `near_marker` in the file."""
@@ -66,12 +65,8 @@ def _substitute_placeholders(raw: str) -> str:
         raw = raw.replace(placeholder, value)
     # Pipe-delimited enum placeholders like "VERIFIED|FAILED|..." — pick
     # the first token before the first pipe (JSON-string aware).
-    raw = re.sub(
-        r'"([A-Z_]+)\|[^"]*"', lambda m: f'"{m.group(1)}"', raw
-    )
-    raw = re.sub(
-        r'"([a-z_-]+)\|[^"]*"', lambda m: f'"{m.group(1)}"', raw
-    )
+    raw = re.sub(r'"([A-Z_]+)\|[^"]*"', lambda m: f'"{m.group(1)}"', raw)
+    raw = re.sub(r'"([a-z_-]+)\|[^"]*"', lambda m: f'"{m.group(1)}"', raw)
     return raw
 
 
@@ -90,14 +85,14 @@ def _validate_or_raise(payload: dict, schema_path: str) -> None:
             for e in errors
         )
         raise AssertionError(
-            f"{schema_path} rejected payload:\n{details}\n"
-            f"payload keys: {sorted(payload.keys())}"
+            f"{schema_path} rejected payload:\n{details}\npayload keys: {sorted(payload.keys())}"
         )
 
 
 # ---------------------------------------------------------------------------
 # SCH-0 / SCH-3 — worker result template
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.contract
 def test_worker_result_template_validates_result_schema():
@@ -144,6 +139,7 @@ def test_verify_md_alreadyfixed_template_validates_result_schema():
 # SCH-1 — finding-schema files shape
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.contract
 def test_finding_schema_accepts_object_files_shape():
     """Producers (parse_results.py:129, parse_issues.md:571) emit
@@ -171,6 +167,7 @@ def test_finding_schema_accepts_object_files_shape():
 # SCH-2 — FULL tier reachable
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.contract
 def test_full_tier_reachable_from_realistic_plan_and_result(tmp_path):
     """compute-completeness-tier.py gates FULL on three signals:
@@ -197,60 +194,86 @@ def test_full_tier_reachable_from_realistic_plan_and_result(tmp_path):
     )
     plan = tmp_path / "plan.json"
     plan.write_text(
-        json.dumps({
-            "vuln_id": "VULN-001",
-            "cwe": "CWE-89",
-            "strategy": "route all callers through parameterized query",
-            "callers_routed_coverage": "superset",  # not on schema today
-            "files_to_change": ["auth.py"],
-            "why_this_works": "parameterization eliminates the sink",
-            "projected_completeness_tier": "FULL",
-            "tier_judgment": {"invoked": False, "phase": None, "final_tier": None,
-                              "rationale": None, "failure_reason": None},
-        }),
+        json.dumps(
+            {
+                "vuln_id": "VULN-001",
+                "cwe": "CWE-89",
+                "strategy": "route all callers through parameterized query",
+                "callers_routed_coverage": "superset",  # not on schema today
+                "files_to_change": ["auth.py"],
+                "why_this_works": "parameterization eliminates the sink",
+                "projected_completeness_tier": "FULL",
+                "tier_judgment": {
+                    "invoked": False,
+                    "phase": None,
+                    "final_tier": None,
+                    "rationale": None,
+                    "failure_reason": None,
+                },
+            }
+        ),
         encoding="utf-8",
     )
     result = tmp_path / "result.json"
     result.write_text(
-        json.dumps({
-            "vuln_id": "VULN-001",
-            "status": "VERIFIED",
-            "cwe": "CWE-89",
-            "file_path": "auth.py",
-            "completeness_tier": "FULL",
-            "residual_vectors": [],
-            "tier_judgment": {"invoked": False, "phase": None, "final_tier": None,
-                              "rationale": None, "failure_reason": None},
-            "callers_routed_through_fix": ["auth.py:login", "auth.py:register"],
-            "callers_not_routed": [],
-            "discrimination_evidence": {
-                "method": "stash-and-run",
-                "pre_fix_result": "fail",
-                "post_fix_result": "pass",
-                "assertion_target": "tests/verify_VULN_001.py::test_injection_blocked",
-            },
-        }),
+        json.dumps(
+            {
+                "vuln_id": "VULN-001",
+                "status": "VERIFIED",
+                "cwe": "CWE-89",
+                "file_path": "auth.py",
+                "completeness_tier": "FULL",
+                "residual_vectors": [],
+                "tier_judgment": {
+                    "invoked": False,
+                    "phase": None,
+                    "final_tier": None,
+                    "rationale": None,
+                    "failure_reason": None,
+                },
+                "callers_routed_through_fix": ["auth.py:login", "auth.py:register"],
+                "callers_not_routed": [],
+                "discrimination_evidence": {
+                    "method": "stash-and-run",
+                    "pre_fix_result": "fail",
+                    "post_fix_result": "pass",
+                    "assertion_target": "tests/verify_VULN_001.py::test_injection_blocked",
+                },
+            }
+        ),
         encoding="utf-8",
     )
     script = SCRIPTS / "compute-completeness-tier.py"
     # Post-Commit 3 signature: (diff, plan, result). Today's signature: (diff, plan).
     # This test invokes with all three; classifier must handle it.
     proc = subprocess.run(  # nosec B603
-        [sys.executable, str(script), "--diff", str(diff), "--plan", str(plan),
-         "--result", str(result), "--phase", "verify"],
-        capture_output=True, text=True, timeout=30,
+        [
+            sys.executable,
+            str(script),
+            "--diff",
+            str(diff),
+            "--plan",
+            str(plan),
+            "--result",
+            str(result),
+            "--phase",
+            "verify",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     assert proc.returncode == 0, f"classifier errored: {proc.stderr}"
     out = json.loads(proc.stdout)
     assert out["tier"] == "FULL", (
-        f"expected FULL, got {out['tier']!r}. Signals: {out.get('signals')}\n"
-        f"stderr: {proc.stderr}"
+        f"expected FULL, got {out['tier']!r}. Signals: {out.get('signals')}\nstderr: {proc.stderr}"
     )
 
 
 # ---------------------------------------------------------------------------
 # SCH-4 — tier_judgment.md output matches tierJudgment schema
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.contract
 def test_tier_judgment_output_matches_schema():
@@ -282,14 +305,13 @@ def test_tier_judgment_output_matches_schema():
             f"  {'/'.join(str(p) for p in e.absolute_path) or '<root>'}: {e.message}"
             for e in errors
         )
-        raise AssertionError(
-            f"tier_judgment.md output rejected by tierJudgment $def:\n{details}"
-        )
+        raise AssertionError(f"tier_judgment.md output rejected by tierJudgment $def:\n{details}")
 
 
 # ---------------------------------------------------------------------------
 # SCH-5 — sweep pass1 anchors on sink_symbol from triage sidecar
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.contract
 def test_sweep_pass1_reads_sink_symbol_from_triage_sidecar(tmp_path):
@@ -306,53 +328,77 @@ def test_sweep_pass1_reads_sink_symbol_from_triage_sidecar(tmp_path):
     # (`caller_ok`) and one not (`caller_bad`).
     graph = tmp_path / "graph.json"
     graph.write_text(
-        json.dumps({
-            "schema_version": "1",
-            "graphify_version": "test",
-            "generated_at": "2026-07-02T00:00:00Z",
-            "backend": "ast",
-            "confidence": "high",
-            "content_hash": "sha256:0",
-            "root_dir": str(tmp_path),
-            "nodes": {
-                "n_sink": {"kind": "function", "name": "sink_fn", "file": "auth.py",
-                           "line": 1, "qualified_name": "auth.py:sink_fn", "language": "python"},
-                "n_ok": {"kind": "function", "name": "caller_ok", "file": "auth.py",
-                         "line": 10, "qualified_name": "auth.py:caller_ok", "language": "python"},
-                "n_bad": {"kind": "function", "name": "caller_bad", "file": "auth.py",
-                          "line": 20, "qualified_name": "auth.py:caller_bad", "language": "python"},
-            },
-            "edges": [
-                {"from": "n_ok", "to": "n_sink", "kind": "calls"},
-                {"from": "n_bad", "to": "n_sink", "kind": "calls"},
-            ],
-        }),
+        json.dumps(
+            {
+                "schema_version": "1",
+                "graphify_version": "test",
+                "generated_at": "2026-07-02T00:00:00Z",
+                "backend": "ast",
+                "confidence": "high",
+                "content_hash": "sha256:0",
+                "root_dir": str(tmp_path),
+                "nodes": {
+                    "n_sink": {
+                        "kind": "function",
+                        "name": "sink_fn",
+                        "file": "auth.py",
+                        "line": 1,
+                        "qualified_name": "auth.py:sink_fn",
+                        "language": "python",
+                    },
+                    "n_ok": {
+                        "kind": "function",
+                        "name": "caller_ok",
+                        "file": "auth.py",
+                        "line": 10,
+                        "qualified_name": "auth.py:caller_ok",
+                        "language": "python",
+                    },
+                    "n_bad": {
+                        "kind": "function",
+                        "name": "caller_bad",
+                        "file": "auth.py",
+                        "line": 20,
+                        "qualified_name": "auth.py:caller_bad",
+                        "language": "python",
+                    },
+                },
+                "edges": [
+                    {"from": "n_ok", "to": "n_sink", "kind": "calls"},
+                    {"from": "n_bad", "to": "n_sink", "kind": "calls"},
+                ],
+            }
+        ),
         encoding="utf-8",
     )
     # Triage sidecar with sink_symbol (per REQ-GRA-008)
     triage_dir = tmp_path / "triage"
     triage_dir.mkdir()
     (triage_dir / "VULN-001.json").write_text(
-        json.dumps({
-            "vuln_id": "VULN-001",
-            "confidence": "high",
-            "sink_symbol": "auth.py:sink_fn",
-            "callers_of_sink": ["auth.py:caller_ok", "auth.py:caller_bad"],
-            "generated_at": "2026-07-02T00:00:00Z",
-        }),
+        json.dumps(
+            {
+                "vuln_id": "VULN-001",
+                "confidence": "high",
+                "sink_symbol": "auth.py:sink_fn",
+                "callers_of_sink": ["auth.py:caller_ok", "auth.py:caller_bad"],
+                "generated_at": "2026-07-02T00:00:00Z",
+            }
+        ),
         encoding="utf-8",
     )
     # Result JSON without sink_symbol (workers today don't carry it)
     results_dir = tmp_path / "results"
     results_dir.mkdir()
     (results_dir / "VULN-001_result.json").write_text(
-        json.dumps({
-            "vuln_id": "VULN-001",
-            "status": "VERIFIED",
-            "cwe": "CWE-89",
-            "file_path": "auth.py",
-            "callers_routed_through_fix": ["auth.py:caller_ok"],  # caller_bad is a sibling
-        }),
+        json.dumps(
+            {
+                "vuln_id": "VULN-001",
+                "status": "VERIFIED",
+                "cwe": "CWE-89",
+                "file_path": "auth.py",
+                "callers_routed_through_fix": ["auth.py:caller_ok"],  # caller_bad is a sibling
+            }
+        ),
         encoding="utf-8",
     )
     patterns = tmp_path / "patterns.md"
@@ -361,14 +407,25 @@ def test_sweep_pass1_reads_sink_symbol_from_triage_sidecar(tmp_path):
     script = SCRIPTS / "sweep-root-causes.py"
     out_path = tmp_path / "sweep.json"
     proc = subprocess.run(  # nosec B603
-        [sys.executable, str(script),
-         "--repo-root", str(tmp_path),
-         "--graph", str(graph),
-         "--patterns", str(patterns),
-         "--results-dir", str(results_dir),
-         "--triage-dir", str(triage_dir),
-         "--out", str(out_path)],
-        capture_output=True, text=True, timeout=30,
+        [
+            sys.executable,
+            str(script),
+            "--repo-root",
+            str(tmp_path),
+            "--graph",
+            str(graph),
+            "--patterns",
+            str(patterns),
+            "--results-dir",
+            str(results_dir),
+            "--triage-dir",
+            str(triage_dir),
+            "--out",
+            str(out_path),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     assert proc.returncode == 0, f"sweep errored: {proc.stderr}"
     out = json.loads(out_path.read_text(encoding="utf-8"))
@@ -376,9 +433,7 @@ def test_sweep_pass1_reads_sink_symbol_from_triage_sidecar(tmp_path):
     assert rows, "sweep emitted no rows"
     row = rows[0]
     # Pass-1 should have found the un-routed sibling
-    assert row.get("pass1_siblings"), (
-        f"Pass-1 anchoring failed; pass1_siblings empty. Row: {row}"
-    )
+    assert row.get("pass1_siblings"), f"Pass-1 anchoring failed; pass1_siblings empty. Row: {row}"
     assert "auth.py:caller_bad" in row["pass1_siblings"], (
         f"expected auth.py:caller_bad in siblings, got {row['pass1_siblings']}"
     )
@@ -387,6 +442,7 @@ def test_sweep_pass1_reads_sink_symbol_from_triage_sidecar(tmp_path):
 # ---------------------------------------------------------------------------
 # SCH-adjacent — the parse-tier-judgment.py script referenced by tier_judgment.md
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.contract
 def test_parse_tier_judgment_script_exists():

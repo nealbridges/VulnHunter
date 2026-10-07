@@ -15,7 +15,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SYNC_LINT = REPO_ROOT / "scripts" / "worker-preamble-sync-lint.py"
 
@@ -24,11 +23,11 @@ def test_sync_lint_passes_on_head():
     """The current tree has SYNC markers that byte-match their source."""
     proc = subprocess.run(  # nosec B603
         [sys.executable, str(SYNC_LINT)],
-        capture_output=True, text=True, timeout=10,
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
-    assert proc.returncode == 0, (
-        f"sync-lint failed on HEAD:\nstderr:\n{proc.stderr}"
-    )
+    assert proc.returncode == 0, f"sync-lint failed on HEAD:\nstderr:\n{proc.stderr}"
 
 
 def test_sync_lint_catches_drift(tmp_path, monkeypatch):
@@ -67,7 +66,9 @@ def test_sync_lint_catches_drift(tmp_path, monkeypatch):
 
     proc = subprocess.run(  # nosec B603
         [sys.executable, str(scratch_scripts / "worker-preamble-sync-lint.py")],
-        capture_output=True, text=True, timeout=10,
+        capture_output=True,
+        text=True,
+        timeout=10,
     )
     assert proc.returncode != 0, (
         "sync-lint failed to detect drift; exit was 0.\n"

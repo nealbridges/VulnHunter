@@ -14,7 +14,7 @@ import hashlib
 import logging
 import re
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -109,7 +109,7 @@ def _scan_date_from_dir(results_dir_name: str) -> str:
     m = _SCAN_DATE_RE.search(results_dir_name)
     if m:
         return m.group(1)
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return datetime.now(UTC).strftime("%Y-%m-%d")
 
 
 def _compute_vulnfix_key(location: str, cwe: str, root_cause: str) -> str:
@@ -184,8 +184,8 @@ async def extract_findings(
     config: AgentConfig,
     token_manager: TokenProvider,
     *,
-    cost_tracker: "_llm.CostStats | None" = None,
-    audit_writer: "AuditWriter | None" = None,
+    cost_tracker: _llm.CostStats | None = None,
+    audit_writer: AuditWriter | None = None,
 ) -> ExtractedReport:
     """Extract confirmed findings from results_dir/README.md via Haiku.
 
@@ -224,8 +224,7 @@ async def extract_findings(
         # account because the scan itself completed. More expensive but
         # unblocks the pipeline.
         logger.warning(
-            "[extract] Haiku+Sonnet fallback exhausted (%s); retrying with "
-            "scan-session model %s",
+            "[extract] Haiku+Sonnet fallback exhausted (%s); retrying with scan-session model %s",
             exc,
             config.anthropic.model,
         )
@@ -272,9 +271,7 @@ async def extract_findings(
 
     raw_findings = parsed.get("findings") if isinstance(parsed, dict) else None
     if not isinstance(raw_findings, list):
-        raise _llm.LLMError(
-            f"extractor returned no 'findings' list (got {type(parsed).__name__})"
-        )
+        raise _llm.LLMError(f"extractor returned no 'findings' list (got {type(parsed).__name__})")
 
     files = _discover_finding_files(results_dir)
     findings = []

@@ -11,9 +11,9 @@ Public surface:
 
 from __future__ import annotations
 
-from .build import build_or_load, build_graph
-from .query import GraphQuery, load_graph
+from .build import build_graph, build_or_load
 from .config import GRAPHIFY_VERSION_RANGE
+from .query import GraphQuery, load_graph
 
 __all__ = [
     "build_or_load",

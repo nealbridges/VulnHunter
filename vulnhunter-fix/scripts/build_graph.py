@@ -21,26 +21,25 @@ Exit codes:
         requested (caller may still proceed; sidecars will carry
         ``confidence: "low"``).
 """
-from __future__ import annotations
 
-import _skill_bootstrap  # noqa: F401  — adds bundled .venv site-packages to sys.path
+from __future__ import annotations
 
 import argparse
 import json
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
+import _skill_bootstrap  # noqa: F401  — adds bundled .venv site-packages to sys.path
 from vulnhunter_fix.graph.build import build_or_load
 from vulnhunter_fix.graph.query import GraphQuery
-
 
 VULN_ID_RE = re.compile(r"VULN-\d+", re.IGNORECASE)
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _sink_symbol_from_finding(finding: dict) -> str | None:
@@ -61,7 +60,9 @@ def _sink_symbol_from_finding(finding: dict) -> str | None:
     return str(loc).strip()
 
 
-def _build_sidecar(query: GraphQuery, finding: dict, doc_backend: str, doc_version: str | None) -> dict:
+def _build_sidecar(
+    query: GraphQuery, finding: dict, doc_backend: str, doc_version: str | None
+) -> dict:
     """Emit one triage-schema.json-compatible sidecar for a single finding."""
     vuln_id = finding.get("id") or finding.get("vuln_id") or ""
     m = VULN_ID_RE.search(str(vuln_id))
@@ -104,14 +105,22 @@ def _build_sidecar(query: GraphQuery, finding: dict, doc_backend: str, doc_versi
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(description="Build graph + optional per-finding sidecars (REQ-GRA-002..020).")
+    ap = argparse.ArgumentParser(
+        description="Build graph + optional per-finding sidecars (REQ-GRA-002..020)."
+    )
     ap.add_argument("--repo-root", required=True, help="Absolute path to the target repo checkout.")
-    ap.add_argument("--work-dir", required=True,
-                    help="Where to write cache/graph.json and graph_context/. "
-                         "In-place mode: <repo>/.vulnhunter-fix/. Fork mode: .work/<repo>/.")
-    ap.add_argument("--findings", default=None,
-                    help="Path to findings.json (single object or {\"findings\": [...]}). "
-                         "When set, emits one sidecar per finding under graph_context/.")
+    ap.add_argument(
+        "--work-dir",
+        required=True,
+        help="Where to write cache/graph.json and graph_context/. "
+        "In-place mode: <repo>/.vulnhunter-fix/. Fork mode: .work/<repo>/.",
+    )
+    ap.add_argument(
+        "--findings",
+        default=None,
+        help='Path to findings.json (single object or {"findings": [...]}). '
+        "When set, emits one sidecar per finding under graph_context/.",
+    )
     args = ap.parse_args(argv[1:])
 
     repo_root = Path(args.repo_root).resolve()
@@ -125,13 +134,18 @@ def main(argv: list[str]) -> int:
     graph_path = cache_dir / "graph.json"
 
     doc = build_or_load(str(repo_root), graph_path)
-    print(json.dumps({
-        "graph": str(graph_path),
-        "backend": doc.backend,
-        "confidence": doc.confidence,
-        "nodes": len(doc.nodes),
-        "edges": len(doc.edges),
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "graph": str(graph_path),
+                "backend": doc.backend,
+                "confidence": doc.confidence,
+                "nodes": len(doc.nodes),
+                "edges": len(doc.edges),
+            },
+            indent=2,
+        )
+    )
 
     if args.findings is None:
         return 0
@@ -154,8 +168,11 @@ def main(argv: list[str]) -> int:
     elif isinstance(payload, dict) and payload.get("id"):
         findings = [payload]
     else:
-        print("error: findings payload must be a list, a {findings: [...]} object, "
-              "or a single finding with an 'id' field.", file=sys.stderr)
+        print(
+            "error: findings payload must be a list, a {findings: [...]} object, "
+            "or a single finding with an 'id' field.",
+            file=sys.stderr,
+        )
         return 2
 
     sidecar_dir = work_dir / "graph_context"
@@ -174,11 +191,16 @@ def main(argv: list[str]) -> int:
         sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
         written.append(str(sidecar_path))
 
-    print(json.dumps({
-        "sidecars_written": len(written),
-        "sidecars_dir": str(sidecar_dir),
-        "errors": errors,
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "sidecars_written": len(written),
+                "sidecars_dir": str(sidecar_dir),
+                "errors": errors,
+            },
+            indent=2,
+        )
+    )
 
     if doc.backend != "ast" and written:
         # Not a hard fail — sidecars are still valid — but signal it so

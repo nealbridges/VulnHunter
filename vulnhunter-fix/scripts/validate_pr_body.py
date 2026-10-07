@@ -36,7 +36,6 @@ import re
 import sys
 from pathlib import Path
 
-
 # Match `Closes #N`, `Fixes #N`, `Resolves #N` (case-insensitive),
 # as the canonical GitHub close keywords. Each match captures the
 # issue number. We don't require them all be on the same line —
@@ -64,8 +63,7 @@ def validate(body: str, expected: set[int]) -> tuple[bool, str]:
     extra = found - expected
     if not missing and not extra:
         return True, (
-            f"ok: PR body closes all {len(expected)} expected issues "
-            f"({sorted(expected)})"
+            f"ok: PR body closes all {len(expected)} expected issues ({sorted(expected)})"
         )
     msgs = []
     if missing:

@@ -320,9 +320,7 @@ class AgentConfig:
     verify: VerifyConfig
     logging: LoggingConfig
     audit: AuditConfig
-    repo_properties: RepoPropertiesConfig = field(
-        default_factory=RepoPropertiesConfig
-    )
+    repo_properties: RepoPropertiesConfig = field(default_factory=RepoPropertiesConfig)
     source_path: Path | None = field(repr=False, default=None)
 
 
@@ -430,9 +428,7 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
     github_raw = raw.get("github", {})
 
     auth_mode = (
-        str(_resolve(anthropic_raw, "anthropic", "auth_mode", default="api_key"))
-        .strip()
-        .lower()
+        str(_resolve(anthropic_raw, "anthropic", "auth_mode", default="api_key")).strip().lower()
     )
     if auth_mode not in ("api_key", "bedrock_oauth", "bedrock_sigv4"):
         raise ValueError(
@@ -441,9 +437,9 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
         )
     # api_key resolves from [anthropic].api_key / VULNHUNT_ANTHROPIC_API_KEY,
     # falling back to the standard ANTHROPIC_API_KEY env var.
-    api_key = str(
-        _resolve(anthropic_raw, "anthropic", "api_key", default="")
-    ) or os.environ.get("ANTHROPIC_API_KEY", "")
+    api_key = str(_resolve(anthropic_raw, "anthropic", "api_key", default="")) or os.environ.get(
+        "ANTHROPIC_API_KEY", ""
+    )
     anthropic = AnthropicConfig(
         model=str(_resolve(anthropic_raw, "anthropic", "model", required=True)),
         auth_mode=auth_mode,
@@ -454,34 +450,24 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
         aws_region=str(
             _resolve(anthropic_raw, "anthropic", "aws_region", default="us-east-1")
         ).strip(),
-        aws_profile=str(
-            _resolve(anthropic_raw, "anthropic", "aws_profile", default="")
-        ).strip(),
+        aws_profile=str(_resolve(anthropic_raw, "anthropic", "aws_profile", default="")).strip(),
     )
     if auth_mode == "bedrock_oauth" and not anthropic.bedrock_base_url:
-        raise ValueError(
-            "anthropic.auth_mode='bedrock_oauth' requires anthropic.bedrock_base_url"
-        )
+        raise ValueError("anthropic.auth_mode='bedrock_oauth' requires anthropic.bedrock_base_url")
     # bedrock_sigv4 needs a region to build the endpoint / sign requests, but
     # bedrock_base_url is optional (blank → regional Bedrock runtime endpoint).
     if auth_mode == "bedrock_sigv4" and not anthropic.aws_region:
-        raise ValueError(
-            "anthropic.auth_mode='bedrock_sigv4' requires anthropic.aws_region"
-        )
+        raise ValueError("anthropic.auth_mode='bedrock_sigv4' requires anthropic.aws_region")
 
     oauth = OAuthConfig(
-        token_endpoint=str(
-            _resolve(oauth_raw, "oauth", "token_endpoint", default="")
-        ),
+        token_endpoint=str(_resolve(oauth_raw, "oauth", "token_endpoint", default="")),
         client_id=str(_resolve(oauth_raw, "oauth", "client_id", default="")),
         client_secret=str(_resolve(oauth_raw, "oauth", "client_secret", default="")),
         expiry_safety_factor=float(
             _resolve(oauth_raw, "oauth", "expiry_safety_factor", kind=float, default=0.9)
         ),
         default_lifetime_seconds=int(
-            _resolve(
-                oauth_raw, "oauth", "default_lifetime_seconds", kind=int, default=3600
-            )
+            _resolve(oauth_raw, "oauth", "default_lifetime_seconds", kind=int, default=3600)
         ),
         http_timeout_seconds=int(
             _resolve(oauth_raw, "oauth", "http_timeout_seconds", kind=int, default=30)
@@ -495,20 +481,12 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
             "oauth.client_id, and oauth.client_secret"
         )
 
-    tls = TLSConfig(
-        ssl_cert_path=str(
-            _resolve(tls_raw, "tls", "ssl_cert_path", default="")
-        )
-    )
+    tls = TLSConfig(ssl_cert_path=str(_resolve(tls_raw, "tls", "ssl_cert_path", default="")))
 
     sandbox = SandboxConfig(
-        enabled=bool(
-            _resolve(sandbox_raw, "sandbox", "enabled", kind=bool, default=True)
-        ),
+        enabled=bool(_resolve(sandbox_raw, "sandbox", "enabled", kind=bool, default=True)),
         fail_if_unavailable=bool(
-            _resolve(
-                sandbox_raw, "sandbox", "fail_if_unavailable", kind=bool, default=True
-            )
+            _resolve(sandbox_raw, "sandbox", "fail_if_unavailable", kind=bool, default=True)
         ),
         allow_unsandboxed_commands=bool(
             _resolve(
@@ -522,9 +500,7 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
     )
 
     telemetry = TelemetryConfig(
-        enabled=bool(
-            _resolve(telemetry_raw, "telemetry", "enabled", kind=bool, default=False)
-        ),
+        enabled=bool(_resolve(telemetry_raw, "telemetry", "enabled", kind=bool, default=False)),
         otel_exporter_otlp_endpoint=str(
             _resolve(
                 telemetry_raw,
@@ -544,9 +520,7 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
     )
 
     scan = ScanConfig(
-        clone_base_dir=str(
-            _resolve(scan_raw, "scan", "clone_base_dir", default="./clones")
-        ),
+        clone_base_dir=str(_resolve(scan_raw, "scan", "clone_base_dir", default="./clones")),
         clone_timeout_seconds=int(
             _resolve(scan_raw, "scan", "clone_timeout_seconds", kind=int, default=300)
         ),
@@ -572,18 +546,19 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
                 default=["Agent", "Glob", "Read", "Write"],
             )
         ),
-        permission_mode=str(
-            _resolve(scan_raw, "scan", "permission_mode", default="acceptEdits")
-        ),
+        permission_mode=str(_resolve(scan_raw, "scan", "permission_mode", default="acceptEdits")),
         autocompact_pct_override=(
             int(env_value)
-            if (env_value := _resolve(
-                scan_raw,
-                "scan",
-                "autocompact_pct_override",
-                kind=int,
-                default=None,
-            )) is not None
+            if (
+                env_value := _resolve(
+                    scan_raw,
+                    "scan",
+                    "autocompact_pct_override",
+                    kind=int,
+                    default=None,
+                )
+            )
+            is not None
             else None
         ),
         async_agent_stall_timeout_ms=int(
@@ -610,19 +585,13 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
         host=str(_resolve(github_raw, "github", "host", default="github.com")),
         scan_token=str(_resolve(github_raw, "github", "scan_token", default="")),
         reports_token=str(_resolve(github_raw, "github", "reports_token", default="")),
-        broker_token_dir=str(
-            _resolve(github_raw, "github", "broker_token_dir", default="")
-        ),
+        broker_token_dir=str(_resolve(github_raw, "github", "broker_token_dir", default="")),
     )
 
     publish_raw = raw.get("publish", {})
     publish = PublishConfig(
-        enabled=bool(
-            _resolve(publish_raw, "publish", "enabled", kind=bool, default=False)
-        ),
-        destination_repo=str(
-            _resolve(publish_raw, "publish", "destination_repo", default="")
-        ),
+        enabled=bool(_resolve(publish_raw, "publish", "enabled", kind=bool, default=False)),
+        destination_repo=str(_resolve(publish_raw, "publish", "destination_repo", default="")),
         branch=str(_resolve(publish_raw, "publish", "branch", default="main")),
         commit_author_name=str(
             _resolve(
@@ -642,18 +611,12 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
         ),
     )
     if publish.enabled and not publish.destination_repo:
-        raise ValueError(
-            "publish.enabled=true but publish.destination_repo is empty"
-        )
+        raise ValueError("publish.enabled=true but publish.destination_repo is empty")
 
     issues_raw = raw.get("issues", {})
     issues = IssuesConfig(
-        enabled=bool(
-            _resolve(issues_raw, "issues", "enabled", kind=bool, default=True)
-        ),
-        target_repo=str(
-            _resolve(issues_raw, "issues", "target_repo", default="")
-        ),
+        enabled=bool(_resolve(issues_raw, "issues", "enabled", kind=bool, default=True)),
+        target_repo=str(_resolve(issues_raw, "issues", "target_repo", default="")),
         labels=list(
             _resolve(
                 issues_raw,
@@ -663,9 +626,7 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
                 default=["security", "vulnhunter"],
             )
         ),
-        dedup_label=str(
-            _resolve(issues_raw, "issues", "dedup_label", default="vulnhunter")
-        ),
+        dedup_label=str(_resolve(issues_raw, "issues", "dedup_label", default="vulnhunter")),
         haiku_model=str(
             _resolve(
                 issues_raw,
@@ -674,15 +635,9 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
                 default="claude-haiku-4-5",
             )
         ),
-        sonnet_model=str(
-            _resolve(
-                issues_raw, "issues", "sonnet_model", default="claude-sonnet-5"
-            )
-        ),
+        sonnet_model=str(_resolve(issues_raw, "issues", "sonnet_model", default="claude-sonnet-5")),
         semantic_dedup=bool(
-            _resolve(
-                issues_raw, "issues", "semantic_dedup", kind=bool, default=True
-            )
+            _resolve(issues_raw, "issues", "semantic_dedup", kind=bool, default=True)
         ),
         request_timeout_seconds=int(
             _resolve(
@@ -788,9 +743,7 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
             )
         ),
         repo_aliases={
-            str(k): str(v)
-            for k, v in aliases_raw.items()
-            if isinstance(v, str) and v.strip()
+            str(k): str(v) for k, v in aliases_raw.items() if isinstance(v, str) and v.strip()
         },
         allowed_clone_hosts=tuple(
             str(h).strip()
@@ -814,30 +767,22 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
             _resolve(verify_raw, "verify", "max_comment_pages", kind=int, default=20)
         ),
         max_timeline_bytes=int(
-            _resolve(
-                verify_raw, "verify", "max_timeline_bytes", kind=int, default=5_000_000
-            )
+            _resolve(verify_raw, "verify", "max_timeline_bytes", kind=int, default=5_000_000)
         ),
         max_event_pages=int(
             _resolve(verify_raw, "verify", "max_event_pages", kind=int, default=20)
         ),
         max_edit_diff_bytes=int(
-            _resolve(
-                verify_raw, "verify", "max_edit_diff_bytes", kind=int, default=200_000
-            )
+            _resolve(verify_raw, "verify", "max_edit_diff_bytes", kind=int, default=200_000)
         ),
         max_edit_total_bytes=int(
-            _resolve(
-                verify_raw, "verify", "max_edit_total_bytes", kind=int, default=5_000_000
-            )
+            _resolve(verify_raw, "verify", "max_edit_total_bytes", kind=int, default=5_000_000)
         ),
     )
 
     audit_raw = raw.get("audit", {})
     audit = AuditConfig(
-        enabled=bool(
-            _resolve(audit_raw, "audit", "enabled", kind=bool, default=True)
-        ),
+        enabled=bool(_resolve(audit_raw, "audit", "enabled", kind=bool, default=True)),
         events_path=str(
             _resolve(
                 audit_raw,
@@ -854,18 +799,10 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
                 default="~/.vulnhunter/findings_events.jsonl",
             )
         ),
-        stdout=bool(
-            _resolve(audit_raw, "audit", "stdout", kind=bool, default=False)
-        ),
-        app_id=str(
-            _resolve(audit_raw, "audit", "app_id", default="NA")
-        ),
-        actor=str(
-            _resolve(audit_raw, "audit", "actor", default="vulnhunter-agent")
-        ),
-        strict=bool(
-            _resolve(audit_raw, "audit", "strict", kind=bool, default=False)
-        ),
+        stdout=bool(_resolve(audit_raw, "audit", "stdout", kind=bool, default=False)),
+        app_id=str(_resolve(audit_raw, "audit", "app_id", default="NA")),
+        actor=str(_resolve(audit_raw, "audit", "actor", default="vulnhunter-agent")),
+        strict=bool(_resolve(audit_raw, "audit", "strict", kind=bool, default=False)),
     )
 
     # repo_properties.github_property_map is a TOML table (GitHub
@@ -878,9 +815,7 @@ def load_config(path: str | os.PathLike[str] | None = None) -> AgentConfig:
         prop_map_raw = {}
     repo_properties_cfg = RepoPropertiesConfig(
         github_property_map={
-            str(k): str(v)
-            for k, v in prop_map_raw.items()
-            if isinstance(v, str) and v.strip()
+            str(k): str(v) for k, v in prop_map_raw.items() if isinstance(v, str) and v.strip()
         },
     )
 

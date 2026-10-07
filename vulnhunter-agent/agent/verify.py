@@ -33,28 +33,25 @@ Exit codes mirror the design's error table — see ``_VerifyExitCode``.
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
 from typing import Any
 
 from . import _github_verify as ghv
+from . import audit as _audit
 from ._body_reconstruct import DiffApplyError, reconstruct_original
 from ._github_verify import (
     FetchedIssue,
     GitHubVerifyError,
     IssueRef,
-    UserContentEdit,
     make_client,
 )
 from .auth import TokenProvider, make_token_manager, resolve_verify
 from .config import AgentConfig
-from . import audit as _audit
 from .repo_properties import RepoProperties
 from .token_client import get_github_token
 from .verify_extract import (
@@ -138,8 +135,8 @@ async def run_verify(
     no_post: bool,
     no_reopen: bool,
     model_override: str | None,
-    audit_writer: "_audit.AuditWriter | None" = None,
-    audit_repo_properties: "RepoProperties | None" = None,
+    audit_writer: _audit.AuditWriter | None = None,
+    audit_repo_properties: RepoProperties | None = None,
 ) -> int:
     """Run one verify session against the supplied issue URLs.
 
@@ -187,9 +184,7 @@ async def run_verify(
     # scheduler-retryable).
     hosts = {ghv.issue_host(u) for u in issue_urls}
     if len(hosts) != 1:
-        logger.error(
-            "All issue URLs must be on the same host; saw: %s", sorted(hosts)
-        )
+        logger.error("All issue URLs must be on the same host; saw: %s", sorted(hosts))
         return _EXIT_INFRA_FAILURE
     host = next(iter(hosts))
 
@@ -257,9 +252,7 @@ async def run_verify(
                         model_version=audit_model_version,
                         target_sha=audit_target_sha,
                         findings_count=_audit_dispositions_count[0],
-                        scan_duration_seconds=int(
-                            time.time() - verify_wall_start
-                        ),
+                        scan_duration_seconds=int(time.time() - verify_wall_start),
                         scan_cost_usd=None,
                         notes=notes,
                     )
@@ -277,9 +270,7 @@ async def run_verify(
                     "preserving underlying verify error"
                 )
             except Exception:  # noqa: BLE001
-                logger.exception(
-                    "Failed to emit verify_completed audit event"
-                )
+                logger.exception("Failed to emit verify_completed audit event")
             return exit_code
 
         if audit_writer is not None:
@@ -295,7 +286,9 @@ async def run_verify(
             )
 
         # Stage the scratch tree and run the loop.
-        scratch_root = (scratch_base_dir or Path(config.verify.scratch_base_dir)).expanduser().resolve()
+        scratch_root = (
+            (scratch_base_dir or Path(config.verify.scratch_base_dir)).expanduser().resolve()
+        )
         run_id = _make_run_id(records)
         run_dir = _contained_run_dir(scratch_root, run_id)
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -334,8 +327,7 @@ async def run_verify(
             )
 
         narratives = [
-            build_narrative(r.issue, r.comments, r.events, r.markers.finding_id)
-            for r in records
+            build_narrative(r.issue, r.comments, r.events, r.markers.finding_id) for r in records
         ]
         fixed_ids = [r.markers.finding_id for r in records]
         comments_path = run_dir / "comments.md"
@@ -431,31 +423,22 @@ async def run_verify(
             # Strict-mode contract: audit failure surfaces to the
             # caller. Post already ran, so log the disposition summary
             # first so the operator sees it before the exception.
-            _print_summary(
-                post_results, run_dir, no_post=no_post, failed=failed_finding_ids
-            )
+            _print_summary(post_results, run_dir, no_post=no_post, failed=failed_finding_ids)
             raise
         except Exception:  # noqa: BLE001
             logger.exception("Failed to emit verify audit records")
-        _print_summary(
-            post_results, run_dir, no_post=no_post, failed=failed_finding_ids
-        )
-        partial_failures = [
-            r for r in post_results if r.reopen_failed or r.archival_failed
-        ]
+        _print_summary(post_results, run_dir, no_post=no_post, failed=failed_finding_ids)
+        partial_failures = [r for r in post_results if r.reopen_failed or r.archival_failed]
         if failed_finding_ids:
             logger.error(
-                "Verify completed but %d/%d issues couldn't be updated "
-                "on GitHub: %s",
+                "Verify completed but %d/%d issues couldn't be updated on GitHub: %s",
                 len(failed_finding_ids),
                 len(post_results) + len(failed_finding_ids),
                 ", ".join(failed_finding_ids),
             )
             return _emit_completed_and_exit(
                 _EXIT_INFRA_FAILURE,
-                notes=(
-                    f"failed: {len(failed_finding_ids)} issue post(s) failed"
-                ),
+                notes=(f"failed: {len(failed_finding_ids)} issue post(s) failed"),
             )
         if partial_failures:
             logger.error(
@@ -471,9 +454,7 @@ async def run_verify(
                 notes=f"failed: {len(partial_failures)} partial post failure(s)",
             )
         # Success path — verify_completed reflects the disposition count.
-        _audit_dispositions_count[0] = len(
-            (session_result.parsed or {}).get("dispositions") or []
-        )
+        _audit_dispositions_count[0] = len((session_result.parsed or {}).get("dispositions") or [])
         return _emit_completed_and_exit(_EXIT_OK)
 
 
@@ -507,8 +488,7 @@ async def _fetch_all_issues(
         issue = await ghv.get_issue(client, host, ref)
         if issue.state != "closed":
             logger.warning(
-                "Skipping issue #%d on %s/%s: state=%r (verify reacts to "
-                "closures only).",
+                "Skipping issue #%d on %s/%s: state=%r (verify reacts to closures only).",
                 ref.number,
                 ref.owner,
                 ref.repo,
@@ -532,8 +512,7 @@ async def _fetch_all_issues(
             # are user-controlled prose, but they're going to a log file
             # (not to a model) so they're safe to log verbatim.
             logger.info(
-                "Issue #%d: body has %d edit(s); reconstructing from "
-                "GraphQL userContentEdits.",
+                "Issue #%d: body has %d edit(s); reconstructing from GraphQL userContentEdits.",
                 ref.number,
                 len(edits),
             )
@@ -544,8 +523,7 @@ async def _fetch_all_issues(
             )
             for i, e in enumerate(edits):
                 logger.info(
-                    "  edit[%d]: editedAt=%s editor=%s diff_len=%d "
-                    "diff_first200=%r",
+                    "  edit[%d]: editedAt=%s editor=%s diff_len=%d diff_first200=%r",
                     i,
                     e.edited_at,
                     e.editor or "(none)",
@@ -555,10 +533,7 @@ async def _fetch_all_issues(
             try:
                 original_body = reconstruct_original(
                     issue.body,
-                    [
-                        {"editedAt": e.edited_at, "diff": e.diff}
-                        for e in edits
-                    ],
+                    [{"editedAt": e.edited_at, "diff": e.diff} for e in edits],
                 )
             except DiffApplyError as exc:
                 raise DiffApplyError(
@@ -585,9 +560,7 @@ async def _fetch_all_issues(
             max_pages=config.verify.max_comment_pages,
             max_total_bytes=config.verify.max_timeline_bytes,
         )
-        events = await ghv.list_events(
-            client, host, ref, max_pages=config.verify.max_event_pages
-        )
+        events = await ghv.list_events(client, host, ref, max_pages=config.verify.max_event_pages)
         records.append(
             _FetchedRecord(
                 ref=ref,
@@ -602,12 +575,12 @@ async def _fetch_all_issues(
     if not records:
         # Every supplied issue was open (or the list was empty). Surface
         # this the same way as before — the run can't proceed.
-        rendered = ", ".join(
-            f"#{r.number} on {r.owner}/{r.repo}" for r in skipped_open
-        ) or "(no issues provided)"
+        rendered = (
+            ", ".join(f"#{r.number} on {r.owner}/{r.repo}" for r in skipped_open)
+            or "(no issues provided)"
+        )
         raise GitHubVerifyError(
-            f"No closed issues to verify; every supplied issue is open: "
-            f"{rendered}."
+            f"No closed issues to verify; every supplied issue is open: {rendered}."
         )
     if skipped_open:
         logger.info(
@@ -624,19 +597,14 @@ def _enforce_homogeneity(records: list[_FetchedRecord]) -> None:
 
     Raises ``ValueError`` listing the distinct tuples otherwise.
     """
-    keys = {
-        (r.ref.owner.lower(), r.ref.repo.lower(), r.markers.results_dir)
-        for r in records
-    }
+    keys = {(r.ref.owner.lower(), r.ref.repo.lower(), r.markers.results_dir) for r in records}
     if len(keys) == 1:
         return
     rendered = "\n".join(
-        f"  - {owner}/{repo} @ {results_dir}"
-        for owner, repo, results_dir in sorted(keys)
+        f"  - {owner}/{repo} @ {results_dir}" for owner, repo, results_dir in sorted(keys)
     )
     raise ValueError(
-        "Verify run requires all issues to share the same "
-        "(repo, scan_id). Got:\n" + rendered
+        "Verify run requires all issues to share the same (repo, scan_id). Got:\n" + rendered
     )
 
 
@@ -660,7 +628,7 @@ def _target_repo_url_to_slug(records: list[_FetchedRecord], host: str) -> str:
 
 def _emit_verify_dispositions(
     *,
-    audit_writer: "_audit.AuditWriter | None",
+    audit_writer: _audit.AuditWriter | None,
     config: AgentConfig,
     dispositions: list[dict[str, Any]],
     report_id: str,
@@ -741,8 +709,7 @@ def _map_verify_verdict(verdict: str) -> tuple[str, str]:
     if verdict == "INVALID_INPUT":
         return "FAIL", ""
     logger.warning(
-        "Unknown disposition verdict %r; emitting FAIL without a "
-        "state transition.",
+        "Unknown disposition verdict %r; emitting FAIL without a state transition.",
         verdict,
     )
     return "FAIL", ""
@@ -758,9 +725,7 @@ def _contained_run_dir(scratch_root: Path, run_id: str) -> Path:
     root = scratch_root.resolve()
     run_dir = (root / run_id).resolve()
     if run_dir != root and not run_dir.is_relative_to(root):
-        raise ValueError(
-            f"run_dir {run_dir} escapes scratch_root {root}; refusing to create it"
-        )
+        raise ValueError(f"run_dir {run_dir} escapes scratch_root {root}; refusing to create it")
     return run_dir
 
 
@@ -775,7 +740,7 @@ def _make_run_id(records: list[_FetchedRecord]) -> str:
     repo = r.ref.repo.lower()
     results_dir = r.markers.results_dir
     scan_short = results_dir.split("_")[-1] if "_" in results_dir else "noscanid"
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     return f"{repo}-{scan_short}-{ts}"
 
 
@@ -1020,8 +985,7 @@ def _process_clone_request(
         except ResolveError as exc:
             state.ignored_hints.add(hint)
             logger.warning(
-                "Repo hint %r resolved to %s but clone failed (%s); "
-                "annotating under R6.",
+                "Repo hint %r resolved to %s but clone failed (%s); annotating under R6.",
                 hint,
                 url,
                 exc,
@@ -1078,10 +1042,7 @@ def _verify_entry_count(
     if got_ids != want_ids:
         missing = sorted(want_ids - got_ids)
         extra = sorted(got_ids - want_ids)
-        raise ValueError(
-            "Disposition entry-count mismatch: "
-            f"missing={missing} extra={extra}"
-        )
+        raise ValueError(f"Disposition entry-count mismatch: missing={missing} extra={extra}")
 
 
 async def _post_dispositions(
@@ -1109,8 +1070,7 @@ async def _post_dispositions(
         record = by_finding.get(finding_id)
         if record is None:
             logger.warning(
-                "Disposition entry %s has no matching issue in this run; "
-                "skipping post.",
+                "Disposition entry %s has no matching issue in this run; skipping post.",
                 finding_id,
             )
             # An entry without a matching issue means the skill returned
@@ -1123,8 +1083,7 @@ async def _post_dispositions(
         issue_comment = entry.get("issue_comment", "")
         if no_post:
             logger.info(
-                "Dry-run (--no-post): would post %s verdict for %s on "
-                "issue #%d",
+                "Dry-run (--no-post): would post %s verdict for %s on issue #%d",
                 verdict,
                 finding_id,
                 record.ref.number,

@@ -26,9 +26,8 @@ import argparse
 import json
 import re
 import sys
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 ALGO_YAML = REPO_ROOT / "references" / "approved-crypto-algorithms.yaml"
@@ -122,11 +121,11 @@ def _read_diff(path: str) -> str:
 
 def _added_lines(diff: str) -> list[str]:
     lines = []
-    for l in diff.splitlines():
-        if l.startswith("+++"):
+    for line in diff.splitlines():
+        if line.startswith("+++"):
             continue
-        if l.startswith("+"):
-            lines.append(l[1:])
+        if line.startswith("+"):
+            lines.append(line[1:])
     return lines
 
 
@@ -169,11 +168,23 @@ def _strip_line_comment(line: str) -> str:
 # Elliptic-curve identifiers → strength in bits, for enforcing ecc_min_bits
 # (12-seg review S7c: the floor was declared but never enforced).
 _ECC_CURVE_BITS = {
-    "secp192r1": 192, "prime192v1": 192, "p-192": 192, "p192": 192,
-    "secp224r1": 224, "p-224": 224, "p224": 224,
-    "secp256r1": 256, "prime256v1": 256, "p-256": 256, "p256": 256,
-    "secp384r1": 384, "p-384": 384, "p384": 384,
-    "secp521r1": 521, "p-521": 521, "p521": 521,
+    "secp192r1": 192,
+    "prime192v1": 192,
+    "p-192": 192,
+    "p192": 192,
+    "secp224r1": 224,
+    "p-224": 224,
+    "p224": 224,
+    "secp256r1": 256,
+    "prime256v1": 256,
+    "p-256": 256,
+    "p256": 256,
+    "secp384r1": 384,
+    "p-384": 384,
+    "p384": 384,
+    "secp521r1": 521,
+    "p-521": 521,
+    "p521": 521,
 }
 
 
@@ -204,7 +215,9 @@ def _weak_key_parameter(added_lines: list[str], ref: dict) -> str | None:
         low = text.lower()
         for curve, bits in _ECC_CURVE_BITS.items():
             if bits < ecc_min and re.search(rf"(?<![a-z0-9]){re.escape(curve)}(?![a-z0-9])", low):
-                return f"weak ECC curve {curve} ({bits}-bit) < required {ecc_min} bits (REQ-CWE-009)"
+                return (
+                    f"weak ECC curve {curve} ({bits}-bit) < required {ecc_min} bits (REQ-CWE-009)"
+                )
     pbkdf2_min = consts.get("pbkdf2_min_iterations")
     if isinstance(pbkdf2_min, int):
         for line in added_lines:
@@ -221,10 +234,15 @@ def check_algorithm_approved(diff: str, ref: dict) -> tuple[bool, str | None]:
     # Strip line comments first: an approved identifier in a comment must not
     # green-light weak code, and a denied token in a comment must not fail a
     # good fix (12-seg review S7a). Matching is grounded in code + strings.
-    added_lines = [_strip_line_comment(l) for l in _added_lines(diff)]
+    added_lines = [_strip_line_comment(line) for line in _added_lines(diff)]
     added = "\n".join(added_lines).lower()
-    denied = ref.get("symmetric_denied", []) + ref.get("asymmetric_denied", []) + \
-             ref.get("hash_denied", []) + ref.get("kdf_denied", []) + ref.get("mac_denied", [])
+    denied = (
+        ref.get("symmetric_denied", [])
+        + ref.get("asymmetric_denied", [])
+        + ref.get("hash_denied", [])
+        + ref.get("kdf_denied", [])
+        + ref.get("mac_denied", [])
+    )
     for term in denied:
         if term and _token_present(term, added):
             return False, f"denied algorithm present: {term}"
@@ -233,8 +251,13 @@ def check_algorithm_approved(diff: str, ref: dict) -> tuple[bool, str | None]:
     weak = _weak_key_parameter(added_lines, ref)
     if weak:
         return False, weak
-    approved = ref.get("symmetric", []) + ref.get("asymmetric", []) + \
-               ref.get("hash", []) + ref.get("kdf", []) + ref.get("mac", [])
+    approved = (
+        ref.get("symmetric", [])
+        + ref.get("asymmetric", [])
+        + ref.get("hash", [])
+        + ref.get("kdf", [])
+        + ref.get("mac", [])
+    )
     for term in approved:
         if term and _token_present(term, added):
             return True, f"approved algorithm: {term}"
@@ -257,7 +280,7 @@ def _annotation_within_window(added_lines: list[str], annotation_term: str) -> b
     term_l = annotation_term.lower()
     for i, line in enumerate(added_lines):
         if term_l in line.lower():
-            for follow in added_lines[i + 1:i + 3]:  # next 2 lines
+            for follow in added_lines[i + 1 : i + 3]:  # next 2 lines
                 if key_ctx.search(follow):
                     return True
     return False
@@ -268,10 +291,19 @@ def check_key_source_approved(diff: str, ref: dict) -> tuple[bool, str | None]:
     added = "\n".join(added_lines).lower()
     denied = ref.get("denied", [])
     for term in denied:
-        if term and term.lower() in added:   # case-insensitive: a lowercased bare env var must not bypass the deny
+        if (
+            term and term.lower() in added
+        ):  # case-insensitive: a lowercased bare env var must not bypass the deny
             return False, f"denied key source: {term}"
     # Non-annotation approved categories: plain case-insensitive containment.
-    approved_categories = ("chamber", "aws_kms", "vault", "gcp_secret_manager", "azure_kv", "kubernetes")
+    approved_categories = (
+        "chamber",
+        "aws_kms",
+        "vault",
+        "gcp_secret_manager",
+        "azure_kv",
+        "kubernetes",
+    )
     for cat in approved_categories:
         for term in ref.get(cat, []):
             if term and term.lower() in added:
@@ -338,11 +370,13 @@ def run_checkers(diff: str) -> TrustChainResult:
         algo_ref = _load_yaml_flat(ALGO_YAML)
         key_ref = _load_yaml_flat(KEY_YAML)
     except OSError as exc:
-        raise SystemExit(f"reference YAML load failed: {exc}")
+        raise SystemExit(f"reference YAML load failed: {exc}") from exc
 
     result = TrustChainResult()
     result.algorithm_approved, result.algorithm_evidence = check_algorithm_approved(diff, algo_ref)
-    result.key_source_approved, result.key_source_evidence = check_key_source_approved(diff, key_ref)
+    result.key_source_approved, result.key_source_evidence = check_key_source_approved(
+        diff, key_ref
+    )
     result.key_rotation_present, result.key_rotation_evidence = check_key_rotation_present(diff)
     result.transport_encrypted, result.transport_evidence = check_transport_encrypted(diff)
     return result
@@ -352,7 +386,11 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="Crypto trust-chain checkers (REQ-CWE-009).")
     ap.add_argument("--diff", required=True, help="Path to unified diff, or '-' for stdin.")
     ap.add_argument("--repo-root", default=".", help="Repo root (currently unused; reserved).")
-    ap.add_argument("--emit-sidecar", default=None, help="If set, treated as VULN-NNN id and prints sidecar-compatible fragment.")
+    ap.add_argument(
+        "--emit-sidecar",
+        default=None,
+        help="If set, treated as VULN-NNN id and prints sidecar-compatible fragment.",
+    )
     args = ap.parse_args(argv[1:])
 
     try:

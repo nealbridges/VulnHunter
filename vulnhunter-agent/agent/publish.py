@@ -70,9 +70,7 @@ def ensure_destination_repo(
     found, permission denied, unexpected status).
     """
     if not get_github_token("reports", config):
-        raise PublishError(
-            "ensure_destination_repo requires reports_token to be set."
-        )
+        raise PublishError("ensure_destination_repo requires reports_token to be set.")
     owner, name = _parse_owner_repo(publish.destination_repo)
     api = api_base(config.github.host)
     headers = {
@@ -94,8 +92,7 @@ def ensure_destination_repo(
             return False
         if resp.status_code != 404:
             raise PublishError(
-                f"unexpected {resp.status_code} checking {owner}/{name}: "
-                f"{resp.text[:200]}"
+                f"unexpected {resp.status_code} checking {owner}/{name}: {resp.text[:200]}"
             )
 
         # 2. Look up the owner so we know whether to use /orgs or /user.
@@ -128,15 +125,13 @@ def ensure_destination_repo(
             create_url = f"{api}/user/repos"
         else:
             raise PublishError(
-                f"unknown owner type {owner_type!r} for {owner}; "
-                "expected User or Organization."
+                f"unknown owner type {owner_type!r} for {owner}; expected User or Organization."
             )
 
         create = client.post(create_url, json=body)
         if create.status_code != 201:
             raise PublishError(
-                f"creating {owner}/{name} failed "
-                f"({create.status_code}): {create.text[:300]}"
+                f"creating {owner}/{name} failed ({create.status_code}): {create.text[:300]}"
             )
         logger.info(
             "Created %s/%s as a private repo (auto-initialised on default branch)",
@@ -179,15 +174,11 @@ def _run(
         stderr = redact(result.stderr.strip())
         # Redact the command too in case the URL leaked into argv.
         rendered = " ".join(redact(arg) for arg in cmd)
-        raise PublishError(
-            f"git command failed (exit {result.returncode}): {rendered}\n{stderr}"
-        )
+        raise PublishError(f"git command failed (exit {result.returncode}): {rendered}\n{stderr}")
     return result
 
 
-def _validate_token_compatibility(
-    publish: PublishConfig, config: AgentConfig
-) -> None:
+def _validate_token_compatibility(publish: PublishConfig, config: AgentConfig) -> None:
     """Refuse to push if the configured token can't authenticate the destination."""
     parsed = urlparse(publish.destination_repo)
     if parsed.scheme not in ("http", "https"):
@@ -306,8 +297,7 @@ def publish_results(
         creating_branch = fetch.returncode != 0
         if creating_branch:
             logger.info(
-                "Branch %s doesn't exist at %s yet; will create it with the "
-                "first push.",
+                "Branch %s doesn't exist at %s yet; will create it with the first push.",
                 publish.branch,
                 redact(publish.destination_repo),
             )
@@ -325,8 +315,7 @@ def publish_results(
         # existing dir first (re-runs of the same scan).
         # Path-relative-to-dest is what we hand to `git add`.
         rel_path = (
-            f"{source_owner}/{source_name}/{timestamp_segment}/"
-            f"{commit_segment}/{results_dir.name}"
+            f"{source_owner}/{source_name}/{timestamp_segment}/{commit_segment}/{results_dir.name}"
         )
         target = (
             dest_clone
@@ -345,9 +334,7 @@ def publish_results(
         # Stage + commit. If the working tree has no changes, fail loud:
         # the caller asked us to publish results that aren't actually new.
         _run(["git", "add", "--", rel_path], cwd=dest_clone, env=env)
-        status = _run(
-            ["git", "status", "--porcelain"], cwd=dest_clone, env=env
-        ).stdout.strip()
+        status = _run(["git", "status", "--porcelain"], cwd=dest_clone, env=env).stdout.strip()
         if not status:
             raise PublishError(
                 f"No changes to commit after copying {rel_path}; "
@@ -361,9 +348,7 @@ def publish_results(
             env=env,
         )
 
-        sha = _run(
-            ["git", "rev-parse", "HEAD"], cwd=dest_clone, env=env
-        ).stdout.strip()
+        sha = _run(["git", "rev-parse", "HEAD"], cwd=dest_clone, env=env).stdout.strip()
 
         # Push. When the branch is new on the remote we set the upstream
         # so subsequent runs can fetch it.

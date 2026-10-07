@@ -100,9 +100,7 @@ def _extract_keys(body: str) -> list[str]:
     return _KEY_RE.findall(body or "")
 
 
-def _key_pass(
-    findings: list[Finding], open_issues: list[OpenIssue]
-) -> dict[str, list[int]]:
+def _key_pass(findings: list[Finding], open_issues: list[OpenIssue]) -> dict[str, list[int]]:
     """Match findings whose vulnfix_key appears in any open issue's body."""
     by_key: dict[str, list[int]] = {}
     for issue in open_issues:
@@ -134,9 +132,7 @@ def _summarize_issue(issue: OpenIssue) -> dict[str, Any]:
     }
 
 
-def _build_user_msg(
-    findings: list[Finding], issues: list[OpenIssue]
-) -> str:
+def _build_user_msg(findings: list[Finding], issues: list[OpenIssue]) -> str:
     # Wrap the attacker-controllable finding/issue text in a nonce-delimited
     # DATA envelope (CWE-1427). The per-call nonce means an injected payload
     # cannot forge a closing delimiter to break out of the data region; the
@@ -163,9 +159,7 @@ def _build_user_msg(
 
 
 def _budget_tokens(config: AgentConfig) -> int:
-    return int(
-        config.issues.model_context_tokens * config.issues.token_budget_fraction
-    )
+    return int(config.issues.model_context_tokens * config.issues.token_budget_fraction)
 
 
 def _per_issue_cost(issue: OpenIssue) -> int:
@@ -229,8 +223,8 @@ async def _semantic_pass(
     config: AgentConfig,
     token_manager: TokenProvider,
     *,
-    cost_tracker: "_llm.CostStats | None" = None,
-    audit_writer: "AuditWriter | None" = None,
+    cost_tracker: _llm.CostStats | None = None,
+    audit_writer: AuditWriter | None = None,
 ) -> dict[str, list[int]]:
     """LLM-driven semantic match. Returns {finding_id: [issue_number,...]}.
 
@@ -273,7 +267,10 @@ async def _semantic_pass(
             logger.warning(
                 "[dedup] Haiku+Sonnet fallback exhausted for chunk %d/%d (%s); "
                 "retrying with scan-session model %s",
-                idx, len(chunks), exc, config.anthropic.model,
+                idx,
+                len(chunks),
+                exc,
+                config.anthropic.model,
             )
             if audit_writer is not None:
                 from .audit import build_model_fallback
@@ -326,9 +323,7 @@ async def _semantic_pass(
             valid = [
                 int(n)
                 for n in nums
-                if isinstance(n, int)
-                and not isinstance(n, bool)
-                and n in chunk_numbers
+                if isinstance(n, int) and not isinstance(n, bool) and n in chunk_numbers
             ]
             if valid:
                 union.setdefault(fid, []).extend(valid)
@@ -342,8 +337,8 @@ async def dedup(
     config: AgentConfig,
     token_manager: TokenProvider,
     *,
-    cost_tracker: "_llm.CostStats | None" = None,
-    audit_writer: "AuditWriter | None" = None,
+    cost_tracker: _llm.CostStats | None = None,
+    audit_writer: AuditWriter | None = None,
 ) -> list[DedupDecision]:
     """Decide which findings duplicate existing open issues.
 

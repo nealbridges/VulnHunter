@@ -2,19 +2,29 @@
 
 import json
 
-import pytest
-
 import local_harness.benchmark.run as run
+import pytest
 from local_harness.scan import ScanResult
 
-
 BENCH_JSON = [
-    {"finding_id": "F1", "type": "SQLi", "description": "sqli",
-     "source_code": "https://github.com/acme/widget/tree/abcdef1234567890"},
-    {"finding_id": "F2", "type": "XSS", "description": "xss",
-     "source_code": "https://github.com/acme/widget/tree/abcdef1234567890"},
-    {"finding_id": "F3", "type": "IDOR", "description": "idor",
-     "source_code": "https://github.com/acme/other/tree/99998888aaaabbbb"},
+    {
+        "finding_id": "F1",
+        "type": "SQLi",
+        "description": "sqli",
+        "source_code": "https://github.com/acme/widget/tree/abcdef1234567890",
+    },
+    {
+        "finding_id": "F2",
+        "type": "XSS",
+        "description": "xss",
+        "source_code": "https://github.com/acme/widget/tree/abcdef1234567890",
+    },
+    {
+        "finding_id": "F3",
+        "type": "IDOR",
+        "description": "idor",
+        "source_code": "https://github.com/acme/other/tree/99998888aaaabbbb",
+    },
 ]
 
 
@@ -108,9 +118,11 @@ def test_phase_clone_skips_already_cloned(monkeypatch, tmp_path):
 
     def fail(*a, **k):
         raise AssertionError("should not clone")
+
     monkeypatch.setattr(run, "clone_at_commit", fail)
-    targets = {"t1": {"key": "t1", "repo_url": "u", "commit_hash": "c",
-                      "clone_dir": str(clone_dir)}}
+    targets = {
+        "t1": {"key": "t1", "repo_url": "u", "commit_hash": "c", "clone_dir": str(clone_dir)}
+    }
     state = {"scan_targets": {"t1": {"status": "cloned"}}, "judgments": {}}
     run.phase_clone(targets, state)  # must not raise
 
@@ -120,8 +132,7 @@ def test_phase_scan_all_skipped(monkeypatch, tmp_path, capsys):
     rd = tmp_path / "rd"
     rd.mkdir()
     targets = {"t1": {"key": "t1", "clone_dir": str(tmp_path), "findings": []}}
-    state = {"scan_targets": {"t1": {"status": "scanned", "results_dir": str(rd)}},
-             "judgments": {}}
+    state = {"scan_targets": {"t1": {"status": "scanned", "results_dir": str(rd)}}, "judgments": {}}
     run.phase_scan(targets, state)
     assert "already scanned" in capsys.readouterr().out
 
@@ -132,16 +143,21 @@ def test_phase_scan_runs(monkeypatch, tmp_path):
     monkeypatch.setattr(run, "has_valid_results", lambda cd: False)
 
     def fake_scan_targets(to_scan, max_workers=None):
-        return [("t1", ScanResult("/c/t1", "t1", 0, 5, 12.0, "/c/t1/rd", {"total_cost_usd": 1.0})),
-                ("t2", ScanResult("/c/t2", "t2", 1, 0, 3.0, None, {}))]
+        return [
+            ("t1", ScanResult("/c/t1", "t1", 0, 5, 12.0, "/c/t1/rd", {"total_cost_usd": 1.0})),
+            ("t2", ScanResult("/c/t2", "t2", 1, 0, 3.0, None, {})),
+        ]
+
     monkeypatch.setattr(run, "scan_targets", fake_scan_targets)
 
     targets = {
         "t1": {"key": "t1", "clone_dir": "/c/t1", "findings": [{"finding_id": "F1"}]},
         "t2": {"key": "t2", "clone_dir": "/c/t2", "findings": [{"finding_id": "F2"}]},
     }
-    state = {"scan_targets": {"t1": {"status": "cloned"}, "t2": {"status": "cloned"}},
-             "judgments": {"F1": {}, "F2": {}}}
+    state = {
+        "scan_targets": {"t1": {"status": "cloned"}, "t2": {"status": "cloned"}},
+        "judgments": {"F1": {}, "F2": {}},
+    }
     run.phase_scan(targets, state, force_rescan=True)
     assert state["scan_targets"]["t1"]["status"] == "scanned"
     assert state["scan_targets"]["t2"]["status"] == "scan_failed"
@@ -154,6 +170,7 @@ def test_phase_scan_adopts_existing_results(monkeypatch, tmp_path):
 
     def fail_scan(*a, **k):
         raise AssertionError("should not scan")
+
     monkeypatch.setattr(run, "scan_targets", fail_scan)
     targets = {"t1": {"key": "t1", "clone_dir": "/c/t1", "findings": []}}
     state = {"scan_targets": {"t1": {"status": "cloned"}}, "judgments": {}}
@@ -164,24 +181,42 @@ def test_phase_scan_adopts_existing_results(monkeypatch, tmp_path):
 def test_phase_judge(monkeypatch, tmp_path):
     monkeypatch.setattr(run, "STATE_FILE", str(tmp_path / "state.json"))
     monkeypatch.setattr(run, "read_results_report", lambda rd: "the report")
-    monkeypatch.setattr(run, "judge_findings_batch",
-                        lambda report, findings: [
-                            {"finding_id": "F1", "detected": True, "confidence": "high",
-                             "reasoning": "yes", "matched_finding_id": "S1"}])
-    targets = {"t1": {"key": "t1", "repo_name": "repo", "commit_hash": "c",
-                      "findings": [{"finding_id": "F1", "type": "SQLi",
-                                    "benchmark_file": "a.json"}]}}
-    state = {"scan_targets": {"t1": {"status": "scanned", "results_dir": "/rd"}},
-             "judgments": {}}
+    monkeypatch.setattr(
+        run,
+        "judge_findings_batch",
+        lambda report, findings: [
+            {
+                "finding_id": "F1",
+                "detected": True,
+                "confidence": "high",
+                "reasoning": "yes",
+                "matched_finding_id": "S1",
+            }
+        ],
+    )
+    targets = {
+        "t1": {
+            "key": "t1",
+            "repo_name": "repo",
+            "commit_hash": "c",
+            "findings": [{"finding_id": "F1", "type": "SQLi", "benchmark_file": "a.json"}],
+        }
+    }
+    state = {"scan_targets": {"t1": {"status": "scanned", "results_dir": "/rd"}}, "judgments": {}}
     run.phase_judge(targets, state)
     assert state["judgments"]["F1"]["detected"] is True
 
 
 def test_phase_judge_scan_unavailable(monkeypatch, tmp_path):
     monkeypatch.setattr(run, "STATE_FILE", str(tmp_path / "state.json"))
-    targets = {"t1": {"key": "t1", "repo_name": "repo", "commit_hash": "c",
-                      "findings": [{"finding_id": "F1", "type": "SQLi",
-                                    "benchmark_file": "a.json"}]}}
+    targets = {
+        "t1": {
+            "key": "t1",
+            "repo_name": "repo",
+            "commit_hash": "c",
+            "findings": [{"finding_id": "F1", "type": "SQLi", "benchmark_file": "a.json"}],
+        }
+    }
     state = {"scan_targets": {"t1": {"status": "scan_failed"}}, "judgments": {}}
     run.phase_judge(targets, state)
     assert state["judgments"]["F1"]["detected"] is None
@@ -191,11 +226,15 @@ def test_phase_judge_scan_unavailable(monkeypatch, tmp_path):
 def test_phase_judge_no_report(monkeypatch, tmp_path):
     monkeypatch.setattr(run, "STATE_FILE", str(tmp_path / "state.json"))
     monkeypatch.setattr(run, "read_results_report", lambda rd: None)
-    targets = {"t1": {"key": "t1", "repo_name": "repo", "commit_hash": "c",
-                      "findings": [{"finding_id": "F1", "type": "SQLi",
-                                    "benchmark_file": "a.json"}]}}
-    state = {"scan_targets": {"t1": {"status": "scanned", "results_dir": "/rd"}},
-             "judgments": {}}
+    targets = {
+        "t1": {
+            "key": "t1",
+            "repo_name": "repo",
+            "commit_hash": "c",
+            "findings": [{"finding_id": "F1", "type": "SQLi", "benchmark_file": "a.json"}],
+        }
+    }
+    state = {"scan_targets": {"t1": {"status": "scanned", "results_dir": "/rd"}}, "judgments": {}}
     run.phase_judge(targets, state)
     assert "no README.md" in state["judgments"]["F1"]["reasoning"]
 
@@ -205,12 +244,20 @@ def test_phase_judge_skips_existing(monkeypatch, tmp_path):
 
     def fail(*a, **k):
         raise AssertionError("should not judge")
+
     monkeypatch.setattr(run, "judge_findings_batch", fail)
-    targets = {"t1": {"key": "t1", "repo_name": "repo", "commit_hash": "c",
-                      "findings": [{"finding_id": "F1", "type": "SQLi",
-                                    "benchmark_file": "a.json"}]}}
-    state = {"scan_targets": {"t1": {"status": "scanned", "results_dir": "/rd"}},
-             "judgments": {"F1": {"detected": True}}}
+    targets = {
+        "t1": {
+            "key": "t1",
+            "repo_name": "repo",
+            "commit_hash": "c",
+            "findings": [{"finding_id": "F1", "type": "SQLi", "benchmark_file": "a.json"}],
+        }
+    }
+    state = {
+        "scan_targets": {"t1": {"status": "scanned", "results_dir": "/rd"}},
+        "judgments": {"F1": {"detected": True}},
+    }
     run.phase_judge(targets, state)  # F1 already judged, no rejudge
 
 

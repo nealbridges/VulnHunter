@@ -24,7 +24,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Regexes that match pytest/coverage output shapes.
@@ -110,19 +109,25 @@ def cmd_check(args: argparse.Namespace) -> int:
         print(f"error: {reality['error']}", file=sys.stderr)
         return 2
     drift = []
-    if claims["claimed_passed"] is not None and reality["passed"] is not None:
-        if claims["claimed_passed"] != reality["passed"]:
-            drift.append(
-                f"  passed count: body claims {claims['claimed_passed']}, "
-                f"suite reports {reality['passed']}"
-            )
-    if claims["claimed_coverage"] is not None and reality["coverage_pct"] is not None:
-        # Allow 1-point tolerance to avoid false positives on rounding.
-        if abs(claims["claimed_coverage"] - reality["coverage_pct"]) > 1.0:
-            drift.append(
-                f"  coverage: body claims {claims['claimed_coverage']:.2f}%, "
-                f"suite reports {reality['coverage_pct']:.2f}%"
-            )
+    if (
+        claims["claimed_passed"] is not None
+        and reality["passed"] is not None
+        and claims["claimed_passed"] != reality["passed"]
+    ):
+        drift.append(
+            f"  passed count: body claims {claims['claimed_passed']}, "
+            f"suite reports {reality['passed']}"
+        )
+    # Allow 1-point tolerance to avoid false positives on rounding.
+    if (
+        claims["claimed_coverage"] is not None
+        and reality["coverage_pct"] is not None
+        and abs(claims["claimed_coverage"] - reality["coverage_pct"]) > 1.0
+    ):
+        drift.append(
+            f"  coverage: body claims {claims['claimed_coverage']:.2f}%, "
+            f"suite reports {reality['coverage_pct']:.2f}%"
+        )
     if drift:
         print("PR body drift detected:", file=sys.stderr)
         for line in drift:

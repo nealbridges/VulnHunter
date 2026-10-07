@@ -14,14 +14,12 @@ forward (REQ-SCH-003) and by the schema-repair loop (REQ-SCH-004).
 
 from __future__ import annotations
 
-import _skill_bootstrap  # noqa: F401  — adds bundled .venv site-packages to sys.path
-
 import json
 import sys
 from pathlib import Path
 
+import _skill_bootstrap  # noqa: F401  — adds bundled .venv site-packages to sys.path
 from jsonschema import Draft202012Validator
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = REPO_ROOT / "references" / "result-schema.json"

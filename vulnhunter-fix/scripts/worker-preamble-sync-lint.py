@@ -27,7 +27,6 @@ import re
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONSUMER = REPO_ROOT / "prompts" / "worker_agent_common.md"
 
@@ -51,14 +50,14 @@ def _extract_blocks(path: Path) -> dict[tuple[str, str], str] | None:
         m_end = END_RE.search(line)
         if m_start and m_end:
             print(
-                f"error: {path}:{i+1} has both start and end on one line",
+                f"error: {path}:{i + 1} has both start and end on one line",
                 file=sys.stderr,
             )
             return None
         if m_start:
             if open_key is not None:
                 print(
-                    f"error: {path}:{i+1} nested SYNC block (previous {open_key} still open)",
+                    f"error: {path}:{i + 1} nested SYNC block (previous {open_key} still open)",
                     file=sys.stderr,
                 )
                 return None
@@ -67,14 +66,14 @@ def _extract_blocks(path: Path) -> dict[tuple[str, str], str] | None:
         elif m_end:
             if open_key is None:
                 print(
-                    f"error: {path}:{i+1} SYNC end with no matching start",
+                    f"error: {path}:{i + 1} SYNC end with no matching start",
                     file=sys.stderr,
                 )
                 return None
             key = (m_end.group(1), m_end.group(2))
             if key != open_key:
                 print(
-                    f"error: {path}:{i+1} SYNC end {key} doesn't match open {open_key}",
+                    f"error: {path}:{i + 1} SYNC end {key} doesn't match open {open_key}",
                     file=sys.stderr,
                 )
                 return None
@@ -117,8 +116,7 @@ def main() -> int:
             continue
         if source_content != consumer_content:
             drift.append(
-                f"  block {block_name!r} drift between {source_path.name} "
-                f"and {CONSUMER.name}"
+                f"  block {block_name!r} drift between {source_path.name} and {CONSUMER.name}"
             )
 
     if drift:

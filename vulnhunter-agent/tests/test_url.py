@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from hypothesis import given, settings, strategies as st
-
 from agent._url import inject_token, redact
-
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 # ---------------------------------------------------------------------------
 # inject_token
@@ -89,8 +88,7 @@ class TestInjectToken:
 class TestRedact:
     def test_replaces_basic_auth_with_asterisks(self) -> None:
         assert (
-            redact("https://user:pass@github.com/owner/repo")
-            == "https://***@github.com/owner/repo"
+            redact("https://user:pass@github.com/owner/repo") == "https://***@github.com/owner/repo"
         )
 
     def test_credential_free_url_unchanged(self) -> None:
@@ -99,8 +97,7 @@ class TestRedact:
 
     def test_handles_x_access_token_credentials(self) -> None:
         assert (
-            redact("https://x-access-token:ghp_123@github.com/o/r")
-            == "https://***@github.com/o/r"
+            redact("https://x-access-token:ghp_123@github.com/o/r") == "https://***@github.com/o/r"
         )
 
     def test_idempotent(self) -> None:
@@ -174,9 +171,7 @@ def test_property_redact_is_idempotent(url: str, token: str) -> None:
     token=_ALPHA,
     other_host=_HOST_CHARS,
 )
-def test_property_inject_only_modifies_matching_host(
-    url: str, token: str, other_host: str
-) -> None:
+def test_property_inject_only_modifies_matching_host(url: str, token: str, other_host: str) -> None:
     """inject_token must leave URLs alone when the host doesn't match."""
     from urllib.parse import urlparse
 

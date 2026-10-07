@@ -21,13 +21,12 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .config import check_backend_isolation, iter_source_files, language_for_path
 from .fallback import build_fallback_graph
-from .schema import Backend, Confidence, Edge, GraphDocument, Node, SCHEMA_VERSION
-
+from .schema import SCHEMA_VERSION, Edge, GraphDocument, Node
 
 log = logging.getLogger(__name__)
 
@@ -57,7 +56,7 @@ def _graphify_parallel() -> bool:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def _content_hash(root: Path) -> str:
@@ -132,9 +131,9 @@ def _try_graphify_build(root: Path, content_hash: str) -> GraphDocument | None:
     code_files = [Path(f) for f in (detected.get("files") or {}).get("code", []) or []]
     if not code_files:
         log.warning(
-            "graph.build: graphify.detect found no code files under %s "
-            "(skipped=%d); falling back.",
-            root, len(detected.get("skipped_sensitive") or []),
+            "graph.build: graphify.detect found no code files under %s (skipped=%d); falling back.",
+            root,
+            len(detected.get("skipped_sensitive") or []),
         )
         return None
 
@@ -193,9 +192,16 @@ _RELATION_MAP = {
 # Node kinds graphify may emit that are NOT code/structure — skipped during
 # normalization so they don't pollute god_nodes/counts or leak prose into
 # graph.json (12-seg review S2 MEDIUM).
-_NON_CODE_NODE_KINDS = frozenset({
-    "docstring", "comment", "string", "rationale", "literal", "annotation",
-})
+_NON_CODE_NODE_KINDS = frozenset(
+    {
+        "docstring",
+        "comment",
+        "string",
+        "rationale",
+        "literal",
+        "annotation",
+    }
+)
 
 
 def _parse_source_location(loc) -> int:
@@ -216,7 +222,7 @@ def _iter_normalized_graphify_edges(raw):
     if isinstance(raw, dict):
         source = raw.get("edges") or []
     elif hasattr(raw, "edges"):
-        source = getattr(raw, "edges") or []
+        source = raw.edges or []
     else:
         return
     for item in source:
@@ -247,9 +253,9 @@ def _iter_normalized_graphify_entities(raw, root: Path):
     if isinstance(raw, dict):
         source = raw.get("nodes") or raw.get("entities") or []
     elif hasattr(raw, "nodes"):
-        source = getattr(raw, "nodes") or []
+        source = raw.nodes or []
     elif hasattr(raw, "entities"):
-        source = getattr(raw, "entities") or []
+        source = raw.entities or []
     else:
         source = raw if hasattr(raw, "__iter__") else []
 
@@ -289,7 +295,13 @@ def _iter_normalized_graphify_entities(raw, root: Path):
         if raw_kind == "code" or raw_kind == "file":
             if label.endswith("()"):
                 kind = "function"
-            elif label.endswith(".py") or label.endswith(".go") or label.endswith(".ts") or label.endswith(".tsx") or label.endswith(".java"):
+            elif (
+                label.endswith(".py")
+                or label.endswith(".go")
+                or label.endswith(".ts")
+                or label.endswith(".tsx")
+                or label.endswith(".java")
+            ):
                 kind = "module"
             else:
                 kind = "function"

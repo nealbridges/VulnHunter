@@ -1,6 +1,7 @@
 """Coverage tests for scripts/pr-body-check.py (12-seg review S6 — this
 script had zero tests). Exercises claim parsing + drift detection without
 running the real suite (``_run_suite`` is monkeypatched)."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -8,7 +9,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO_ROOT / "scripts"
@@ -38,8 +38,9 @@ def test_parse_body_claims_absent(pbc):
 def test_check_detects_passed_drift(pbc, tmp_path, monkeypatch, capsys):
     body = tmp_path / "b.md"
     body.write_text("Test plan: 999 passed.\n", encoding="utf-8")
-    monkeypatch.setattr(pbc, "_run_suite",
-                        lambda: {"passed": 500, "coverage_pct": None, "returncode": 0})
+    monkeypatch.setattr(
+        pbc, "_run_suite", lambda: {"passed": 500, "coverage_pct": None, "returncode": 0}
+    )
     rc = pbc.main(["pr-body-check.py", "check", "--body", str(body)])
     assert rc == 1
     assert "drift" in capsys.readouterr().err.lower()
@@ -48,8 +49,9 @@ def test_check_detects_passed_drift(pbc, tmp_path, monkeypatch, capsys):
 def test_check_clean_when_claims_match(pbc, tmp_path, monkeypatch):
     body = tmp_path / "b.md"
     body.write_text("Test plan: 500 passed.\n", encoding="utf-8")
-    monkeypatch.setattr(pbc, "_run_suite",
-                        lambda: {"passed": 500, "coverage_pct": None, "returncode": 0})
+    monkeypatch.setattr(
+        pbc, "_run_suite", lambda: {"passed": 500, "coverage_pct": None, "returncode": 0}
+    )
     rc = pbc.main(["pr-body-check.py", "check", "--body", str(body)])
     assert rc == 0
 
@@ -58,8 +60,9 @@ def test_check_coverage_tolerance(pbc, tmp_path, monkeypatch):
     """A <=1-point coverage difference is within tolerance (no drift)."""
     body = tmp_path / "b.md"
     body.write_text("Coverage: 83.0% coverage.\n", encoding="utf-8")
-    monkeypatch.setattr(pbc, "_run_suite",
-                        lambda: {"passed": None, "coverage_pct": 83.5, "returncode": 0})
+    monkeypatch.setattr(
+        pbc, "_run_suite", lambda: {"passed": None, "coverage_pct": 83.5, "returncode": 0}
+    )
     assert pbc.main(["pr-body-check.py", "check", "--body", str(body)]) == 0
 
 

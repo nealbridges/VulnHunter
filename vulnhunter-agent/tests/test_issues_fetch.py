@@ -7,10 +7,10 @@ from typing import Any
 import httpx
 import pytest
 import respx
-
 from agent import issues_fetch as fetch_mod
 from agent.config import AgentConfig, GitHubConfig, IssuesConfig
 from agent.issues_fetch import IssuesFetchError, fetch_open_issues_with_label
+
 from tests.conftest import _build_agent_config
 
 
@@ -86,9 +86,7 @@ class TestFetchOpenIssues:
     @respx.mock
     def test_filters_out_pull_requests(self) -> None:
         respx.get("https://api.github.com/repos/o/r/issues").mock(
-            return_value=httpx.Response(
-                200, json=[_issue(1), _issue(2, is_pr=True), _issue(3)]
-            )
+            return_value=httpx.Response(200, json=[_issue(1), _issue(2, is_pr=True), _issue(3)])
         )
         out = fetch_open_issues_with_label(
             "https://github.com/o/r",
@@ -119,9 +117,7 @@ class TestFetchOpenIssues:
     @respx.mock
     def test_hits_max_cap(self) -> None:
         respx.get("https://api.github.com/repos/o/r/issues").mock(
-            return_value=httpx.Response(
-                200, json=[_issue(n) for n in range(1, 101)]
-            )
+            return_value=httpx.Response(200, json=[_issue(n) for n in range(1, 101)])
         )
         with pytest.raises(IssuesFetchError, match="hit max_open_issues"):
             fetch_open_issues_with_label(
@@ -143,14 +139,10 @@ class TestFetchOpenIssues:
             )
 
     @respx.mock
-    def test_5xx_retries_then_succeeds(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_5xx_retries_then_succeeds(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # Single retry on 5xx — no real sleep in tests.
         monkeypatch.setattr(fetch_mod.time, "sleep", lambda s: None)
-        route = respx.get(
-            "https://api.github.com/repos/o/r/issues"
-        ).mock(
+        route = respx.get("https://api.github.com/repos/o/r/issues").mock(
             side_effect=[
                 httpx.Response(503, text="busy"),
                 httpx.Response(200, json=[_issue(1)]),
@@ -165,9 +157,7 @@ class TestFetchOpenIssues:
         assert route.call_count == 2
 
     @respx.mock
-    def test_5xx_persistent_raises(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_5xx_persistent_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(fetch_mod.time, "sleep", lambda s: None)
         respx.get("https://api.github.com/repos/o/r/issues").mock(
             return_value=httpx.Response(503, text="still busy")

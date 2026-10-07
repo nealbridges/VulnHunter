@@ -1,4 +1,5 @@
 """Coverage tests for run-gates.py (REQ-GAT-011)."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -8,7 +9,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO_ROOT / "scripts"
@@ -34,17 +34,20 @@ def _commit(root: Path, name: str, body: str, msg: str) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(body, encoding="utf-8")
     subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
-    subprocess.run(
-        ["git", "-C", str(root), "commit", "-m", msg], check=True, capture_output=True
-    )
+    subprocess.run(["git", "-C", str(root), "commit", "-m", msg], check=True, capture_output=True)
 
 
 # ---- unit tests on builders ----
 
+
 def test_gate1_builder_pr_only(rg):
     ctx = rg.GateContext(
-        pr_body=Path("/tmp/pr"), issue_body=None, result={},
-        sidecar={}, branch="b", repo_root=Path("/tmp"),
+        pr_body=Path("/tmp/pr"),
+        issue_body=None,
+        result={},
+        sidecar={},
+        branch="b",
+        repo_root=Path("/tmp"),
     )
     invocations = rg._build_gate1_invocations(ctx)
     assert invocations == [["/tmp/pr"]]
@@ -52,8 +55,12 @@ def test_gate1_builder_pr_only(rg):
 
 def test_gate1_builder_with_issue(rg):
     ctx = rg.GateContext(
-        pr_body=Path("/tmp/pr"), issue_body=Path("/tmp/iss"), result={},
-        sidecar={}, branch="b", repo_root=Path("/tmp"),
+        pr_body=Path("/tmp/pr"),
+        issue_body=Path("/tmp/iss"),
+        result={},
+        sidecar={},
+        branch="b",
+        repo_root=Path("/tmp"),
     )
     invocations = rg._build_gate1_invocations(ctx)
     assert invocations == [["/tmp/pr", "/tmp/iss"]]
@@ -61,9 +68,12 @@ def test_gate1_builder_with_issue(rg):
 
 def test_gate2_builder_default(rg):
     ctx = rg.GateContext(
-        pr_body=Path("/tmp/pr"), issue_body=None,
+        pr_body=Path("/tmp/pr"),
+        issue_body=None,
         result={"completeness_tier": "MITIGATION", "status": "VERIFIED", "sweep_ran": True},
-        sidecar={}, branch="b", repo_root=Path("/tmp"),
+        sidecar={},
+        branch="b",
+        repo_root=Path("/tmp"),
     )
     invocations = rg._build_gate2_invocations(ctx)
     assert len(invocations) == 1
@@ -74,9 +84,12 @@ def test_gate2_builder_default(rg):
 
 def test_gate2_builder_breaking_change_enforces_string(rg):
     ctx = rg.GateContext(
-        pr_body=Path("/tmp/pr"), issue_body=None,
+        pr_body=Path("/tmp/pr"),
+        issue_body=None,
         result={"status": "BREAKING_CHANGE"},
-        sidecar={}, branch="b", repo_root=Path("/tmp"),
+        sidecar={},
+        branch="b",
+        repo_root=Path("/tmp"),
     )
     argv = rg._build_gate2_invocations(ctx)[0]
     assert "--enforce-strings" in argv
@@ -85,8 +98,12 @@ def test_gate2_builder_breaking_change_enforces_string(rg):
 
 def test_gate2_builder_pr_and_issue(rg):
     ctx = rg.GateContext(
-        pr_body=Path("/tmp/pr"), issue_body=Path("/tmp/iss"),
-        result={}, sidecar={}, branch="b", repo_root=Path("/tmp"),
+        pr_body=Path("/tmp/pr"),
+        issue_body=Path("/tmp/iss"),
+        result={},
+        sidecar={},
+        branch="b",
+        repo_root=Path("/tmp"),
     )
     invocations = rg._build_gate2_invocations(ctx)
     assert len(invocations) == 2
@@ -96,9 +113,12 @@ def test_gate2_builder_pr_and_issue(rg):
 
 def test_gate3_builder(rg):
     ctx = rg.GateContext(
-        pr_body=Path("/tmp/pr"), issue_body=None,
+        pr_body=Path("/tmp/pr"),
+        issue_body=None,
         result={"files_modified": ["a.py", "b.py"], "test_file": "tests/t.py"},
-        sidecar={}, branch="vulnfix", repo_root=Path("/tmp/root"),
+        sidecar={},
+        branch="vulnfix",
+        repo_root=Path("/tmp/root"),
     )
     argv = rg._build_gate3_invocations(ctx)[0]
     assert "--files-modified" in argv
@@ -108,8 +128,12 @@ def test_gate3_builder(rg):
 
 def test_gate4_builder_pr_and_issue(rg):
     ctx = rg.GateContext(
-        pr_body=Path("/tmp/pr"), issue_body=Path("/tmp/iss"),
-        result={}, sidecar={}, branch="b", repo_root=Path("/tmp"),
+        pr_body=Path("/tmp/pr"),
+        issue_body=Path("/tmp/iss"),
+        result={},
+        sidecar={},
+        branch="b",
+        repo_root=Path("/tmp"),
     )
     invocations = rg._build_gate4_invocations(ctx)
     assert len(invocations) == 2
@@ -118,8 +142,12 @@ def test_gate4_builder_pr_and_issue(rg):
 def test_gate5_anti_merge_noop_without_sidecar(rg):
     """No anti_merge block on sidecar → gate is a no-op (single-finding PRs)."""
     ctx = rg.GateContext(
-        pr_body=Path("/tmp/pr"), issue_body=None,
-        result={}, sidecar={}, branch="b", repo_root=Path("/tmp"),
+        pr_body=Path("/tmp/pr"),
+        issue_body=None,
+        result={},
+        sidecar={},
+        branch="b",
+        repo_root=Path("/tmp"),
     )
     assert rg._build_gate5_invocations(ctx) == []
 
@@ -128,9 +156,12 @@ def test_gate5_anti_merge_bad_grouping_fails_strict(rg):
     """Anti-merge sidecar block with grouping over threshold builds a
     --strict invocation that will exit 1."""
     ctx = rg.GateContext(
-        pr_body=Path("/tmp/pr"), issue_body=None, result={},
+        pr_body=Path("/tmp/pr"),
+        issue_body=None,
+        result={},
         sidecar={"anti_merge": {"files_grouped": 6, "files_split": 3}},
-        branch="b", repo_root=Path("/tmp"),
+        branch="b",
+        repo_root=Path("/tmp"),
     )
     invocations = rg._build_gate5_invocations(ctx)
     assert len(invocations) == 1
@@ -170,12 +201,15 @@ def test_run_returns_tuple(rg):
 
 # ---- main() end-to-end ----
 
+
 def test_main_all_gates_pass(rg, tmp_path, capsys):
     root = tmp_path / "repo"
     root.mkdir()
     _make_git_repo(root)
     _commit(root, "src/foo.py", "print('base')\n", "base")
-    subprocess.run(["git", "-C", str(root), "checkout", "-b", "vulnfix"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(root), "checkout", "-b", "vulnfix"], check=True, capture_output=True
+    )
     _commit(root, "src/foo.py", "print('fixed')\n", "fix")
 
     pr_body = tmp_path / "pr.md"
@@ -190,20 +224,31 @@ def test_main_all_gates_pass(rg, tmp_path, capsys):
         encoding="utf-8",
     )
     result = tmp_path / "result.json"
-    result.write_text(json.dumps({
-        "completeness_tier": "FULL",
-        "status": "VERIFIED_FULL",
-        "sweep_ran": False,
-        "files_modified": ["src/foo.py"],
-    }), encoding="utf-8")
+    result.write_text(
+        json.dumps(
+            {
+                "completeness_tier": "FULL",
+                "status": "VERIFIED_FULL",
+                "sweep_ran": False,
+                "files_modified": ["src/foo.py"],
+            }
+        ),
+        encoding="utf-8",
+    )
 
-    rc = rg.main([
-        "run-gates.py",
-        "--pr-body", str(pr_body),
-        "--result", str(result),
-        "--branch", "vulnfix",
-        "--repo-root", str(root),
-    ])
+    rc = rg.main(
+        [
+            "run-gates.py",
+            "--pr-body",
+            str(pr_body),
+            "--result",
+            str(result),
+            "--branch",
+            "vulnfix",
+            "--repo-root",
+            str(root),
+        ]
+    )
     payload = json.loads(capsys.readouterr().out)
     assert isinstance(payload["pass"], bool)
     assert "gates" in payload
@@ -217,7 +262,9 @@ def test_main_missing_sidecar_is_ok(rg, tmp_path, capsys):
     root.mkdir()
     _make_git_repo(root)
     _commit(root, "src/foo.py", "a\n", "base")
-    subprocess.run(["git", "-C", str(root), "checkout", "-b", "vulnfix"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(root), "checkout", "-b", "vulnfix"], check=True, capture_output=True
+    )
     _commit(root, "src/foo.py", "aa\n", "fix")
 
     pr_body = tmp_path / "pr.md"
@@ -226,13 +273,19 @@ def test_main_missing_sidecar_is_ok(rg, tmp_path, capsys):
     result.write_text('{"files_modified": ["src/foo.py"]}', encoding="utf-8")
 
     # Should not raise even though sidecar is absent
-    rg.main([
-        "run-gates.py",
-        "--pr-body", str(pr_body),
-        "--result", str(result),
-        "--branch", "vulnfix",
-        "--repo-root", str(root),
-    ])
+    rg.main(
+        [
+            "run-gates.py",
+            "--pr-body",
+            str(pr_body),
+            "--result",
+            str(result),
+            "--branch",
+            "vulnfix",
+            "--repo-root",
+            str(root),
+        ]
+    )
     # Some gates will fail (Gate 4 idempotency), but the orchestrator itself must run
     payload = json.loads(capsys.readouterr().out)
     assert payload["pass"] is False  # missing vulnfix-key marker
@@ -247,13 +300,17 @@ def test_gate6_verification_registered_in_routing(rg):
 
 def test_gate6_builder_passes_sidecars_and_result(rg):
     ctx = rg.GateContext(
-        pr_body=Path("/tmp/pr"), issue_body=None, result={}, sidecar={},
-        branch="b", repo_root=Path("/tmp/root"),
+        pr_body=Path("/tmp/pr"),
+        issue_body=None,
+        result={},
+        sidecar={},
+        branch="b",
+        repo_root=Path("/tmp/root"),
         result_path=Path("/tmp/result.json"),
         sidecars_dir=Path("/tmp/graph_context"),
     )
     argv = rg._build_gate6_invocations(ctx)[0]
-    assert argv[0] == "/tmp/pr"                       # positional pr_body first
+    assert argv[0] == "/tmp/pr"  # positional pr_body first
     assert "--worktree" in argv and "/tmp/root" in argv
     assert "--sidecars-dir" in argv and "/tmp/graph_context" in argv
     assert "--result" in argv and "/tmp/result.json" in argv
@@ -269,9 +326,7 @@ def test_every_gate_validator_script_is_reachable(rg):
     scripts_dir = SCRIPTS
     prompts_dir = REPO_ROOT / "prompts"
     routed = {spec["script"].name for spec in rg.GATE_ROUTING.values()}
-    prompt_text = "\n".join(
-        p.read_text(encoding="utf-8") for p in prompts_dir.rglob("*.md")
-    )
+    prompt_text = "\n".join(p.read_text(encoding="utf-8") for p in prompts_dir.rglob("*.md"))
 
     # Gate scripts must be routed; validators may be routed OR phase-invoked.
     gate_scripts = sorted(scripts_dir.glob("check-*.py")) + [scripts_dir / "anti-merge-check.py"]
@@ -294,6 +349,7 @@ def test_every_gate_validator_script_is_reachable(rg):
 
 # ---- fail-closed guards (synthesized review S5) ----
 
+
 def _passing_inputs(tmp_path: Path):
     """Set up a repo + bodies + result that make ALL gates pass, so any
     failure in the tests below is attributable to the guard under test."""
@@ -301,8 +357,9 @@ def _passing_inputs(tmp_path: Path):
     root.mkdir()
     _make_git_repo(root)
     _commit(root, "src/foo.py", "print('base')\n", "base")
-    subprocess.run(["git", "-C", str(root), "checkout", "-b", "vulnfix"],
-                   check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(root), "checkout", "-b", "vulnfix"], check=True, capture_output=True
+    )
     _commit(root, "src/foo.py", "print('fixed')\n", "fix")
     pr_body = tmp_path / "pr.md"
     pr_body.write_text(
@@ -317,16 +374,23 @@ def _passing_inputs(tmp_path: Path):
         encoding="utf-8",
     )
     result = tmp_path / "result.json"
-    result.write_text(json.dumps({
-        "completeness_tier": "FULL",
-        "status": "VERIFIED_FULL",
-        "sweep_ran": False,
-        "files_modified": ["src/foo.py"],
-    }), encoding="utf-8")
+    result.write_text(
+        json.dumps(
+            {
+                "completeness_tier": "FULL",
+                "status": "VERIFIED_FULL",
+                "sweep_ran": False,
+                "files_modified": ["src/foo.py"],
+            }
+        ),
+        encoding="utf-8",
+    )
     return pr_body, result, root
 
 
-def test_main_fails_closed_when_required_gate_emits_no_invocations(rg, tmp_path, capsys, monkeypatch):
+def test_main_fails_closed_when_required_gate_emits_no_invocations(
+    rg, tmp_path, capsys, monkeypatch
+):
     """B1 (synthesized review S5): a required gate whose builder returns []
     is silently skipped, and all() over the remaining (passing) outcomes then
     vacuously reports pass:true — zero enforcement, green light. main() must
@@ -336,10 +400,19 @@ def test_main_fails_closed_when_required_gate_emits_no_invocations(rg, tmp_path,
     monkeypatch.setitem(
         rg.GATE_ROUTING["gate6_verification_table"], "build_invocations", lambda ctx: []
     )
-    rc = rg.main([
-        "run-gates.py", "--pr-body", str(pr_body), "--result", str(result),
-        "--branch", "vulnfix", "--repo-root", str(root),
-    ])
+    rc = rg.main(
+        [
+            "run-gates.py",
+            "--pr-body",
+            str(pr_body),
+            "--result",
+            str(result),
+            "--branch",
+            "vulnfix",
+            "--repo-root",
+            str(root),
+        ]
+    )
     payload = json.loads(capsys.readouterr().out)
     assert payload["pass"] is False, "required gate skipped but aggregate passed (vacuous)"
     assert rc != 0
@@ -350,10 +423,19 @@ def test_main_empty_routing_does_not_vacuous_pass(rg, tmp_path, capsys, monkeypa
     all([]) is True — the classic empty-set fail-open."""
     pr_body, result, root = _passing_inputs(tmp_path)
     monkeypatch.setattr(rg, "GATE_ROUTING", {})
-    rc = rg.main([
-        "run-gates.py", "--pr-body", str(pr_body), "--result", str(result),
-        "--branch", "vulnfix", "--repo-root", str(root),
-    ])
+    rc = rg.main(
+        [
+            "run-gates.py",
+            "--pr-body",
+            str(pr_body),
+            "--result",
+            str(result),
+            "--branch",
+            "vulnfix",
+            "--repo-root",
+            str(root),
+        ]
+    )
     payload = json.loads(capsys.readouterr().out)
     assert payload["pass"] is False
     assert rc != 0
@@ -365,11 +447,19 @@ def test_main_missing_result_hard_fails(rg, tmp_path, capsys):
     required-section set). Asserts the distinct input-error signal (rc==2 +
     error key) so it can't false-green off an incidental gate failure."""
     pr_body, _result, root = _passing_inputs(tmp_path)
-    rc = rg.main([
-        "run-gates.py", "--pr-body", str(pr_body),
-        "--result", str(tmp_path / "does-not-exist.json"),
-        "--branch", "vulnfix", "--repo-root", str(root),
-    ])
+    rc = rg.main(
+        [
+            "run-gates.py",
+            "--pr-body",
+            str(pr_body),
+            "--result",
+            str(tmp_path / "does-not-exist.json"),
+            "--branch",
+            "vulnfix",
+            "--repo-root",
+            str(root),
+        ]
+    )
     payload = json.loads(capsys.readouterr().out)
     assert payload["pass"] is False
     assert rc == 2, "input-load failure must use the distinct hard-fail code, not gate-fail 1"
@@ -383,10 +473,19 @@ def test_main_corrupt_result_hard_fails(rg, tmp_path, capsys):
     pr_body, _result, root = _passing_inputs(tmp_path)
     bad = tmp_path / "corrupt.json"
     bad.write_text("{ not valid json", encoding="utf-8")
-    rc = rg.main([
-        "run-gates.py", "--pr-body", str(pr_body), "--result", str(bad),
-        "--branch", "vulnfix", "--repo-root", str(root),
-    ])
+    rc = rg.main(
+        [
+            "run-gates.py",
+            "--pr-body",
+            str(pr_body),
+            "--result",
+            str(bad),
+            "--branch",
+            "vulnfix",
+            "--repo-root",
+            str(root),
+        ]
+    )
     payload = json.loads(capsys.readouterr().out)
     assert payload["pass"] is False
     assert rc == 2

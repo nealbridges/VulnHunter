@@ -23,7 +23,6 @@ from issue_intake import (  # noqa: E402
     reconstruct_original,
 )
 
-
 # ---- canonical body fixtures ----------------------------------------------
 
 
@@ -45,9 +44,7 @@ def _markers(
     finding_id: str = "VULN-001",
     results_dir: str = "myapp_VULNHUNT_RESULTS_2026-06-28-120000",
 ) -> ExtractedMarkers:
-    return ExtractedMarkers(
-        vulnfix_key=key, finding_id=finding_id, results_dir=results_dir
-    )
+    return ExtractedMarkers(vulnfix_key=key, finding_id=finding_id, results_dir=results_dir)
 
 
 def _record(
@@ -107,10 +104,7 @@ class TestExtractMarkers:
         assert "vulnhunt-results-dir" in msg
 
     def test_missing_one_marker(self):
-        body = (
-            "<!-- vulnfix-key: abcdef0123456789 -->\n"
-            "<!-- vulnhunt-finding-id: VULN-001 -->\n"
-        )
+        body = "<!-- vulnfix-key: abcdef0123456789 -->\n<!-- vulnhunt-finding-id: VULN-001 -->\n"
         with pytest.raises(MarkerExtractionError) as excinfo:
             extract_markers(body)
         msg = str(excinfo.value)
@@ -251,10 +245,12 @@ class TestEnforceHomogeneity:
 
     def test_different_repo_raises(self):
         with pytest.raises(ValueError):
-            enforce_homogeneity([
-                _record(owner="a", repo="x", markers=_markers()),
-                _record(owner="a", repo="y", markers=_markers()),
-            ])
+            enforce_homogeneity(
+                [
+                    _record(owner="a", repo="x", markers=_markers()),
+                    _record(owner="a", repo="y", markers=_markers()),
+                ]
+            )
 
     def test_empty_list_raises(self):
         with pytest.raises(ValueError, match="No issues"):
@@ -265,11 +261,13 @@ class TestEnforceHomogeneity:
         m2 = _markers(results_dir="scan_b")
         m3 = _markers(results_dir="scan_c")
         with pytest.raises(ValueError) as excinfo:
-            enforce_homogeneity([
-                _record(markers=m1),
-                _record(markers=m2),
-                _record(markers=m3),
-            ])
+            enforce_homogeneity(
+                [
+                    _record(markers=m1),
+                    _record(markers=m2),
+                    _record(markers=m3),
+                ]
+            )
         msg = str(excinfo.value)
         assert "scan_a" in msg and "scan_b" in msg and "scan_c" in msg
 
@@ -308,7 +306,7 @@ class TestComputeVulnfixKey:
         # Hard-coded expected value protects against accidental schema drift.
         import hashlib
 
-        raw = "src/db.py:42|CWE-89|input is concatenated".encode()
+        raw = b"src/db.py:42|CWE-89|input is concatenated"
         expected = hashlib.sha256(raw).hexdigest()[:16]
         got = compute_vulnfix_key("src/db.py:42", "CWE-89", "input is concatenated")
         assert got == expected

@@ -131,15 +131,11 @@ class OAuthTokenManager:
             raise AuthTokenError(f"Token request connection error: {exc}") from exc
 
         if response.status_code != 200:
-            raise AuthTokenError(
-                f"Token request failed: {response.status_code} - {response.text}"
-            )
+            raise AuthTokenError(f"Token request failed: {response.status_code} - {response.text}")
 
         body = response.json()
         if "access_token" not in body:
-            raise AuthTokenError(
-                f"No access_token in response (keys: {list(body.keys())})"
-            )
+            raise AuthTokenError(f"No access_token in response (keys: {list(body.keys())})")
 
         lifetime = int(body.get("expires_in", self._oauth.default_lifetime_seconds))
         self._access_token = str(body["access_token"])
