@@ -14,7 +14,7 @@ license = { text = "Apache-2.0" }
 # that need schema-accurate validation (vulnhunter-agent pins >=4.18).
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-cov", "jsonschema>=4.18"]
+dev = ["pytest", "pytest-cov", "jsonschema>=4.18", "types-jsonschema"]
 
 [project.urls]
 homepage = "https://github.com/nealbridges/VulnHunter"

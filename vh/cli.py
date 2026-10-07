@@ -21,7 +21,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from vulnhunter_common import gitops, hostcmd
+from vulnhunter_common import gitops, hostcmd, manifest
 
 _SCAN_ID = re.compile(r"^.+_VULNHUNT_RESULTS_.+$")
 _EXIT_OK = {0, 1, 2, 3, 4}
@@ -87,31 +87,34 @@ def _manifest_body(results: Path, exit_code: int | None) -> dict:
 
 
 def _validate(body: dict) -> list[str]:
-    errors = []
-    for key in (
-        "schema_version",
-        "scan_id",
-        "agent_exit_code",
-        "cost_usd",
-        "findings",
-        "posted",
-        "skipped",
-        "failed",
-    ):
-        if key not in body:
-            errors.append(f"missing {key}")
-    if body.get("schema_version") != "1":
-        errors.append('schema_version must be "1"')
-    scan_id = body.get("scan_id")
+    """Validate a manifest body: schema + corpus conventions.
+
+    Delegates the schema contract to vulnhunter_common.manifest — real
+    JSON-Schema validation when jsonschema is importable, the announced
+    structural fallback otherwise. On top of the schema floor, the
+    corpus convention (plan §3.0: the corpus is the acceptance set) adds
+    the stricter scan_id naming rule the results layout depends on.
+    """
+    errors, used_jsonschema = manifest.validate_manifest(body)
+    errors = [e for e in errors if not e.startswith("__fallback__")]
+    if not used_jsonschema:
+        # Fallback mode: mirror the checks the schema would enforce.
+        for key in ("schema_version", "scan_id", "agent_exit_code", "cost_usd"):
+            if key not in body:
+                errors.append(f"missing {key}")
+        if body.get("schema_version") != "1":
+            errors.append('schema_version must be "1"')
+        if body.get("agent_exit_code") not in _EXIT_OK:
+            errors.append("agent_exit_code must be 0, 1, 2, 3, or 4")
+        cost = body.get("cost_usd")
+        if not isinstance(cost, (int, float)) or isinstance(cost, bool) or cost < 0:
+            errors.append("cost_usd must be a number >= 0")
+        for key in ("findings", "posted", "skipped", "failed"):
+            if not isinstance(body.get(key), list):
+                errors.append(f"{key} must be an array")
+    scan_id = body.get("scan_id") if isinstance(body, dict) else None
     if not isinstance(scan_id, str) or not _SCAN_ID.match(scan_id):
         errors.append("scan_id must match .+_VULNHUNT_RESULTS_.+")
-    if body.get("agent_exit_code") not in _EXIT_OK:
-        errors.append("agent_exit_code must be 0, 1, 2, 3, or 4")
-    if not isinstance(body.get("cost_usd"), (int, float)) or body.get("cost_usd", -1) < 0:
-        errors.append("cost_usd must be a number >= 0")
-    for key in ("findings", "posted", "skipped", "failed"):
-        if not isinstance(body.get(key), list):
-            errors.append(f"{key} must be an array")
     return errors
 
 
