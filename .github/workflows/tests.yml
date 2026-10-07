@@ -62,6 +62,10 @@ jobs:
             --cov-report=xml \
             --junitxml=pytest-report.xml
 
+      - name: Type-check (vh only; ratchet targets per mypy.ini)
+        if: matrix.project == 'vh'
+        run: mypy vh
+
       - name: Upload test artifacts on failure
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4

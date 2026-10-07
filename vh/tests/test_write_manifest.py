@@ -23,7 +23,8 @@ def results_dir(tmp_path: Path) -> Path:
 
 
 def _read_manifest(results: Path) -> dict:
-    return json.loads((results / "scan_manifest.json").read_text())
+    loaded: dict = json.loads((results / "scan_manifest.json").read_text())
+    return loaded
 
 
 def _run(results: Path, *extra: str) -> int:

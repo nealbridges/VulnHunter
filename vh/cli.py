@@ -208,4 +208,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    return args.func(args)
+    func = args.func
+    # argparse stores the handler as Any (set_defaults(**kwargs)); the
+    # annotation documents the contract every cmd_* honors: return int.
+    return int(func(args))

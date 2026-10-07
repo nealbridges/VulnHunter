@@ -12,7 +12,7 @@ license = { text = "Apache-2.0" }
 # No runtime dependencies: vh shells out to git and the host's own
 # headless command. pytest is needed only for the test suite.
 [project.optional-dependencies]
-dev = ["pytest", "pytest-cov"]
+dev = ["pytest", "pytest-cov", "mypy"]
 
 [project.urls]
 homepage = "https://github.com/nealbridges/VulnHunter"
