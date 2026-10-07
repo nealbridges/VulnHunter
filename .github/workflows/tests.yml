@@ -94,6 +94,9 @@ jobs:
 
       - name: Type-check (vh only; ratchet targets per mypy.ini)
         if: matrix.project == 'vh'
+        # The job-level working-directory is the component dir; mypy's target
+        # ('vh') is the package at the REPO ROOT, so run from the root.
+        working-directory: ${{ github.workspace }}
         run: mypy vh
 
       - name: Upload test artifacts on failure
