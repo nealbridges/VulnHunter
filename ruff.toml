@@ -1,0 +1,40 @@
+# Root ruff configuration for all VulnHunter Python components.
+# Plan: product_docs/PYTHON_MODERNIZATION_PLAN.md Phase 0 item 1.
+# Serves the CONTRACT+RUNTIME layers (§2.2): repo-wide deterministic checks.
+# Conservative by design — this repo is in a mechanical-modernization pass;
+# stricter rules land via the §4 ratchet, not this file.
+
+target-version = "py311"          # oldest floor in the repo (vulnhunter-fix)
+line-length = 100                 # matches prevailing style; long prose strings exist
+
+[lint]
+# E501 handled by formatter; formatting-only churn is avoided in this pass.
+select = [
+  "E",    # pycodestyle errors
+  "F",    # pyflakes (unused imports/vars, undefined names)
+  "W",    # pycodestyle warnings
+  "I",    # import sorting (deterministic, low-churn)
+  "B",    # bugbear — likely bugs (incl. swallowed-exception hygiene)
+  "UP",   # pyupgrade — py3.11+ idioms, mechanical
+  "SIM",  # flake8-simplify — mechanical simplifications
+]
+ignore = [
+  "E501",  # formatter owns line length
+  "SIM108", # ternary conversions are churn, not fixes
+]
+
+[lint.per-file-ignores]
+# Tests: long assertion messages and fixture-heavy code are normal.
+"**/tests/**" = ["E501"]
+# Deliberate sys.path.insert-then-import bootstrap in graph test helpers.
+"vulnhunter-fix/tests/test_graph_build_bugs.py" = ["E402"]
+"vulnhunter-fix/tests/test_graph_query.py" = ["E402"]
+# OutputKind's str+Enum base pair is a serialization contract; revisit as
+# StrEnum under the Phase 3 verify_runner hardening, not by lint autofix.
+"vulnhunter-agent/agent/verify_runner.py" = ["UP042"]
+# Vendored/generated artifacts stay as-is.
+"**/.venv/**" = ["ALL"]
+"**/c1_*egg-info/**" = ["ALL"]
+
+[format]
+quote-style = "double"
