@@ -6,8 +6,6 @@ import json
 import os
 from collections.abc import Callable
 
-import pytest
-
 from agent.build_settings import _build_sandbox, build_claude_settings
 from agent.config import (
     AgentConfig,
@@ -15,7 +13,6 @@ from agent.config import (
     SandboxConfig,
     TelemetryConfig,
 )
-
 
 # ---------------------------------------------------------------------------
 # _build_sandbox
@@ -50,9 +47,7 @@ class TestBuildSandbox:
         sandbox = _build_sandbox(cfg)
         assert sandbox["network"]["allowedDomains"] == ["api.anthropic.com"]
 
-    def test_sandbox_flags_propagate(
-        self, agent_config: Callable[..., AgentConfig]
-    ) -> None:
+    def test_sandbox_flags_propagate(self, agent_config: Callable[..., AgentConfig]) -> None:
         cfg = agent_config(
             sandbox=SandboxConfig(
                 enabled=False,
@@ -151,36 +146,32 @@ class TestBuildSandbox:
 
 
 class TestBuildClaudeSettings:
-    def test_returns_valid_json(
-        self, populated_agent_config: AgentConfig
-    ) -> None:
+    def test_returns_valid_json(self, populated_agent_config: AgentConfig) -> None:
         out = build_claude_settings(populated_agent_config, "tok", model="claude-opus-4-8")
         parsed = json.loads(out)
         assert "env" in parsed
         assert "sandbox" in parsed
 
-    def test_env_has_bedrock_keys(
-        self, populated_agent_config: AgentConfig
-    ) -> None:
-        out = json.loads(build_claude_settings(populated_agent_config, "tok-xyz", model="claude-opus-4-8"))
+    def test_env_has_bedrock_keys(self, populated_agent_config: AgentConfig) -> None:
+        out = json.loads(
+            build_claude_settings(populated_agent_config, "tok-xyz", model="claude-opus-4-8")
+        )
         env = out["env"]
         assert env["CLAUDE_CODE_USE_BEDROCK"] == "1"
         assert env["ANTHROPIC_AUTH_TOKEN"] == "tok-xyz"
         assert env["ANTHROPIC_BEDROCK_BASE_URL"] == "https://bedrock.example.com"
         assert env["AWS_REGION"] == "us-east-1"
 
-    def test_telemetry_disabled_omits_otel(
-        self, populated_agent_config: AgentConfig
-    ) -> None:
-        out = json.loads(build_claude_settings(populated_agent_config, "tok", model="claude-opus-4-8"))
+    def test_telemetry_disabled_omits_otel(self, populated_agent_config: AgentConfig) -> None:
+        out = json.loads(
+            build_claude_settings(populated_agent_config, "tok", model="claude-opus-4-8")
+        )
         env = out["env"]
         assert env["CLAUDE_CODE_ENABLE_TELEMETRY"] == "0"
         for key in env:
             assert not key.startswith("OTEL_")
 
-    def test_telemetry_enabled_sets_otel(
-        self, agent_config: Callable[..., AgentConfig]
-    ) -> None:
+    def test_telemetry_enabled_sets_otel(self, agent_config: Callable[..., AgentConfig]) -> None:
         cfg = agent_config(
             telemetry=TelemetryConfig(
                 enabled=True,
@@ -203,15 +194,17 @@ class TestBuildClaudeSettings:
                 otel_exporter_otlp_endpoint="https://otel.example.com",
             )
         )
-        out = json.loads(build_claude_settings(cfg, "tok", scan_id="abc-123", model="claude-opus-4-8"))
+        out = json.loads(
+            build_claude_settings(cfg, "tok", scan_id="abc-123", model="claude-opus-4-8")
+        )
         attrs = out["env"]["OTEL_RESOURCE_ATTRIBUTES"]
         assert "scan.id=abc-123" in attrs
 
-    def test_scan_id_absent_when_telemetry_off(
-        self, populated_agent_config: AgentConfig
-    ) -> None:
+    def test_scan_id_absent_when_telemetry_off(self, populated_agent_config: AgentConfig) -> None:
         out = json.loads(
-            build_claude_settings(populated_agent_config, "tok", scan_id="abc", model="claude-opus-4-8")
+            build_claude_settings(
+                populated_agent_config, "tok", scan_id="abc", model="claude-opus-4-8"
+            )
         )
         # No OTEL_* keys at all when telemetry off.
         for key in out["env"]:
@@ -220,42 +213,30 @@ class TestBuildClaudeSettings:
     def test_autocompact_pct_propagates_as_string(
         self, populated_agent_config: AgentConfig
     ) -> None:
-        out = json.loads(build_claude_settings(populated_agent_config, "tok", model="claude-opus-4-8"))
+        out = json.loads(
+            build_claude_settings(populated_agent_config, "tok", model="claude-opus-4-8")
+        )
         assert out["env"]["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"] == "85"
 
-    def test_autocompact_defaults_to_85_for_standard_context(
-        self, agent_config_factory
-    ) -> None:
+    def test_autocompact_defaults_to_85_for_standard_context(self, agent_config_factory) -> None:
         cfg = agent_config_factory(autocompact_pct_override=None)
         out = json.loads(build_claude_settings(cfg, "tok", model="claude-opus-4-8"))
         assert out["env"]["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"] == "85"
 
-    def test_autocompact_defaults_to_90_for_1m_context(
-        self, agent_config_factory
-    ) -> None:
+    def test_autocompact_defaults_to_90_for_1m_context(self, agent_config_factory) -> None:
         cfg = agent_config_factory(autocompact_pct_override=None)
-        out = json.loads(
-            build_claude_settings(cfg, "tok", model="claude-opus-4-8[1m]")
-        )
+        out = json.loads(build_claude_settings(cfg, "tok", model="claude-opus-4-8[1m]"))
         assert out["env"]["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"] == "90"
 
-    def test_autocompact_explicit_override_wins(
-        self, agent_config_factory
-    ) -> None:
+    def test_autocompact_explicit_override_wins(self, agent_config_factory) -> None:
         # Even with a 1M model, an explicit config value wins.
         cfg = agent_config_factory(autocompact_pct_override=70)
-        out = json.loads(
-            build_claude_settings(cfg, "tok", model="claude-opus-4-8[1m]")
-        )
+        out = json.loads(build_claude_settings(cfg, "tok", model="claude-opus-4-8[1m]"))
         assert out["env"]["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"] == "70"
 
-    def test_prompt_caching_1h_bedrock_enabled(
-        self, populated_agent_config: AgentConfig
-    ) -> None:
+    def test_prompt_caching_1h_bedrock_enabled(self, populated_agent_config: AgentConfig) -> None:
         out = json.loads(
-            build_claude_settings(
-                populated_agent_config, "tok", model="claude-opus-4-8"
-            )
+            build_claude_settings(populated_agent_config, "tok", model="claude-opus-4-8")
         )
         # Strict allow-list: scans run 30-60+ minutes, so the 5-min
         # default cache TTL would evict between phase boundaries and
@@ -263,16 +244,14 @@ class TestBuildClaudeSettings:
         # TTL has no extra per-token cost.
         assert out["env"]["ENABLE_PROMPT_CACHING_1H_BEDROCK"] == "1"
 
-    def test_http_proxy_blanked(
-        self, populated_agent_config: AgentConfig
-    ) -> None:
-        env = json.loads(build_claude_settings(populated_agent_config, "tok", model="claude-opus-4-8"))["env"]
+    def test_http_proxy_blanked(self, populated_agent_config: AgentConfig) -> None:
+        env = json.loads(
+            build_claude_settings(populated_agent_config, "tok", model="claude-opus-4-8")
+        )["env"]
         for key in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
             assert env[key] == ""
 
-    def test_no_proxy_comes_from_config(
-        self, agent_config_factory
-    ) -> None:
+    def test_no_proxy_comes_from_config(self, agent_config_factory) -> None:
         cfg = agent_config_factory(no_proxy="localhost,10.0.0.0/8,.internal.example")
         env = json.loads(build_claude_settings(cfg, "tok", model="claude-opus-4-8"))["env"]
         assert env["NO_PROXY"] == "localhost,10.0.0.0/8,.internal.example"
@@ -320,9 +299,9 @@ class TestBuildClaudeSettings:
                 aws_region="us-east-1",
             )
         )
-        env = json.loads(
-            build_claude_settings(cfg, "", model="us.anthropic.claude-opus-4-8")
-        )["env"]
+        env = json.loads(build_claude_settings(cfg, "", model="us.anthropic.claude-opus-4-8"))[
+            "env"
+        ]
         assert env["CLAUDE_CODE_USE_BEDROCK"] == "1"
         assert env["AWS_REGION"] == "us-east-1"
         assert env["ENABLE_PROMPT_CACHING_1H_BEDROCK"] == "1"
@@ -345,9 +324,9 @@ class TestBuildClaudeSettings:
                 bedrock_base_url="https://bedrock.vpce.example.com",
             )
         )
-        env = json.loads(
-            build_claude_settings(cfg, "", model="us.anthropic.claude-opus-4-8")
-        )["env"]
+        env = json.loads(build_claude_settings(cfg, "", model="us.anthropic.claude-opus-4-8"))[
+            "env"
+        ]
         assert env["AWS_PROFILE"] == "vulnhunter"
         assert env["ANTHROPIC_BEDROCK_BASE_URL"] == "https://bedrock.vpce.example.com"
         assert env["AWS_REGION"] == "us-west-2"
@@ -358,9 +337,7 @@ class TestBuildClaudeSettings:
 # ---------------------------------------------------------------------------
 
 
-def test_snapshot_rendered_settings(
-    populated_agent_config: AgentConfig, snapshot
-) -> None:
+def test_snapshot_rendered_settings(populated_agent_config: AgentConfig, snapshot) -> None:
     """Lock the rendered JSON for a known fixture (telemetry off, sandbox on)."""
     rendered = build_claude_settings(populated_agent_config, "stub-token", model="claude-opus-4-8")
     parsed = json.loads(rendered)

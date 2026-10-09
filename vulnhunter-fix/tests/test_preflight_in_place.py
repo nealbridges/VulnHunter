@@ -29,9 +29,7 @@ def _init_repo(tmp_path: Path, origin: str | None = None) -> Path:
     subprocess.run(["git", "add", "README"], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-q", "-m", "x"], cwd=repo, check=True)
     if origin:
-        subprocess.run(
-            ["git", "remote", "add", "origin", origin], cwd=repo, check=True
-        )
+        subprocess.run(["git", "remote", "add", "origin", origin], cwd=repo, check=True)
     return repo
 
 
@@ -82,9 +80,7 @@ class TestCheckInPlaceMode:
         out = capsys.readouterr().out
         assert "[FAIL] Working tree is clean" in out
 
-    def test_worktree_prune_runs_on_clean_repo(
-        self, tmp_path, monkeypatch, capsys
-    ):
+    def test_worktree_prune_runs_on_clean_repo(self, tmp_path, monkeypatch, capsys):
         repo = _init_repo(tmp_path, origin="https://github.com/a/b.git")
         monkeypatch.chdir(repo)
         preflight.check_in_place_mode()
@@ -102,11 +98,14 @@ class TestCheckInPlaceMode:
         # see it via this spy.
         try:
             import urllib.request
+
             called = {"urlopen": False}
             orig = urllib.request.urlopen
+
             def spy(*a, **kw):
                 called["urlopen"] = True
                 return orig(*a, **kw)
+
             monkeypatch.setattr(urllib.request, "urlopen", spy)
         except ImportError:
             called = {"urlopen": False}
@@ -145,13 +144,20 @@ class TestProbeSkipping:
         repo = _init_repo(tmp_path, origin="https://github.com/a/b.git")
         monkeypatch.chdir(repo)
         for fn in (
-            "check_python", "check_git", "check_gh_cli", "check_agent_cli",
-            "check_memory", "check_disk_space", "check_in_place_mode",
+            "check_python",
+            "check_git",
+            "check_gh_cli",
+            "check_agent_cli",
+            "check_memory",
+            "check_disk_space",
+            "check_in_place_mode",
         ):
             monkeypatch.setattr(preflight, fn, lambda *a, **kw: None)
         called = {"probe": False}
+
         def probe_spy():
             called["probe"] = True
+
         monkeypatch.setattr(preflight, "check_git_clone_writable", probe_spy)
         with pytest.raises(SystemExit):
             preflight.main()
@@ -162,13 +168,20 @@ class TestProbeSkipping:
     def test_probe_runs_when_fork_mode(self, tmp_path, monkeypatch, capsys):
         monkeypatch.chdir(tmp_path)
         for fn in (
-            "check_python", "check_git", "check_gh_cli", "check_agent_cli",
-            "check_memory", "check_disk_space", "check_in_place_mode",
+            "check_python",
+            "check_git",
+            "check_gh_cli",
+            "check_agent_cli",
+            "check_memory",
+            "check_disk_space",
+            "check_in_place_mode",
         ):
             monkeypatch.setattr(preflight, fn, lambda *a, **kw: None)
         called = {"probe": False}
+
         def probe_spy():
             called["probe"] = True
+
         monkeypatch.setattr(preflight, "check_git_clone_writable", probe_spy)
         with pytest.raises(SystemExit):
             preflight.main()
@@ -198,6 +211,7 @@ class TestCheckDetailReporting:
     def test_disk_space_fallback_reports_reason(self, monkeypatch, capsys):
         def raise_oserror(path):
             raise OSError("boom")
+
         monkeypatch.setattr(preflight, "_free_disk_bytes", raise_oserror)
         preflight.check_disk_space()
         out = capsys.readouterr().out
@@ -207,6 +221,7 @@ class TestCheckDetailReporting:
     def test_memory_fallback_reports_reason(self, monkeypatch, capsys):
         def raise_oserror():
             raise OSError("boom")
+
         monkeypatch.setattr(preflight, "_total_memory_bytes", raise_oserror)
         preflight.check_memory()
         out = capsys.readouterr().out
@@ -225,8 +240,8 @@ class TestDiskSpaceQuotaAware:
     def test_reads_free_to_caller_not_total_free(self, monkeypatch):
         import ctypes
 
-        FREE_TO_CALLER = 111 * (1024 ** 3)
-        TOTAL_FREE = 999 * (1024 ** 3)
+        FREE_TO_CALLER = 111 * (1024**3)
+        TOTAL_FREE = 999 * (1024**3)
 
         def fake_get_disk_free_space_ex_w(path, free_to_caller, total_bytes, total_free):
             if free_to_caller:

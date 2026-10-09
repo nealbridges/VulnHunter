@@ -22,7 +22,6 @@ import re
 import sys
 from pathlib import Path
 
-
 REQUIRED_ALWAYS = (
     "## Finding Summary",
     "## Attacker Capability",
@@ -31,10 +30,10 @@ REQUIRED_ALWAYS = (
     "## Verification Results",
 )
 
-CONDITIONAL_TABLE = "## Verification Table"      # PR only
-CONDITIONAL_RESIDUAL = "## Residual Risk"        # tier != FULL
-CONDITIONAL_BREAKING = "## Breaking Change"      # status == BREAKING_CHANGE
-CONDITIONAL_SWEEP = "## Sweep Summary"           # sweep_ran
+CONDITIONAL_TABLE = "## Verification Table"  # PR only
+CONDITIONAL_RESIDUAL = "## Residual Risk"  # tier != FULL
+CONDITIONAL_BREAKING = "## Breaking Change"  # status == BREAKING_CHANGE
+CONDITIONAL_SWEEP = "## Sweep Summary"  # sweep_ran
 
 DEFAULT_FORBIDDEN = ("TBD", "TODO", "FIXME", "[placeholder]", "<add here>", "<fill in>")
 
@@ -93,7 +92,7 @@ def _find_section_content(text: str, heading: str) -> tuple[bool, bool]:
     after = idx + len(heading)
     next_h = re.search(r"^(?:##|###)\s", masked[after:], re.MULTILINE)
     end = after + (next_h.start() if next_h else len(masked) - after)
-    body = text[after:end].strip()   # from original — preserves code blocks
+    body = text[after:end].strip()  # from original — preserves code blocks
     return True, bool(body)
 
 
@@ -127,7 +126,7 @@ def check(args) -> int:
         forbidden.update(args.forbid_strings)
     for term in forbidden:
         if term in text:
-            line_no = text[:text.find(term)].count("\n") + 1
+            line_no = text[: text.find(term)].count("\n") + 1
             errors.append(f"{args.body}:{line_no}: forbidden token: {term!r}")
 
     if args.enforce_strings:

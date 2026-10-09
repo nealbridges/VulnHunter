@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from agent import _llm
 from agent import issues_extract as extract_mod
 from agent.issues_extract import (
@@ -15,6 +14,7 @@ from agent.issues_extract import (
     _scan_date_from_dir,
     extract_findings,
 )
+
 from tests._helpers import FakeTokenManager as _TM
 
 
@@ -23,9 +23,7 @@ def fake_results_dir(tmp_path: Path) -> Path:
     """Build a results directory with README + poc + exploit_tests."""
     results = tmp_path / "myrepo_VULNHUNT_RESULTS_opus47_2026-06-23-141824"
     results.mkdir()
-    (results / "README.md").write_text(
-        "# Report\n\nFindings: see summary table.\n"
-    )
+    (results / "README.md").write_text("# Report\n\nFindings: see summary table.\n")
     poc = results / "poc"
     poc.mkdir()
     (poc / "VULN-001_demo.py").write_text("# poc")
@@ -59,10 +57,7 @@ class TestComputeVulnfixKey:
 
 class TestScanDateFromDir:
     def test_extracts_date(self) -> None:
-        assert (
-            _scan_date_from_dir("repo_VULNHUNT_RESULTS_opus47_2026-06-23-141824")
-            == "2026-06-23"
-        )
+        assert _scan_date_from_dir("repo_VULNHUNT_RESULTS_opus47_2026-06-23-141824") == "2026-06-23"
 
     def test_falls_back_to_today(self) -> None:
         out = _scan_date_from_dir("no-timestamp")
@@ -110,10 +105,7 @@ class TestExtractFindings:
             },
         )
 
-
-        report = await extract_findings(
-            fake_results_dir, populated_agent_config, _TM()
-        )
+        report = await extract_findings(fake_results_dir, populated_agent_config, _TM())
         assert len(report.findings) == 1
         f = report.findings[0]
         assert f.id == "VULN-001"
@@ -133,10 +125,7 @@ class TestExtractFindings:
             {"findings": [{"id": "", "title": "no id", "cwe": "CWE-1"}]},
         )
 
-
-        report = await extract_findings(
-            fake_results_dir, populated_agent_config, _TM()
-        )
+        report = await extract_findings(fake_results_dir, populated_agent_config, _TM())
         assert report.findings == []
 
     async def test_missing_findings_list_raises(
@@ -147,11 +136,8 @@ class TestExtractFindings:
     ) -> None:
         _stub_llm(monkeypatch, {"not_findings": []})
 
-
         with pytest.raises(_llm.LLMError, match="findings"):
-            await extract_findings(
-                fake_results_dir, populated_agent_config, _TM()
-            )
+            await extract_findings(fake_results_dir, populated_agent_config, _TM())
 
     async def test_missing_readme_raises(
         self,
@@ -160,7 +146,6 @@ class TestExtractFindings:
     ) -> None:
         empty = tmp_path / "no_readme_dir"
         empty.mkdir()
-
 
         with pytest.raises(FileNotFoundError):
             await extract_findings(empty, populated_agent_config, _TM())
@@ -196,9 +181,7 @@ class TestModelFallbackAudit:
         monkeypatch.setattr(extract_mod._llm, "call_json_with_fallback", fb)
         monkeypatch.setattr(extract_mod._llm, "call_json", cj)
         aw = _FakeAudit()
-        await extract_findings(
-            fake_results_dir, populated_agent_config, _TM(), audit_writer=aw
-        )
+        await extract_findings(fake_results_dir, populated_agent_config, _TM(), audit_writer=aw)
         fbk = [r for r in aw.records if r["event_type"] == "model_fallback"]
         assert len(fbk) == 1
         assert fbk[0]["from_model"] == populated_agent_config.issues.sonnet_model
@@ -222,9 +205,7 @@ class TestModelFallbackAudit:
         monkeypatch.setattr(extract_mod._llm, "call_json", cj)
         aw = _FakeAudit()
         with pytest.raises(_llm.LLMError):
-            await extract_findings(
-                fake_results_dir, populated_agent_config, _TM(), audit_writer=aw
-            )
+            await extract_findings(fake_results_dir, populated_agent_config, _TM(), audit_writer=aw)
         un = [r for r in aw.records if r["event_type"] == "model_unavailable"]
         assert len(un) == 1
         assert un[0]["from_model"] == populated_agent_config.anthropic.model
@@ -240,7 +221,5 @@ class TestModelFallbackAudit:
 
         monkeypatch.setattr(extract_mod._llm, "call_json_with_fallback", ok)
         aw = _FakeAudit()
-        await extract_findings(
-            fake_results_dir, populated_agent_config, _TM(), audit_writer=aw
-        )
+        await extract_findings(fake_results_dir, populated_agent_config, _TM(), audit_writer=aw)
         assert aw.records == []

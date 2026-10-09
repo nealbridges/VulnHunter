@@ -30,10 +30,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-
 WEIGHTS = {
     "critical": 8,
-    "high+": 8,   # High+ normalizes to Critical
+    "high+": 8,  # High+ normalizes to Critical
     "high": 4,
     "medium": 2,
     "low": 1,
@@ -140,7 +139,7 @@ def annotate_clusters_json(payload: dict[str, Any]) -> dict[str, Any]:
         original = next(r for r in raw if r.get("name") == c.name)
         annotated = dict(original)
         annotated["score"] = c.score
-        annotated["recommended"] = (i == 0)
+        annotated["recommended"] = i == 0
         out_clusters.append(annotated)
     return {**payload, "clusters": out_clusters}
 

@@ -28,12 +28,11 @@ Side effects:
 - Only fires when a Python binary exists inside the bundled venv
   (``.venv/bin/python3`` on POSIX, ``.venv/Scripts/python.exe`` on Windows).
 """
+
 from __future__ import annotations
 
-import glob
 import os
 import sys
-
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _SKILL_ROOT = os.path.dirname(_HERE)
@@ -101,4 +100,3 @@ _prepend_once(_matching)
 # 3. Skill root itself, so ``import vulnhunter_fix.delivery`` and
 #    ``import vulnhunter_fix.graph.*`` resolve without needing PYTHONPATH.
 _prepend_once(_SKILL_ROOT)
-

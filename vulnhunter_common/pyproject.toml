@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "c1-vulnhunter-common"
+version = "0.1.0"
+description = "Contract + shared runtime layer for VulnHunter Python components (env registry, git ops, host command launcher, manifest schema owner)."
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+
+# Intentionally dependency-free at runtime: jsonschema is imported lazily
+# by vulnhunter_common.manifest and is already required by the components
+# that need schema-accurate validation (vulnhunter-agent pins >=4.18).
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "jsonschema>=4.18", "types-jsonschema"]
+
+[project.urls]
+homepage = "https://github.com/nealbridges/VulnHunter"
+upstream = "https://github.com/capitalone/vulnhunter"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["vulnhunter_common*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

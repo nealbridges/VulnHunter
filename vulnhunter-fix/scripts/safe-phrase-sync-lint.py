@@ -15,7 +15,6 @@ import ast
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DELIVERY = REPO_ROOT / "vulnhunter_fix" / "delivery.py"
 GATE1 = REPO_ROOT / "scripts" / "check-severity-mask.py"
@@ -26,12 +25,15 @@ def _extract_constant(path: Path, name: str) -> tuple[str, ...] | None:
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
             for target in node.targets:
-                if isinstance(target, ast.Name) and target.id == name:
-                    if isinstance(node.value, (ast.Tuple, ast.List)):
-                        vals = []
-                        for elt in node.value.elts:
-                            if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
-                                vals.append(elt.value)
+                if (
+                    isinstance(target, ast.Name)
+                    and target.id == name
+                    and isinstance(node.value, (ast.Tuple, ast.List))
+                ):
+                    vals = []
+                    for elt in node.value.elts:
+                        if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                            vals.append(elt.value)
                         return tuple(vals)
     return None
 

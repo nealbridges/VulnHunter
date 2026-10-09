@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 import pytest
 import respx
-
 from agent import repo_properties as rp_mod
 from agent.config import RepoPropertiesConfig
 from agent.repo_properties import (
@@ -18,7 +18,6 @@ from agent.repo_properties import (
     fetch_from_github,
     resolve,
 )
-
 
 # A representative operator-defined property map: GitHub custom-property
 # name → emitted findings-stream field name. The agent ships with an
@@ -101,9 +100,7 @@ class TestCoerceFromPayload:
         # unknown property is silently dropped, not an error
 
     def test_only_present_properties_populated(self) -> None:
-        p = _coerce_from_payload(
-            [{"property_name": "appId", "value": "BASE"}], _PROP_MAP
-        )
+        p = _coerce_from_payload([{"property_name": "appId", "value": "BASE"}], _PROP_MAP)
         assert p.values == {"app_id_tag": "BASE"}
 
     def test_non_list_payload_returns_blank(self) -> None:
@@ -215,27 +212,21 @@ class TestFetchFromGitHub:
         assert fetch_from_github("https://github.com/o/r", config=cfg) == RepoProperties()
 
     @respx.mock
-    def test_network_error_returns_blank(
-        self, agent_config: Callable[..., Any]
-    ) -> None:
+    def test_network_error_returns_blank(self, agent_config: Callable[..., Any]) -> None:
         cfg = self._cfg(agent_config)
         respx.get("https://api.github.com/repos/o/r/properties/values").mock(
             side_effect=httpx.ConnectError("connection refused")
         )
         assert fetch_from_github("https://github.com/o/r", config=cfg) == RepoProperties()
 
-    def test_missing_scan_token_returns_blank(
-        self, agent_config: Callable[..., Any]
-    ) -> None:
+    def test_missing_scan_token_returns_blank(self, agent_config: Callable[..., Any]) -> None:
         # Property map set but empty scan_token — should skip fetch.
         cfg = agent_config(
             repo_properties=RepoPropertiesConfig(github_property_map=_PROP_MAP),
         )
         assert fetch_from_github("https://github.com/o/r", config=cfg) == RepoProperties()
 
-    def test_unparseable_url_returns_blank(
-        self, agent_config: Callable[..., Any]
-    ) -> None:
+    def test_unparseable_url_returns_blank(self, agent_config: Callable[..., Any]) -> None:
         cfg = self._cfg(agent_config)
         assert fetch_from_github("not-a-url", config=cfg) == RepoProperties()
 
@@ -341,9 +332,7 @@ class TestPreflightOrdering:
         # Fake fetch → records order, returns a mapped property value.
         def _fake_fetch(repo_url: str, *, config, timeout_seconds=30):
             call_order.append("fetch_from_github")
-            return main_mod.repo_props.RepoProperties(
-                values={"app_id_tag": "from-github"}
-            )
+            return main_mod.repo_props.RepoProperties(values={"app_id_tag": "from-github"})
 
         # Fake run_vulnhunt → records order, returns a synthetic results dir.
         async def _fake_run_vulnhunt(clone_dir, config, **kwargs):
@@ -370,8 +359,9 @@ class TestPreflightOrdering:
         # Config with scan token + a non-empty property map so the
         # properties fetch engages; issues stage disabled so the flow
         # exits cleanly.
-        from tests.conftest import _build_agent_config
         from agent.config import AuditConfig
+
+        from tests.conftest import _build_agent_config
 
         cfg = _build_agent_config(
             github=GitHubConfig(
@@ -380,9 +370,7 @@ class TestPreflightOrdering:
                 reports_token="",
                 broker_token_dir="",
             ),
-            repo_properties=RepoPropertiesConfig(
-                github_property_map={"appId": "app_id_tag"}
-            ),
+            repo_properties=RepoPropertiesConfig(github_property_map={"appId": "app_id_tag"}),
             audit=AuditConfig(
                 enabled=True,
                 events_path=str(tmp_path / "audit.jsonl"),
@@ -397,12 +385,8 @@ class TestPreflightOrdering:
         monkeypatch.setattr(main_mod, "shallow_clone", _fake_clone)
         monkeypatch.setattr(main_mod, "run_vulnhunt", _fake_run_vulnhunt)
         monkeypatch.setattr(main_mod, "make_token_manager", lambda *a, **k: _FakeOAuth())
-        monkeypatch.setattr(
-            main_mod, "_preflight_standalone_tokens", lambda **_kw: None
-        )
-        monkeypatch.setattr(
-            main_mod.repo_props, "fetch_from_github", _fake_fetch
-        )
+        monkeypatch.setattr(main_mod, "_preflight_standalone_tokens", lambda **_kw: None)
+        monkeypatch.setattr(main_mod.repo_props, "fetch_from_github", _fake_fetch)
 
         # No issues stage, no publish stage — just scan.
         argv = [
@@ -417,9 +401,7 @@ class TestPreflightOrdering:
         # Preflight ordering: fetch_from_github MUST come before run_vulnhunt.
         fetch_idx = call_order.index("fetch_from_github")
         run_idx = call_order.index("run_vulnhunt")
-        assert fetch_idx < run_idx, (
-            f"fetch must precede run_vulnhunt; got order={call_order}"
-        )
+        assert fetch_idx < run_idx, f"fetch must precede run_vulnhunt; got order={call_order}"
 
     def test_fetch_skipped_when_audit_disabled(
         self,
@@ -462,20 +444,14 @@ class TestPreflightOrdering:
                 reports_token="",
                 broker_token_dir="",
             ),
-            repo_properties=RepoPropertiesConfig(
-                github_property_map={"appId": "app_id_tag"}
-            ),
+            repo_properties=RepoPropertiesConfig(github_property_map={"appId": "app_id_tag"}),
         )
         monkeypatch.setattr(main_mod, "load_config", lambda _p: cfg)
         monkeypatch.setattr(main_mod, "shallow_clone", _fake_clone)
         monkeypatch.setattr(main_mod, "run_vulnhunt", _fake_run_vulnhunt)
         monkeypatch.setattr(main_mod, "make_token_manager", lambda *a, **k: _FakeOAuth())
-        monkeypatch.setattr(
-            main_mod, "_preflight_standalone_tokens", lambda **_kw: None
-        )
-        monkeypatch.setattr(
-            main_mod.repo_props, "fetch_from_github", _fake_fetch
-        )
+        monkeypatch.setattr(main_mod, "_preflight_standalone_tokens", lambda **_kw: None)
+        monkeypatch.setattr(main_mod.repo_props, "fetch_from_github", _fake_fetch)
 
         argv = [
             "--mode=scan",
@@ -485,6 +461,4 @@ class TestPreflightOrdering:
             "--no-audit",
         ]
         main_mod.main(argv)
-        assert called["n"] == 0, (
-            "GitHub properties fetch must not run when audit is disabled"
-        )
+        assert called["n"] == 0, "GitHub properties fetch must not run when audit is disabled"

@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import pytest
 
-
 HAND_WAVE_FIXTURES = [
     "SQLi in legacy_admin.php — future work",
     "XSS via /search — More Work Needed",
@@ -41,7 +40,8 @@ CLEAN_FIXTURES = [
 
 @pytest.mark.parametrize("residual", HAND_WAVE_FIXTURES)
 def test_hand_wave_residual_refuses_delivery(residual):
-    from vulnhunter_fix.delivery import render_pr_body_with_residuals, HandWaveResidualError
+    from vulnhunter_fix.delivery import HandWaveResidualError, render_pr_body_with_residuals
+
     with pytest.raises(HandWaveResidualError):
         render_pr_body_with_residuals(
             vuln_id="VULN-1",
@@ -53,6 +53,7 @@ def test_hand_wave_residual_refuses_delivery(residual):
 @pytest.mark.parametrize("residual", CLEAN_FIXTURES)
 def test_concrete_residual_renders(residual):
     from vulnhunter_fix.delivery import render_pr_body_with_residuals
+
     body = render_pr_body_with_residuals(
         vuln_id="VULN-1",
         tier="MITIGATION",
@@ -63,7 +64,8 @@ def test_concrete_residual_renders(residual):
 
 
 def test_empty_residual_refuses_delivery_for_non_full_tier():
-    from vulnhunter_fix.delivery import render_pr_body_with_residuals, EmptyResidualError
+    from vulnhunter_fix.delivery import EmptyResidualError, render_pr_body_with_residuals
+
     with pytest.raises(EmptyResidualError):
         render_pr_body_with_residuals(
             vuln_id="VULN-1",
@@ -73,7 +75,8 @@ def test_empty_residual_refuses_delivery_for_non_full_tier():
 
 
 def test_full_tier_forbids_residuals():
-    from vulnhunter_fix.delivery import render_pr_body_with_residuals, FullTierWithResidualsError
+    from vulnhunter_fix.delivery import FullTierWithResidualsError, render_pr_body_with_residuals
+
     with pytest.raises(FullTierWithResidualsError):
         render_pr_body_with_residuals(
             vuln_id="VULN-1",

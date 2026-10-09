@@ -14,6 +14,23 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  lint:
+    name: lint (ruff check + format --check)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install ruff==0.16.10  # pin: matches root ruff.toml config era
+      - name: ruff check
+        run: ruff check .
+      - name: ruff format --check
+        run: ruff format --check .
+
   pytest:
     name: pytest (${{ matrix.project }}, py${{ matrix.python-version }})
     runs-on: ubuntu-latest
@@ -22,9 +39,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - project: vulnhunter_common
+            python-version: "3.12"
+            extras: dev
           - project: vh
             python-version: "3.12"
             extras: dev
+            cov-fail-under: "65"  # measured 67 on 3.12 (2026-10-07); ratchet up
+          - project: vh
+            python-version: "3.11"
+            extras: dev
+            cov-fail-under: "65"
           - project: harness
             python-version: "3.12"
             extras: dev
@@ -52,15 +77,27 @@ jobs:
       - name: Install project with dev extras
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[${{ matrix.extras }}]"
+          pip install -e "../vulnhunter_common" -e ".[${{ matrix.extras }}]"
 
       - name: Run pytest with coverage
+        if: matrix.project != 'vulnhunter_common'
         run: |
-          pytest -v \
-            --cov \
-            --cov-report=term \
-            --cov-report=xml \
-            --junitxml=pytest-report.xml
+          COV_ARGS=(--cov --cov-report=term --cov-report=xml --junitxml=pytest-report.xml)
+          if [ -n "${{ matrix.cov-fail-under }}" ]; then
+            COV_ARGS+=(--cov-fail-under=${{ matrix.cov-fail-under }})
+          fi
+          pytest -v "${COV_ARGS[@]}"
+
+      - name: Run pytest (contract layer)
+        if: matrix.project == 'vulnhunter_common'
+        run: pytest -v
+
+      - name: Type-check (vh only; ratchet targets per mypy.ini)
+        if: matrix.project == 'vh'
+        # The job-level working-directory is the component dir; mypy's target
+        # ('vh') is the package at the REPO ROOT, so run from the root.
+        working-directory: ${{ github.workspace }}
+        run: mypy vh
 
       - name: Upload test artifacts on failure
         if: failure()

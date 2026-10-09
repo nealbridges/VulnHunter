@@ -11,7 +11,6 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
-
 from agent import clone as clone_mod
 
 
@@ -26,9 +25,11 @@ def _capture_clone(url):
         return _R()
 
     base = Path(tempfile.gettempdir()) / "vh_v003_base"
-    with mock.patch.object(clone_mod, "_GIT_EXECUTABLE", "/usr/bin/git"), \
-            mock.patch.object(clone_mod.subprocess, "run", _fake_run), \
-            mock.patch.object(clone_mod.shutil, "rmtree"):
+    with (
+        mock.patch.object(clone_mod, "_GIT_EXECUTABLE", "/usr/bin/git"),
+        mock.patch.object(clone_mod.subprocess, "run", _fake_run),
+        mock.patch.object(clone_mod.shutil, "rmtree"),
+    ):
         clone_mod.shallow_clone(url, base, github_token="")
     return captured["argv"]
 

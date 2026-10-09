@@ -111,7 +111,7 @@ async def extract_cross_repo_references(
     *,
     config: AgentConfig,
     token_manager: TokenProvider,
-    cost_tracker: "_llm.CostStats | None" = None,
+    cost_tracker: _llm.CostStats | None = None,
 ) -> list[dict[str, str]]:
     """Run Haiku (Sonnet fallback) over ``comments_text`` and return the
     list of cross-repo references.

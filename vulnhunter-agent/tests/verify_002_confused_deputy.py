@@ -28,14 +28,13 @@ def test_token_attached_to_authorized_owner_prefix():
 
 def test_token_attached_to_authorized_owner_repo_prefix():
     ok = "https://github.com/acme/only-this-repo.git"
-    out = inject_token(
-        ok, _TOKEN, _HOST, allowed_path_prefixes=("acme/only-this-repo",)
-    )
+    out = inject_token(ok, _TOKEN, _HOST, allowed_path_prefixes=("acme/only-this-repo",))
     assert _TOKEN in out
     denied = "https://github.com/acme/other-repo.git"
-    assert inject_token(
-        denied, _TOKEN, _HOST, allowed_path_prefixes=("acme/only-this-repo",)
-    ) == denied
+    assert (
+        inject_token(denied, _TOKEN, _HOST, allowed_path_prefixes=("acme/only-this-repo",))
+        == denied
+    )
 
 
 def test_empty_prefix_list_denies_all():

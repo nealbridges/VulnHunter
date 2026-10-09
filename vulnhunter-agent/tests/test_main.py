@@ -6,12 +6,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from agent import __main__ as main_mod
 from agent.__main__ import _build_parser, main
 from agent.issues_remote_report import DownloadedReport
 from agent.publish import PublishError
-
 
 # ---------------------------------------------------------------------------
 # _build_parser
@@ -70,7 +68,7 @@ def _patch_main_dependencies(
     publish_error: Exception | None = None,
     load_config_error: Exception | None = None,
     run_vulnhunt_error: Exception | None = None,
-    download_result: "DownloadedReport | None" = None,
+    download_result: DownloadedReport | None = None,
     download_error: Exception | None = None,
     issues_summary: Any = None,
     issues_error: Exception | None = None,
@@ -106,7 +104,7 @@ def _patch_main_dependencies(
         assert publish_sha is not None
         return publish_sha
 
-    def fake_download(*a: object, **k: object) -> "DownloadedReport":
+    def fake_download(*a: object, **k: object) -> DownloadedReport:
         calls["download"] += 1
         if download_error is not None:
             raise download_error
@@ -187,7 +185,9 @@ def test_main_publish_enabled_succeeds(
     from agent.config import GitHubConfig, PublishConfig
 
     cfg = agent_config(
-        github=GitHubConfig(host="github.com", scan_token="ghp_x", reports_token="ghp_x", broker_token_dir=""),
+        github=GitHubConfig(
+            host="github.com", scan_token="ghp_x", reports_token="ghp_x", broker_token_dir=""
+        ),
         publish=PublishConfig(
             enabled=True,
             destination_repo="https://github.com/o/results",
@@ -298,7 +298,9 @@ def test_main_publish_error_returns_2(
     from agent.config import GitHubConfig, PublishConfig
 
     cfg = agent_config(
-        github=GitHubConfig(host="github.com", scan_token="t", reports_token="t", broker_token_dir=""),
+        github=GitHubConfig(
+            host="github.com", scan_token="t", reports_token="t", broker_token_dir=""
+        ),
         publish=PublishConfig(
             enabled=True,
             destination_repo="https://github.com/o/r",
@@ -394,32 +396,30 @@ from agent.__main__ import _validate_modes  # noqa: E402
 class TestValidateModes:
     def test_all_off_raises(self, populated_agent_config) -> None:
         with pytest.raises(ValueError, match="Nothing to do"):
-            _validate_modes(
-                scan=False, publish=False, issues=False, config=populated_agent_config
-            )
+            _validate_modes(scan=False, publish=False, issues=False, config=populated_agent_config)
 
     def test_scan_no_publish_with_issues_raises(self, populated_agent_config) -> None:
         cfg = replace(
             populated_agent_config,
-            github=replace(populated_agent_config.github, scan_token="ghp_x", reports_token="ghp_x"),
+            github=replace(
+                populated_agent_config.github, scan_token="ghp_x", reports_token="ghp_x"
+            ),
         )
         with pytest.raises(ValueError, match="incoherent"):
             _validate_modes(scan=True, publish=False, issues=True, config=cfg)
 
-    def test_no_scan_issues_without_destination_raises(
-        self, populated_agent_config
-    ) -> None:
+    def test_no_scan_issues_without_destination_raises(self, populated_agent_config) -> None:
         cfg = replace(
             populated_agent_config,
-            github=replace(populated_agent_config.github, scan_token="ghp_x", reports_token="ghp_x"),
+            github=replace(
+                populated_agent_config.github, scan_token="ghp_x", reports_token="ghp_x"
+            ),
         )
         # publish.destination_repo is empty by default in the fixture.
         with pytest.raises(ValueError, match="destination_repo"):
             _validate_modes(scan=False, publish=False, issues=True, config=cfg)
 
-    def test_issues_without_github_token_raises(
-        self, populated_agent_config
-    ) -> None:
+    def test_issues_without_github_token_raises(self, populated_agent_config) -> None:
         cfg = replace(
             populated_agent_config,
             github=replace(populated_agent_config.github, scan_token="", reports_token=""),
@@ -435,7 +435,9 @@ class TestValidateModes:
     def test_scan_publish_issues_passes(self, populated_agent_config) -> None:
         cfg = replace(
             populated_agent_config,
-            github=replace(populated_agent_config.github, scan_token="ghp_x", reports_token="ghp_x"),
+            github=replace(
+                populated_agent_config.github, scan_token="ghp_x", reports_token="ghp_x"
+            ),
             publish=replace(
                 populated_agent_config.publish,
                 destination_repo="https://github.com/o/dest",
@@ -447,9 +449,7 @@ class TestValidateModes:
 
     def test_scan_only_passes(self, populated_agent_config) -> None:
         # Default fixture: no token, no destination — scan-only is fine.
-        _validate_modes(
-            scan=True, publish=False, issues=False, config=populated_agent_config
-        )
+        _validate_modes(scan=True, publish=False, issues=False, config=populated_agent_config)
 
     def test_scan_publish_no_issues_passes(self, populated_agent_config) -> None:
         cfg = replace(
@@ -463,12 +463,12 @@ class TestValidateModes:
         )
         _validate_modes(scan=True, publish=True, issues=False, config=cfg)
 
-    def test_no_scan_issues_with_destination_passes(
-        self, populated_agent_config
-    ) -> None:
+    def test_no_scan_issues_with_destination_passes(self, populated_agent_config) -> None:
         cfg = replace(
             populated_agent_config,
-            github=replace(populated_agent_config.github, scan_token="ghp_x", reports_token="ghp_x"),
+            github=replace(
+                populated_agent_config.github, scan_token="ghp_x", reports_token="ghp_x"
+            ),
             publish=replace(
                 populated_agent_config.publish,
                 destination_repo="https://github.com/o/dest",
@@ -525,9 +525,7 @@ class TestBuildParserNewFlags:
         assert args.enable_bash is True
 
 
-def _stub_main_environment_for_args(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def _stub_main_environment_for_args(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Patch out everything _main needs so we can drive arg validation paths
     without running an actual scan. Stubs in just enough for the early
     pairing-check to fire.
@@ -543,8 +541,8 @@ def _stub_main_environment_for_args(
         PublishConfig,
         SandboxConfig,
         ScanConfig,
-        TLSConfig,
         TelemetryConfig,
+        TLSConfig,
     )
 
     def fake_load_config(*_a: object, **_k: object) -> AgentConfig:
@@ -577,7 +575,9 @@ def _stub_main_environment_for_args(
                 autocompact_pct_override=85,
                 async_agent_stall_timeout_ms=1_200_000,
             ),
-            github=GitHubConfig(host="github.com", scan_token="", reports_token="", broker_token_dir=""),
+            github=GitHubConfig(
+                host="github.com", scan_token="", reports_token="", broker_token_dir=""
+            ),
             publish=PublishConfig(
                 enabled=False,
                 destination_repo="",
@@ -728,9 +728,7 @@ class TestConfigureLogging:
         main_mod._configure_logging(None, 0)
         assert captured["level"] == logging_mod.INFO
 
-    def test_debug_level_promotes_sdk_logger(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_debug_level_promotes_sdk_logger(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import logging as logging_mod
 
         monkeypatch.setattr(logging_mod, "basicConfig", lambda **kw: None)
@@ -740,9 +738,7 @@ class TestConfigureLogging:
         main_mod._configure_logging("DEBUG", 0)
         assert sdk_logger.level == logging_mod.DEBUG
 
-    def test_double_v_promotes_sdk_logger(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_double_v_promotes_sdk_logger(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import logging as logging_mod
 
         monkeypatch.setattr(logging_mod, "basicConfig", lambda **kw: None)
@@ -758,17 +754,13 @@ class TestConfigureLogging:
 
 
 class TestShortSha:
-    def test_returns_sha_on_success(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
+    def test_returns_sha_on_success(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         class _Result:
             returncode = 0
             stdout = "abc1234\n"
             stderr = ""
 
-        monkeypatch.setattr(
-            main_mod.subprocess, "run", lambda *a, **k: _Result()
-        )
+        monkeypatch.setattr(main_mod.subprocess, "run", lambda *a, **k: _Result())
         assert main_mod._short_sha(tmp_path) == "abc1234"
 
     def test_returns_unknown_when_returncode_nonzero(
@@ -784,14 +776,10 @@ class TestShortSha:
             stdout = ""
             stderr = "fatal: not a git repository"
 
-        monkeypatch.setattr(
-            main_mod.subprocess, "run", lambda *a, **k: _Result()
-        )
+        monkeypatch.setattr(main_mod.subprocess, "run", lambda *a, **k: _Result())
         with caplog.at_level(logging_mod.WARNING):
             assert main_mod._short_sha(tmp_path) == "unknown"
-        assert any(
-            "git rev-parse failed" in r.getMessage() for r in caplog.records
-        )
+        assert any("git rev-parse failed" in r.getMessage() for r in caplog.records)
 
     def test_returns_unknown_on_oserror(
         self,
@@ -807,10 +795,7 @@ class TestShortSha:
         monkeypatch.setattr(main_mod.subprocess, "run", boom)
         with caplog.at_level(logging_mod.WARNING):
             assert main_mod._short_sha(tmp_path) == "unknown"
-        assert any(
-            "Could not resolve source commit hash" in r.getMessage()
-            for r in caplog.records
-        )
+        assert any("Could not resolve source commit hash" in r.getMessage() for r in caplog.records)
 
     def test_returns_unknown_when_stdout_empty(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -820,9 +805,7 @@ class TestShortSha:
             stdout = "   \n"  # whitespace-only after strip()
             stderr = ""
 
-        monkeypatch.setattr(
-            main_mod.subprocess, "run", lambda *a, **k: _Result()
-        )
+        monkeypatch.setattr(main_mod.subprocess, "run", lambda *a, **k: _Result())
         assert main_mod._short_sha(tmp_path) == "unknown"
 
 
@@ -832,10 +815,7 @@ class TestShortSha:
 
 
 class TestResolveModes:
-    def test_explicit_issues_false_overrides_config(
-        self, populated_agent_config: Any
-    ) -> None:
-        from agent.config import IssuesConfig
+    def test_explicit_issues_false_overrides_config(self, populated_agent_config: Any) -> None:
         from dataclasses import replace as _r
 
         cfg = _r(
@@ -846,9 +826,7 @@ class TestResolveModes:
         scan, publish, issues = main_mod._resolve_modes(args, cfg)
         assert issues is False
 
-    def test_explicit_issues_true_overrides_config(
-        self, populated_agent_config: Any
-    ) -> None:
+    def test_explicit_issues_true_overrides_config(self, populated_agent_config: Any) -> None:
         from dataclasses import replace as _r
 
         cfg = _r(
@@ -923,9 +901,7 @@ def test_main_issues_summary_failed_returns_3(
     results = clone / "x_VULNHUNT_RESULTS_opus47_2026-06-23-141824"
     results.mkdir()
     monkeypatch.setattr(main_mod, "_short_sha", lambda d: "abc1234")
-    summary = PostSummary(
-        failed=[FailedIssue(finding_id="V1", title="t", error="boom")]
-    )
+    summary = PostSummary(failed=[FailedIssue(finding_id="V1", title="t", error="boom")])
     _patch_main_dependencies(
         monkeypatch,
         config=cfg,
@@ -1080,8 +1056,7 @@ class TestVerboseForcesLoggingFlags:
         # Override run_vulnhunt to capture the config it was called with.
         monkeypatch.setattr(main_mod, "run_vulnhunt", fake_run_vulnhunt)
         rc = main(
-            ["--mode=scan", "https://github.com/o/r", "--no-publish", "--no-issues"]
-            + argv_extra
+            ["--mode=scan", "https://github.com/o/r", "--no-publish", "--no-issues"] + argv_extra
         )
         assert rc == 0
         return captured["config"]
@@ -1095,9 +1070,7 @@ class TestVerboseForcesLoggingFlags:
         # Baseline config has both flags False (per conftest factory).
         assert populated_agent_config.logging.per_turn_usage is False
         assert populated_agent_config.logging.retries is False
-        cfg = self._run_with_verbose(
-            monkeypatch, tmp_path, populated_agent_config, ["-v"]
-        )
+        cfg = self._run_with_verbose(monkeypatch, tmp_path, populated_agent_config, ["-v"])
         assert cfg.logging.per_turn_usage is True
         assert cfg.logging.retries is True
 
@@ -1107,9 +1080,7 @@ class TestVerboseForcesLoggingFlags:
         tmp_path: Path,
         populated_agent_config,
     ) -> None:
-        cfg = self._run_with_verbose(
-            monkeypatch, tmp_path, populated_agent_config, ["-vv"]
-        )
+        cfg = self._run_with_verbose(monkeypatch, tmp_path, populated_agent_config, ["-vv"])
         assert cfg.logging.per_turn_usage is True
         assert cfg.logging.retries is True
 
@@ -1120,9 +1091,7 @@ class TestVerboseForcesLoggingFlags:
         populated_agent_config,
     ) -> None:
         # Without -v, config defaults are preserved.
-        cfg = self._run_with_verbose(
-            monkeypatch, tmp_path, populated_agent_config, []
-        )
+        cfg = self._run_with_verbose(monkeypatch, tmp_path, populated_agent_config, [])
         assert cfg.logging.per_turn_usage is False
         assert cfg.logging.retries is False
 
@@ -1134,6 +1103,7 @@ class TestVerboseForcesLoggingFlags:
     ) -> None:
         # Config already has per_turn_usage=True; -v must not flip it back.
         from dataclasses import replace
+
         from agent.config import LoggingConfig
 
         config = replace(
@@ -1206,9 +1176,7 @@ class TestModeDispatchAndFlagRejection:
     the other mode's flags. These are unit-level checks against the
     parser/main wiring, not end-to-end runs."""
 
-    def test_missing_mode_emits_friendly_error(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_missing_mode_emits_friendly_error(self, capsys: pytest.CaptureFixture[str]) -> None:
         """The default argparse error ('the following arguments are
         required: --mode') would be confusing given that --mode is a
         deliberate breaking change. main() emits a custom message
@@ -1255,8 +1223,8 @@ class TestModeDispatchAndFlagRejection:
             PublishConfig,
             SandboxConfig,
             ScanConfig,
-            TLSConfig,
             TelemetryConfig,
+            TLSConfig,
             VerifyConfig,
         )
 
@@ -1280,9 +1248,7 @@ class TestModeDispatchAndFlagRejection:
                 fail_if_unavailable=True,
                 allow_unsandboxed_commands=False,
             ),
-            telemetry=TelemetryConfig(
-                enabled=False, otel_exporter_otlp_endpoint=""
-            ),
+            telemetry=TelemetryConfig(enabled=False, otel_exporter_otlp_endpoint=""),
             scan=ScanConfig(
                 clone_base_dir="./clones",
                 clone_timeout_seconds=300,
@@ -1435,10 +1401,10 @@ class TestModeDispatchAndFlagRejection:
 # TOKEN-CLIENT-005 — standalone-mode preflight
 # ---------------------------------------------------------------------------
 
-import httpx  # noqa: E402
-import respx  # noqa: E402
 from dataclasses import replace as _replace_dc  # noqa: E402
 
+import httpx  # noqa: E402
+import respx  # noqa: E402
 from agent.__main__ import (  # noqa: E402
     PreflightError,
     _preflight_standalone_tokens,
@@ -1605,9 +1571,7 @@ class TestPreflightStandaloneTokens:
         )  # no raise
 
     @respx.mock
-    def test_403_includes_body_headers_and_fingerprint(
-        self, populated_agent_config: Any
-    ) -> None:
+    def test_403_includes_body_headers_and_fingerprint(self, populated_agent_config: Any) -> None:
         """Preflight error must carry GitHub's actual response + a token
         fingerprint so the operator can distinguish scope vs. SSO vs.
         stale-token-in-container from a single log line."""
@@ -1650,9 +1614,7 @@ class TestPreflightStandaloneTokens:
         assert "ghp_x" * 36 not in msg
 
     @respx.mock
-    def test_network_error_surfaces_as_preflight_error(
-        self, populated_agent_config: Any
-    ) -> None:
+    def test_network_error_surfaces_as_preflight_error(self, populated_agent_config: Any) -> None:
         respx.get("https://api.github.com/installation/repositories").mock(
             side_effect=httpx.ConnectError("network down")
         )
@@ -1665,13 +1627,11 @@ class TestPreflightStandaloneTokens:
             )
 
     @respx.mock
-    def test_auth_header_carries_scan_token_first(
-        self, populated_agent_config: Any
-    ) -> None:
+    def test_auth_header_carries_scan_token_first(self, populated_agent_config: Any) -> None:
         """For scan+publish+issues, both roles checked; scan goes first."""
-        route = respx.get(
-            "https://api.github.com/installation/repositories"
-        ).mock(return_value=httpx.Response(200, json={}))
+        route = respx.get("https://api.github.com/installation/repositories").mock(
+            return_value=httpx.Response(200, json={})
+        )
         _preflight_standalone_tokens(
             config=self._cfg(
                 populated_agent_config,
@@ -1688,12 +1648,10 @@ class TestPreflightStandaloneTokens:
         assert headers == ["Bearer ghp_scan_xyz", "Bearer ghp_rep_xyz"]
 
     @respx.mock
-    def test_enterprise_host_uses_v3_api_base(
-        self, populated_agent_config: Any
-    ) -> None:
-        route = respx.get(
-            "https://enterprise.example.com/api/v3/installation/repositories"
-        ).mock(return_value=httpx.Response(200, json={}))
+    def test_enterprise_host_uses_v3_api_base(self, populated_agent_config: Any) -> None:
+        route = respx.get("https://enterprise.example.com/api/v3/installation/repositories").mock(
+            return_value=httpx.Response(200, json={})
+        )
         _preflight_standalone_tokens(
             config=self._cfg(populated_agent_config, host="enterprise.example.com"),
             scan=True,
@@ -1701,5 +1659,3 @@ class TestPreflightStandaloneTokens:
             issues=True,
         )
         assert route.call_count == 1
-
-

@@ -22,7 +22,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CLASSIFIER = REPO_ROOT / "scripts" / "compute-completeness-tier.py"
 
@@ -75,34 +74,80 @@ def _run_full(tmp_path, *, discrimination, routed):
     """Run the classifier over a diff that trips sink_signature_changed, with a
     plan claiming superset coverage and a result carrying the given
     discrimination evidence + routed-caller list."""
-    diff = tmp_path / "fix.diff"; diff.write_text(_SIG_CHANGE_DIFF, encoding="utf-8")
+    diff = tmp_path / "fix.diff"
+    diff.write_text(_SIG_CHANGE_DIFF, encoding="utf-8")
     plan = tmp_path / "plan.json"
-    plan.write_text(json.dumps({
-        "vuln_id": "VULN-001", "cwe": "CWE-89", "strategy": "route callers",
-        "callers_routed_coverage": "superset", "files_to_change": ["auth.py"],
-        "why_this_works": "parameterized", "projected_completeness_tier": "FULL",
-        "tier_judgment": {"invoked": False, "phase": None, "final_tier": None,
-                          "rationale": None, "failure_reason": None},
-    }), encoding="utf-8")
+    plan.write_text(
+        json.dumps(
+            {
+                "vuln_id": "VULN-001",
+                "cwe": "CWE-89",
+                "strategy": "route callers",
+                "callers_routed_coverage": "superset",
+                "files_to_change": ["auth.py"],
+                "why_this_works": "parameterized",
+                "projected_completeness_tier": "FULL",
+                "tier_judgment": {
+                    "invoked": False,
+                    "phase": None,
+                    "final_tier": None,
+                    "rationale": None,
+                    "failure_reason": None,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     result = tmp_path / "result.json"
-    result.write_text(json.dumps({
-        "vuln_id": "VULN-001", "status": "VERIFIED", "cwe": "CWE-89", "file_path": "auth.py",
-        "completeness_tier": "FULL", "residual_vectors": [],
-        "tier_judgment": {"invoked": False, "phase": None, "final_tier": None,
-                          "rationale": None, "failure_reason": None},
-        "callers_routed_through_fix": routed, "callers_not_routed": [],
-        "discrimination_evidence": discrimination,
-    }), encoding="utf-8")
+    result.write_text(
+        json.dumps(
+            {
+                "vuln_id": "VULN-001",
+                "status": "VERIFIED",
+                "cwe": "CWE-89",
+                "file_path": "auth.py",
+                "completeness_tier": "FULL",
+                "residual_vectors": [],
+                "tier_judgment": {
+                    "invoked": False,
+                    "phase": None,
+                    "final_tier": None,
+                    "rationale": None,
+                    "failure_reason": None,
+                },
+                "callers_routed_through_fix": routed,
+                "callers_not_routed": [],
+                "discrimination_evidence": discrimination,
+            }
+        ),
+        encoding="utf-8",
+    )
     proc = subprocess.run(
-        [sys.executable, str(CLASSIFIER), "--diff", str(diff), "--plan", str(plan),
-         "--result", str(result), "--phase", "verify"],
-        capture_output=True, text=True, check=True,
+        [
+            sys.executable,
+            str(CLASSIFIER),
+            "--diff",
+            str(diff),
+            "--plan",
+            str(plan),
+            "--result",
+            str(result),
+            "--phase",
+            "verify",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return json.loads(proc.stdout)
 
 
-_FULL_DISC = {"method": "stash-and-run", "pre_fix_result": "fail",
-              "post_fix_result": "pass", "assertion_target": "tests/verify_VULN_001.py::t"}
+_FULL_DISC = {
+    "method": "stash-and-run",
+    "pre_fix_result": "fail",
+    "post_fix_result": "pass",
+    "assertion_target": "tests/verify_VULN_001.py::t",
+}
 
 
 def test_full_denied_when_discrimination_is_a_two_field_stub(tmp_path):
@@ -110,8 +155,11 @@ def test_full_denied_when_discrimination_is_a_two_field_stub(tmp_path):
     post==pass alone — so a two-field stub (no method, no assertion_target)
     earned the terminal FULL signal. That's the headline bypass. A stub must
     NOT earn FULL."""
-    out = _run_full(tmp_path, discrimination={"pre_fix_result": "fail", "post_fix_result": "pass"},
-                    routed=["auth.py:login"])
+    out = _run_full(
+        tmp_path,
+        discrimination={"pre_fix_result": "fail", "post_fix_result": "pass"},
+        routed=["auth.py:login"],
+    )
     assert out["tier"] != "FULL", f"two-field stub earned FULL: {out}"
     assert "full.test_discriminates" not in out["signals"]
 
@@ -128,7 +176,9 @@ def test_full_denied_when_no_callers_routed(tmp_path):
 def test_full_granted_with_complete_evidence(tmp_path):
     """Allow-path guard: signature change + non-empty routed + a complete
     discrimination payload must STILL earn FULL after the tightening."""
-    out = _run_full(tmp_path, discrimination=_FULL_DISC, routed=["auth.py:login", "auth.py:register"])
+    out = _run_full(
+        tmp_path, discrimination=_FULL_DISC, routed=["auth.py:login", "auth.py:register"]
+    )
     assert out["tier"] == "FULL", f"complete evidence wrongly denied FULL: {out}"
 
 

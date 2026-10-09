@@ -16,7 +16,6 @@ import re
 import sys
 from pathlib import Path
 
-
 KEY_RE = re.compile(r"<!--\s*vulnfix-key:\s*([0-9a-f]{16})\s*-->")
 REPORT_ID_RE = re.compile(r"<!--\s*vulnfix-report-id:\s*([^\s>]+)\s*-->")
 
@@ -33,7 +32,9 @@ def check(args) -> int:
         errors.append(f"{args.body}: missing <!-- vulnfix-key: <hex> --> marker (REQ-GAT-005)")
 
     if args.kind == "tracking" and not REPORT_ID_RE.search(text):
-        errors.append(f"{args.body}: tracking issue missing <!-- vulnfix-report-id: <id> --> marker (REQ-GAT-005)")
+        errors.append(
+            f"{args.body}: tracking issue missing <!-- vulnfix-report-id: <id> --> marker (REQ-GAT-005)"
+        )
 
     if errors:
         for e in errors:

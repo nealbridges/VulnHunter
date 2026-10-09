@@ -253,9 +253,10 @@ variant. See "Build-Time Code Swapping" in Phase 1 for how to detect this.
    > `${VULNHUNT_DIR}/phase2b_output.md`. IMPORTANT: Return ≤20 words.
    Verify output file exists.
 
-   **D. Phase 3a+3b+3c - Reproduce, Test, Fix**: Launch a subagent:
+   **D. Phase 3a+3b+3c - Build PoC, Measure Impact, Fix**: Launch a subagent:
    > Your scan directory is `${VULNHUNT_DIR}`. Follow the prompts in
-   > `${PHASES_DIR}/phase3_reproduce_test.md` and `${PHASES_DIR}/phase3c_fixes.md`.
+   > `${PHASES_DIR}/phase3a_build_poc.md`, `${PHASES_DIR}/phase3b_measure_impact.md`,
+    > and `${PHASES_DIR}/phase3c_fixes.md`.
    > Read confirmed findings from `${VULNHUNT_DIR}/phase2b_output.md`.
    > Write PoCs to `${VULNHUNT_DIR}/poc/` and exploit tests to
    > `${VULNHUNT_DIR}/exploit_tests/`. Write the phase summary (VULN-NNN
@@ -344,7 +345,8 @@ installed correctly. Run install.sh from the vulnhunter repository root."
 - `phase2_shared.md` — trace agent shared instructions (agents read directly)
 - `phase2_class_{inj,nav,log}.md` — class-specific vuln references (agents read)
 - `phase2b_verify.md` — verification subagent prompt
-- `phase3_reproduce_test.md` — reproduce/test subagent prompt
+- `phase3a_build_poc.md` — working-PoC builder prompt (runtime from Phase 2b)
+- `phase3b_measure_impact.md` — impact-measurement prompt (impact-unit table, Measured Impact block)
 - `phase3c_fixes.md` — fixes subagent prompt
 - `phase3d_sweep.md` — sweep subagent prompt
 - `phase4_report.md` — report format (you read this for final report)

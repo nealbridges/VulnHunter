@@ -80,9 +80,7 @@ def make_finding(
     )
 
 
-def make_open_issue(
-    n: int, *, body: str = "", title: str | None = None
-) -> OpenIssue:
+def make_open_issue(n: int, *, body: str = "", title: str | None = None) -> OpenIssue:
     """Build an OpenIssue with conventional test defaults."""
     return OpenIssue(
         number=n,

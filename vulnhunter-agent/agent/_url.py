@@ -20,9 +20,7 @@ _BEARER_RE = re.compile(r"(?i)(authorization\s*:\s*(?:bearer|token)\s+)(\S+)")
 _QUERY_TOKEN_RE = re.compile(r"(?i)([?&](?:access_token|token)=)([^&\s]+)")
 # Raw token prefixes GitHub / Anthropic emit. Prefix is preserved so an
 # operator can still tell what kind of token leaked; the secret body is masked.
-_RAW_TOKEN_RE = re.compile(
-    r"(ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|sk-ant-)[A-Za-z0-9_-]+"
-)
+_RAW_TOKEN_RE = re.compile(r"(ghp_|gho_|ghu_|ghs_|ghr_|github_pat_|sk-ant-)[A-Za-z0-9_-]+")
 
 
 def redact(text: str) -> str:

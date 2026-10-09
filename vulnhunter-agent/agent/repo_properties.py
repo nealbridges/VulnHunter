@@ -108,8 +108,7 @@ def fetch_from_github(
         owner, name = parse_owner_repo(repo_url)
     except Exception as exc:  # noqa: BLE001
         logger.info(
-            "Skipping GitHub properties fetch: cannot parse owner/repo "
-            "from %r (%s)",
+            "Skipping GitHub properties fetch: cannot parse owner/repo from %r (%s)",
             repo_url,
             exc,
         )
@@ -153,16 +152,14 @@ def fetch_from_github(
     if resp.status_code == 404:
         # Repo has no custom properties defined — normal case.
         logger.info(
-            "GitHub returned 404 on properties/values for %s/%s "
-            "(no custom properties defined).",
+            "GitHub returned 404 on properties/values for %s/%s (no custom properties defined).",
             owner,
             name,
         )
         return RepoProperties()
     if resp.status_code in (401, 403):
         logger.warning(
-            "GitHub denied properties access for %s/%s (status %d); "
-            "fields blank.",
+            "GitHub denied properties access for %s/%s (status %d); fields blank.",
             owner,
             name,
             resp.status_code,
@@ -192,9 +189,7 @@ def fetch_from_github(
     return _coerce_from_payload(payload, property_map)
 
 
-def _coerce_from_payload(
-    payload: Any, property_map: dict[str, str]
-) -> RepoProperties:
+def _coerce_from_payload(payload: Any, property_map: dict[str, str]) -> RepoProperties:
     """Convert the ``[{property_name, value}, ...]`` list into a dataclass.
 
     ``property_map`` maps GitHub property names to emitted field names;

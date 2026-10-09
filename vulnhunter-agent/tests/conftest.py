@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from agent.config import (
     AgentConfig,
     AnthropicConfig,
@@ -24,11 +23,10 @@ from agent.config import (
     RepoPropertiesConfig,
     SandboxConfig,
     ScanConfig,
-    TLSConfig,
     TelemetryConfig,
+    TLSConfig,
     VerifyConfig,
 )
-
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 

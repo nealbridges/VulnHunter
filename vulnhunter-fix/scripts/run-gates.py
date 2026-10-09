@@ -23,8 +23,6 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = REPO_ROOT / "scripts"
@@ -33,6 +31,7 @@ SCRIPTS = REPO_ROOT / "scripts"
 @dataclass
 class GateContext:
     """Shared inputs the orchestrator gathers once and hands to each builder."""
+
     pr_body: Path
     issue_body: Path | None
     result: dict
@@ -48,6 +47,7 @@ class GateContext:
 # one invocation of the gate's script. Order in GATE_ROUTING determines run
 # order; each entry may emit multiple invocations (e.g., Gate 2 runs once per
 # body scope).
+
 
 def _build_gate1_invocations(ctx: GateContext) -> list[list[str]]:
     bodies = [str(ctx.pr_body)]
@@ -69,8 +69,18 @@ def _build_gate2_invocations(ctx: GateContext) -> list[list[str]]:
         enforce.append("## Breaking Change")
 
     def _args_for(body: Path, kind: str) -> list[str]:
-        args = ["--body", str(body), "--kind", kind,
-                "--tier", tier, "--status", status, "--sweep-ran", sweep_ran]
+        args = [
+            "--body",
+            str(body),
+            "--kind",
+            kind,
+            "--tier",
+            tier,
+            "--status",
+            status,
+            "--sweep-ran",
+            sweep_ran,
+        ]
         if enforce:
             args += ["--enforce-strings", *enforce]
         return args
@@ -84,8 +94,7 @@ def _build_gate2_invocations(ctx: GateContext) -> list[list[str]]:
 def _build_gate3_invocations(ctx: GateContext) -> list[list[str]]:
     files = ctx.result.get("files_modified") or []
     test_file = ctx.result.get("test_file")
-    args = ["--repo-root", str(ctx.repo_root), "--branch", ctx.branch,
-            "--files-modified", *files]
+    args = ["--repo-root", str(ctx.repo_root), "--branch", ctx.branch, "--files-modified", *files]
     if test_file:
         args += ["--test-file", test_file]
     return [args]
@@ -109,8 +118,10 @@ def _build_gate5_invocations(ctx: GateContext) -> list[list[str]]:
     if not anti_merge or "files_grouped" not in anti_merge:
         return []  # no-op — no grouping decision recorded
     args = [
-        "--files-grouped", str(anti_merge["files_grouped"]),
-        "--files-split", str(anti_merge.get("files_split", 1)),
+        "--files-grouped",
+        str(anti_merge["files_grouped"]),
+        "--files-split",
+        str(anti_merge.get("files_split", 1)),
         "--strict",
     ]
     if "test_files_grouped" in anti_merge:
@@ -163,7 +174,7 @@ GATE_ROUTING: dict[str, dict] = {
     "gate1_severity_mask": {
         "script": SCRIPTS / "check-severity-mask.py",
         "build_invocations": _build_gate1_invocations,
-        "positional": True,   # invocation returns a positional list, not flags
+        "positional": True,  # invocation returns a positional list, not flags
     },
     "gate2_body_completeness": {
         "script": SCRIPTS / "check-body-completeness.py",
@@ -248,14 +259,20 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--issue-body", default=None)
     ap.add_argument("--result", required=True)
     ap.add_argument("--sidecar", default=None)
-    ap.add_argument("--sidecars-dir", default=None,
-                    help="Directory of per-VULN triage sidecars (VULN-NNN.json) "
-                         "for Gate 6 caller-coverage verification.")
+    ap.add_argument(
+        "--sidecars-dir",
+        default=None,
+        help="Directory of per-VULN triage sidecars (VULN-NNN.json) "
+        "for Gate 6 caller-coverage verification.",
+    )
     ap.add_argument("--branch", required=True)
-    ap.add_argument("--default-branch", default=None,
-                    help="Target repo's base/default branch (e.g. main, master) "
-                         "so Gate 7 can diff the whole branch (base...HEAD) "
-                         "instead of degrading to a HEAD-only scan.")
+    ap.add_argument(
+        "--default-branch",
+        default=None,
+        help="Target repo's base/default branch (e.g. main, master) "
+        "so Gate 7 can diff the whole branch (base...HEAD) "
+        "instead of degrading to a HEAD-only scan.",
+    )
     ap.add_argument("--repo-root", required=True)
     args = ap.parse_args(argv[1:])
 
@@ -298,15 +315,19 @@ def main(argv: list[str]) -> int:
     # drift or a builder regressing to []). Without this, all() over the
     # surviving outcomes — or over an empty dict — vacuously passes (B1).
     missing = [
-        g for g in REQUIRED_GATES
-        if not any(k == g or k.startswith(g + "_") for k in outcomes)
+        g for g in REQUIRED_GATES if not any(k == g or k.startswith(g + "_") for k in outcomes)
     ]
     if missing:
-        print(json.dumps({
-            "pass": False,
-            "error": f"required gates contributed no invocations (routing drift): {missing}",
-            "gates": outcomes,
-        }, indent=2))
+        print(
+            json.dumps(
+                {
+                    "pass": False,
+                    "error": f"required gates contributed no invocations (routing drift): {missing}",
+                    "gates": outcomes,
+                },
+                indent=2,
+            )
+        )
         print(f"run-gates: required gates did not run: {missing}", file=sys.stderr)
         return 1
 

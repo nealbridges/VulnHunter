@@ -20,8 +20,7 @@ def test_parse_repo_list_default(monkeypatch, tmp_path):
 
 
 def test_collect_results_no_clone_base(tmp_path):
-    out = utils.collect_results(clone_base=str(tmp_path / "nope"),
-                                upload_dir=str(tmp_path / "up"))
+    out = utils.collect_results(clone_base=str(tmp_path / "nope"), upload_dir=str(tmp_path / "up"))
     assert out == {"copied": [], "missing": []}
 
 

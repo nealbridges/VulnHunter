@@ -47,10 +47,14 @@ def test_update_history_records_and_skips(monkeypatch, tmp_path):
         }
     }
     targets = {
-        "t": {"findings": [
-            {"finding_id": "F1"}, {"finding_id": "F2"},
-            {"finding_id": "F3"}, {"finding_id": "F4"},  # F4 has no judgment -> skipped
-        ]}
+        "t": {
+            "findings": [
+                {"finding_id": "F1"},
+                {"finding_id": "F2"},
+                {"finding_id": "F3"},
+                {"finding_id": "F4"},  # F4 has no judgment -> skipped
+            ]
+        }
     }
     recorded, skipped = fh.update_history(state, targets)
     assert recorded == 2

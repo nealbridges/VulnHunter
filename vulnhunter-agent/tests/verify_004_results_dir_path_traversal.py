@@ -8,7 +8,6 @@ or '..', and the sink must refuse a run_dir that escapes scratch_root.
 from pathlib import Path
 
 import pytest
-
 from agent.verify import _contained_run_dir
 from agent.verify_extract import MarkerExtractionError, extract_markers
 

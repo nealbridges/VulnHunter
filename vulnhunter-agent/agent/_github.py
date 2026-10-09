@@ -10,7 +10,6 @@ from __future__ import annotations
 import re
 from urllib.parse import urlparse
 
-
 # Skill convention: results dirs end in YYYY-MM-DD-HHMMSS (see SKILL.md
 # step 2). The publish stage promotes the timestamp to its own path
 # segment so a single day's runs sort cleanly under each (owner, repo).

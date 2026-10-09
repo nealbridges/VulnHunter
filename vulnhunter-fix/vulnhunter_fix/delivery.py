@@ -28,18 +28,23 @@ from __future__ import annotations
 import hashlib
 import re
 
-
 # REQ-HON-006 hand-wave regex source of truth.
 HAND_WAVE_PATTERNS = (
-    "future work", "more work needed", "to be done", "tbd", "later",
+    "future work",
+    "more work needed",
+    "to be done",
+    "tbd",
+    "later",
     # Vague-assurance hand-waves: a residual that claims the risk is already
     # handled is not a residual (12-seg review S3).
-    "adequately handled", "adequately handles", "properly validated",
-    "properly handled", "handled properly", "handled safely",
+    "adequately handled",
+    "adequately handles",
+    "properly validated",
+    "properly handled",
+    "handled properly",
+    "handled safely",
 )
-_HAND_WAVE_RE = re.compile(
-    "|".join(re.escape(p) for p in HAND_WAVE_PATTERNS), re.IGNORECASE
-)
+_HAND_WAVE_RE = re.compile("|".join(re.escape(p) for p in HAND_WAVE_PATTERNS), re.IGNORECASE)
 
 TIER_ONE_LINERS = {
     "MITIGATION": "partially blocked; residual exposure remains",
@@ -114,13 +119,11 @@ def check_tier_residual_consistency(tier, residual_vectors):
     has_residuals = bool(residual_vectors)
     if is_full and has_residuals:
         raise FullTierWithResidualsError(
-            "completeness_tier == FULL requires empty residual_vectors[] "
-            "(REQ-HON-005; schema R-2)"
+            "completeness_tier == FULL requires empty residual_vectors[] (REQ-HON-005; schema R-2)"
         )
     if (not is_full) and (not has_residuals):
         raise EmptyResidualError(
-            f"completeness_tier == {tier} requires non-empty residual_vectors[] "
-            "(REQ-HON-007)"
+            f"completeness_tier == {tier} requires non-empty residual_vectors[] (REQ-HON-007)"
         )
 
 
@@ -220,19 +223,25 @@ def _derive_verdict(row_cells):
         return "NEEDS_REWORK — non-FULL tier missing residual documentation"
 
     yes_or_na = lambda v: is_yes(v) or is_na(v)  # noqa: E731
-    if (is_yes(stated_closed) and is_yes(test_real) and is_yes(fail_closed)
-            and yes_or_na(residual_doc) and yes_or_na(callers_covered) and yes_or_na(sweep_ok)):
+    if (
+        is_yes(stated_closed)
+        and is_yes(test_real)
+        and is_yes(fail_closed)
+        and yes_or_na(residual_doc)
+        and yes_or_na(callers_covered)
+        and yes_or_na(sweep_ok)
+    ):
         return "FULL"
-    if (is_yes(stated_closed) and is_yes(test_real) and is_yes(fail_closed)
-            and is_yes(residual_doc)):
+    if is_yes(stated_closed) and is_yes(test_real) and is_yes(fail_closed) and is_yes(residual_doc):
         return "MITIGATION"
     if is_yes(stated_closed) and is_yes(test_real) and is_no(fail_closed) and is_yes(residual_doc):
         return "WORKAROUND"
     return "NEEDS_REWORK"
 
 
-def render_verification_row(index, vuln_id, cells6, graph_callers=None,
-                             routed_callers=None, sidecar_confidence="high"):
+def render_verification_row(
+    index, vuln_id, cells6, graph_callers=None, routed_callers=None, sidecar_confidence="high"
+):
     """Render one row of the 9-column verification table.
 
     `cells6` is a 6-tuple (stated_closed, test_real, fail_closed,
@@ -260,12 +269,14 @@ def render_verification_table(rows):
         render_verification_row(
             r["index"],
             r["vuln_id"],
-            (r.get("stated_closed", "n/a"),
-             r.get("test_real", "n/a"),
-             r.get("fail_closed", "n/a"),
-             r.get("residual_doc", "n/a"),
-             r.get("sweep_ok", "n/a"),
-             ""),
+            (
+                r.get("stated_closed", "n/a"),
+                r.get("test_real", "n/a"),
+                r.get("fail_closed", "n/a"),
+                r.get("residual_doc", "n/a"),
+                r.get("sweep_ok", "n/a"),
+                "",
+            ),
             graph_callers=r.get("graph_callers"),
             routed_callers=r.get("routed_callers"),
             sidecar_confidence=r.get("sidecar_confidence", "high"),
@@ -285,32 +296,58 @@ def render_verification_table(rows):
 # specific vulnerability class per REQ-SEC-003.
 _CWE_DESCRIPTOR_MAP = {
     # Injection family
-    22: "input-validation", 78: "input-validation", 79: "input-validation",
-    89: "input-validation", 94: "input-validation", 434: "input-validation",
-    502: "input-validation", 601: "input-validation", 611: "input-validation",
+    22: "input-validation",
+    78: "input-validation",
+    79: "input-validation",
+    89: "input-validation",
+    94: "input-validation",
+    434: "input-validation",
+    502: "input-validation",
+    601: "input-validation",
+    611: "input-validation",
     918: "input-validation",
     # Authz / access
-    287: "auth-handling", 290: "auth-handling", 306: "auth-handling",
-    352: "auth-handling", 862: "access-control", 863: "access-control",
-    639: "access-control", 915: "access-control",
+    287: "auth-handling",
+    290: "auth-handling",
+    306: "auth-handling",
+    352: "auth-handling",
+    862: "access-control",
+    863: "access-control",
+    639: "access-control",
+    915: "access-control",
     # Crypto
-    295: "crypto-handling", 326: "crypto-handling", 327: "crypto-handling",
-    328: "crypto-handling", 330: "crypto-handling", 345: "crypto-handling",
+    295: "crypto-handling",
+    326: "crypto-handling",
+    327: "crypto-handling",
+    328: "crypto-handling",
+    330: "crypto-handling",
+    345: "crypto-handling",
     347: "crypto-handling",
     # Memory / resource
-    400: "memory-handling", 401: "memory-handling", 415: "memory-handling",
-    416: "memory-handling", 476: "memory-handling",
+    400: "memory-handling",
+    401: "memory-handling",
+    415: "memory-handling",
+    416: "memory-handling",
+    476: "memory-handling",
     # Concurrency
-    362: "concurrency-handling", 366: "concurrency-handling", 367: "concurrency-handling",
+    362: "concurrency-handling",
+    366: "concurrency-handling",
+    367: "concurrency-handling",
     # Information exposure
-    200: "information-handling", 209: "information-handling", 532: "information-handling",
+    200: "information-handling",
+    209: "information-handling",
+    532: "information-handling",
     117: "information-handling",
     # Network
-    319: "network-handling", 693: "network-handling",
+    319: "network-handling",
+    693: "network-handling",
     # Credentials
-    259: "credential-handling", 798: "credential-handling", 522: "credential-handling",
+    259: "credential-handling",
+    798: "credential-handling",
+    522: "credential-handling",
     # Configuration
-    16: "configuration-handling", 732: "configuration-handling",
+    16: "configuration-handling",
+    732: "configuration-handling",
 }
 
 

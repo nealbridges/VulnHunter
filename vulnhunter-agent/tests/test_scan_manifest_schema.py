@@ -118,9 +118,7 @@ def test_ghec_issue_url_validates(
     validator: Draft202012Validator, manifest: dict[str, Any]
 ) -> None:
     """Enterprise GitHub hosts (e.g. github.example.com) must validate."""
-    manifest["posted"][0]["url"] = (
-        "https://github.example.com/owner/repo/issues/1"
-    )
+    manifest["posted"][0]["url"] = "https://github.example.com/owner/repo/issues/1"
     validator.validate(manifest)
 
 
@@ -197,9 +195,7 @@ def test_extra_finding_field_rejected(
         validator.validate(manifest)
 
 
-@pytest.mark.parametrize(
-    "bad_id", ["VULN-1", "VULN-01", "vuln_001", "VULN-0001", "VULN-", ""]
-)
+@pytest.mark.parametrize("bad_id", ["VULN-1", "VULN-01", "vuln_001", "VULN-0001", "VULN-", ""])
 def test_unpadded_vuln_id_rejected(
     validator: Draft202012Validator, manifest: dict[str, Any], bad_id: str
 ) -> None:
@@ -209,9 +205,7 @@ def test_unpadded_vuln_id_rejected(
         validator.validate(manifest)
 
 
-def test_malformed_cwe_rejected(
-    validator: Draft202012Validator, manifest: dict[str, Any]
-) -> None:
+def test_malformed_cwe_rejected(validator: Draft202012Validator, manifest: dict[str, Any]) -> None:
     manifest["findings"][0]["cwe"] = "89"
     with pytest.raises(ValidationError):
         validator.validate(manifest)
@@ -249,9 +243,7 @@ def test_malformed_issue_url_rejected(
         validator.validate(manifest)
 
 
-def test_http_issue_url_rejected(
-    validator: Draft202012Validator, manifest: dict[str, Any]
-) -> None:
+def test_http_issue_url_rejected(validator: Draft202012Validator, manifest: dict[str, Any]) -> None:
     """``github_issue_url`` is HTTPS-only by design — GitHub's REST
     ``html_url`` field is always https on both github.com and GHEC.
     A producer emitting http:// would be either misconfigured or
@@ -269,9 +261,7 @@ def test_invalid_agent_exit_code_rejected(
         validator.validate(manifest)
 
 
-def test_negative_cost_rejected(
-    validator: Draft202012Validator, manifest: dict[str, Any]
-) -> None:
+def test_negative_cost_rejected(validator: Draft202012Validator, manifest: dict[str, Any]) -> None:
     manifest["cost_usd"] = -1.0
     with pytest.raises(ValidationError):
         validator.validate(manifest)

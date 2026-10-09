@@ -75,11 +75,11 @@ class FetchedIssue:
     """Subset of an issue's REST representation the verify path needs."""
 
     number: int
-    state: str           # "open" | "closed"
-    state_reason: str    # "completed" | "not_planned" | "reopened" | ""
+    state: str  # "open" | "closed"
+    state_reason: str  # "completed" | "not_planned" | "reopened" | ""
     title: str
-    body: str            # current body — may have been edited
-    closed_at: str       # ISO-8601 or "" when still open
+    body: str  # current body — may have been edited
+    closed_at: str  # ISO-8601 or "" when still open
     html_url: str
 
 
@@ -97,19 +97,19 @@ class IssueComment:
 class IssueEvent:
     """One event from the issue's timeline (e.g. closed, reopened)."""
 
-    event: str           # "closed", "reopened", "renamed", ...
+    event: str  # "closed", "reopened", "renamed", ...
     actor: str
     created_at: str
-    commit_id: str       # populated when event=="closed" via commit; else ""
+    commit_id: str  # populated when event=="closed" via commit; else ""
 
 
 @dataclass(frozen=True)
 class UserContentEdit:
     """One edit-history entry from GraphQL ``userContentEdits``."""
 
-    edited_at: str       # ISO-8601
-    editor: str          # login or "" when the actor isn't surfaced
-    diff: str            # unified-diff string, before -> after
+    edited_at: str  # ISO-8601
+    editor: str  # login or "" when the actor isn't surfaced
+    diff: str  # unified-diff string, before -> after
 
 
 def _headers(token: str) -> dict[str, str]:
@@ -209,9 +209,7 @@ async def _request_with_retry(
             resp = await client.request(method, url, json=json, params=params)
         except httpx.HTTPError as exc:
             if attempts > 1:
-                raise GitHubVerifyError(
-                    f"{context} failed after retry: {exc!r}"
-                ) from exc
+                raise GitHubVerifyError(f"{context} failed after retry: {exc!r}") from exc
             logger.warning(
                 "%s raised %r; retrying once after %ds", context, exc, _RETRY_BACKOFF_SECONDS
             )
@@ -281,9 +279,7 @@ async def list_comments(
     the work independent of attacker comment volume.
     """
     out: list[IssueComment] = []
-    url: str | None = (
-        f"{api_base(host)}/repos/{ref.owner}/{ref.repo}/issues/{ref.number}/comments"
-    )
+    url: str | None = f"{api_base(host)}/repos/{ref.owner}/{ref.repo}/issues/{ref.number}/comments"
     params: dict | None = {"per_page": 100}
     pages = 0
     total_bytes = 0
@@ -344,9 +340,7 @@ async def list_events(
     stops following ``Link: rel="next"`` after ``max_pages`` pages.
     """
     out: list[IssueEvent] = []
-    url: str | None = (
-        f"{api_base(host)}/repos/{ref.owner}/{ref.repo}/issues/{ref.number}/events"
-    )
+    url: str | None = f"{api_base(host)}/repos/{ref.owner}/{ref.repo}/issues/{ref.number}/events"
     params: dict | None = {"per_page": 100}
     pages = 0
     while url:
@@ -481,17 +475,12 @@ async def list_user_content_edits(
     )
     data = resp.json()
     if "errors" in data and data["errors"]:
-        raise GitHubVerifyError(
-            f"GraphQL userContentEdits returned errors: {data['errors']!r}"
-        )
+        raise GitHubVerifyError(f"GraphQL userContentEdits returned errors: {data['errors']!r}")
     try:
-        nodes = (
-            data["data"]["repository"][resolver_field]["userContentEdits"]["nodes"]
-        )
+        nodes = data["data"]["repository"][resolver_field]["userContentEdits"]["nodes"]
     except (KeyError, TypeError) as exc:
         raise GitHubVerifyError(
-            f"GraphQL userContentEdits response missing expected fields: "
-            f"{data!r}"
+            f"GraphQL userContentEdits response missing expected fields: {data!r}"
         ) from exc
 
     out: list[UserContentEdit] = []
@@ -512,8 +501,7 @@ async def list_user_content_edits(
             keep = max(0, max_diff_bytes - len(marker.encode("utf-8")))
             diff = encoded[:keep].decode("utf-8", "ignore") + marker
             logger.warning(
-                "Truncated an oversized userContentEdit diff for %s #%d "
-                "(%d bytes > cap %d).",
+                "Truncated an oversized userContentEdit diff for %s #%d (%d bytes > cap %d).",
                 ref.kind,
                 ref.number,
                 len(encoded),
@@ -550,9 +538,7 @@ async def post_comment(
     body: str,
 ) -> str:
     """POST a comment on the issue. Returns the new comment's html_url."""
-    url = (
-        f"{api_base(host)}/repos/{ref.owner}/{ref.repo}/issues/{ref.number}/comments"
-    )
+    url = f"{api_base(host)}/repos/{ref.owner}/{ref.repo}/issues/{ref.number}/comments"
     resp = await _request_with_retry(
         client,
         "POST",

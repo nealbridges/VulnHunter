@@ -23,12 +23,10 @@ These tests cover the actual semantics:
 from __future__ import annotations
 
 import pytest
-
 from agent._body_reconstruct import (
     DiffApplyError,
     reconstruct_original,
 )
-
 
 # ---------- empty / no-op cases --------------------------------------------
 
@@ -165,7 +163,4 @@ def test_erase_then_reconstruct_recovers_markers() -> None:
     recovered = reconstruct_original(current_body, edits)
     assert "<!-- vulnfix-key: 0123456789abcdef -->" in recovered
     assert "<!-- vulnhunt-finding-id: VULN-001 -->" in recovered
-    assert (
-        "<!-- vulnhunt-results-dir: widget_VULNHUNT_RESULTS_opus47_2026 -->"
-        in recovered
-    )
+    assert "<!-- vulnhunt-results-dir: widget_VULNHUNT_RESULTS_opus47_2026 -->" in recovered

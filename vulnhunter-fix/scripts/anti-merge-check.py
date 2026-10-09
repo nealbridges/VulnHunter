@@ -30,7 +30,6 @@ import argparse
 import json
 import sys
 
-
 THRESHOLD = 0.6
 
 
@@ -41,7 +40,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--test-files-grouped", type=int, default=None)
     ap.add_argument("--test-files-split", type=int, default=None)
     ap.add_argument(
-        "--strict", action="store_true",
+        "--strict",
+        action="store_true",
         help="Exit 1 when allowed=false (mechanical gate mode). Default is advisory.",
     )
     args = ap.parse_args(argv[1:])
@@ -75,15 +75,22 @@ def main(argv: list[str]) -> int:
         parts = [f"source ratio {src_ratio:.3f}"]
         if test_ratio is not None:
             parts.append(f"test ratio {test_ratio:.3f}")
-        reason = f"grouping inefficient: {', '.join(parts)} > {THRESHOLD}; split into individual PRs"
+        reason = (
+            f"grouping inefficient: {', '.join(parts)} > {THRESHOLD}; split into individual PRs"
+        )
 
-    print(json.dumps({
-        "allowed": allowed,
-        "source_ratio": round(src_ratio, 3),
-        "test_ratio": round(test_ratio, 3) if test_ratio is not None else None,
-        "threshold": THRESHOLD,
-        "reason": reason,
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "allowed": allowed,
+                "source_ratio": round(src_ratio, 3),
+                "test_ratio": round(test_ratio, 3) if test_ratio is not None else None,
+                "threshold": THRESHOLD,
+                "reason": reason,
+            },
+            indent=2,
+        )
+    )
     if args.strict and not allowed:
         return 1
     return 0

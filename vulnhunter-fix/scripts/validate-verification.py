@@ -33,7 +33,6 @@ import re
 import sys
 from pathlib import Path
 
-
 EXPECTED_HEADERS = [
     "#",
     "VULN-NNN",
@@ -64,7 +63,7 @@ def _parse_table(text: str) -> tuple[list[str], list[list[str]]] | None:
         return None
     header_cells = [c.strip() for c in lines[header_idx].strip("|").split("|")]
     rows = []
-    for line in lines[header_idx + 2:]:
+    for line in lines[header_idx + 2 :]:
         if not line.strip().startswith("|"):
             break
         cells = [c.strip() for c in line.strip("|").split("|")]
@@ -77,7 +76,7 @@ def _check_header(header: list[str], errors: list[str]) -> None:
     if len(header) != 9:
         errors.append(f"header column count: expected 9, got {len(header)}")
         return
-    for got, expected in zip(header, EXPECTED_HEADERS):
+    for got, expected in zip(header, EXPECTED_HEADERS, strict=False):
         if expected not in got:
             errors.append(f"header cell mismatch: expected substring {expected!r}, got {got!r}")
 
@@ -230,7 +229,9 @@ def _check_column7(
             )
 
 
-def validate(pr_body: Path, worktree: Path, sidecars_dir: Path | None, result_path: Path | None) -> int:
+def validate(
+    pr_body: Path, worktree: Path, sidecars_dir: Path | None, result_path: Path | None
+) -> int:
     try:
         text = pr_body.read_text(encoding="utf-8")
     except OSError as exc:
@@ -257,15 +258,15 @@ def validate(pr_body: Path, worktree: Path, sidecars_dir: Path | None, result_pa
             if kind == "yes":
                 if not _extract_citations(row[idx]) and idx != 6:
                     errors.append(
-                        f"{row_label}: column {idx+1} ({header[idx]}) is 'yes' but missing file:line citation (REQ-GRA-012)"
+                        f"{row_label}: column {idx + 1} ({header[idx]}) is 'yes' but missing file:line citation (REQ-GRA-012)"
                     )
                 for file, line in _extract_citations(row[idx]):
                     if not _check_citation_exists(worktree, file, line):
                         errors.append(
-                            f"{row_label}: column {idx+1} citation {file}:{line} does not resolve at worktree"
+                            f"{row_label}: column {idx + 1} citation {file}:{line} does not resolve at worktree"
                         )
             elif kind == "unknown":
-                errors.append(f"{row_label}: column {idx+1} unknown value: {row[idx]!r}")
+                errors.append(f"{row_label}: column {idx + 1} unknown value: {row[idx]!r}")
 
         if vuln_id:
             # Always run the column-7 caller-coverage check. When no
@@ -288,7 +289,9 @@ def validate(pr_body: Path, worktree: Path, sidecars_dir: Path | None, result_pa
 
 
 def main(argv: list[str]) -> int:
-    ap = argparse.ArgumentParser(description="Validate verification table (REQ-GRA-011..014, REQ-GRA-020).")
+    ap = argparse.ArgumentParser(
+        description="Validate verification table (REQ-GRA-011..014, REQ-GRA-020)."
+    )
     ap.add_argument("pr_body", type=Path)
     ap.add_argument("--worktree", type=Path, default=Path.cwd())
     ap.add_argument("--sidecars-dir", type=Path, default=None)

@@ -54,7 +54,10 @@ def _git(repo_root: str, *args: str) -> subprocess.CompletedProcess:
     try:
         return subprocess.run(  # nosec B603 B607
             ["git", "-C", repo_root, *args],
-            capture_output=True, text=True, check=False, timeout=30,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
         return subprocess.CompletedProcess(args, returncode=2, stdout="", stderr=str(exc))
@@ -97,8 +100,7 @@ def _added_files(repo_root: str, base: str) -> tuple[list[str], str | None]:
         # (excluded); if not, the old verify_ name shows as D (also excluded)
         # and only the clean promoted name shows as A. Either way the scaffold
         # name never appears here.
-        proc = _git(repo_root, "show", "--name-only", "--diff-filter=A",
-                    "--pretty=format:", "HEAD")
+        proc = _git(repo_root, "show", "--name-only", "--diff-filter=A", "--pretty=format:", "HEAD")
         if proc.returncode != 0:
             return [], proc.stderr.strip() or "git show failed"
         print(
@@ -123,11 +125,14 @@ def _added_files(repo_root: str, base: str) -> tuple[list[str], str | None]:
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="Committed-test-naming gate (REQ-GAT-013).")
     ap.add_argument("--repo-root", required=True)
-    ap.add_argument("--base", default="main",
-                    help="Base ref to diff the branch against (default: main). "
-                         "If it does not resolve, the gate auto-detects the "
-                         "repo's default branch (origin/HEAD, then main/master) "
-                         "before falling back to a HEAD-only scan with a warning.")
+    ap.add_argument(
+        "--base",
+        default="main",
+        help="Base ref to diff the branch against (default: main). "
+        "If it does not resolve, the gate auto-detects the "
+        "repo's default branch (origin/HEAD, then main/master) "
+        "before falling back to a HEAD-only scan with a warning.",
+    )
     args = ap.parse_args(argv[1:])
 
     paths, err = _added_files(args.repo_root, args.base)

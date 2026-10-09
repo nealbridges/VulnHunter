@@ -2,14 +2,13 @@
 
 import os
 
-import pytest
-
 import local_harness.config as config
+import pytest
 
 
 def test_paths_are_absolute_and_nested():
     assert os.path.isabs(config.HARNESS_DIR)
-    assert config.REPO_ROOT == os.path.dirname(config.HARNESS_DIR)
+    assert os.path.dirname(config.HARNESS_DIR) == config.REPO_ROOT
     assert config.BENCHMARK_DIR.endswith(os.path.join("benchmark", "ground_truth"))
     assert config.STATE_FILE.endswith("state.json")
     assert config.TALLY_FILE.endswith("tally.json")
@@ -21,7 +20,30 @@ def test_retry_and_timeout_constants():
     assert config.SCAN_MAX_RETRIES == 3
     assert config.SCAN_RETRY_BACKOFF_MULTIPLIER == 2.0
     assert config.JUDGE_MAX_RETRIES == 3
-    assert isinstance(config.MODEL, str) and config.MODEL
+
+
+def test_model_mirrors_env_var():
+    """Contract: config.MODEL mirrors VULNHUNT_MODEL (empty when unset).
+
+    The constants test above must not depend on the ambient environment
+    (VULNHUNT_MODEL is a scan-time env contract, not a build constant),
+    so the mirror behavior is pinned here explicitly: set the env, reload,
+    assert, restore. (Pre-existing on main the assertion read ambient
+    VULNHUNT_MODEL, which made the suite env-dependent.)
+    """
+    import importlib
+
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        monkeypatch.setenv("VULNHUNT_MODEL", "test-model-for-reload")
+        importlib.reload(config)
+        assert config.MODEL == "test-model-for-reload"
+        monkeypatch.delenv("VULNHUNT_MODEL", raising=False)
+        importlib.reload(config)
+        assert config.MODEL == ""
+    finally:
+        monkeypatch.undo()
+        importlib.reload(config)
 
 
 def test_batch_and_history_paths():
@@ -33,6 +55,7 @@ def test_batch_and_history_paths():
 
 def test_atomic_write_json_roundtrip(tmp_path):
     import json
+
     target = tmp_path / "sub" / "out.json"  # nested dir is created
     config.atomic_write_json(str(target), {"a": 1}, sort_keys=True)
     assert json.loads(target.read_text()) == {"a": 1}

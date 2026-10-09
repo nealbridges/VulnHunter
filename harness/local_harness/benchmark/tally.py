@@ -45,17 +45,19 @@ def generate_tally(state):
         else:
             by_type[finding_type]["error"] += 1
 
-        findings_list.append({
-            "finding_id": finding_id,
-            "benchmark_file": judgment.get("benchmark_file", ""),
-            "type": finding_type,
-            "repo": judgment.get("repo_name", ""),
-            "commit": judgment.get("commit_hash", "")[:8],
-            "detected": detected,
-            "confidence": judgment.get("confidence"),
-            "reasoning": judgment.get("reasoning", ""),
-            "matched_finding_id": judgment.get("matched_finding_id"),
-        })
+        findings_list.append(
+            {
+                "finding_id": finding_id,
+                "benchmark_file": judgment.get("benchmark_file", ""),
+                "type": finding_type,
+                "repo": judgment.get("repo_name", ""),
+                "commit": judgment.get("commit_hash", "")[:8],
+                "detected": detected,
+                "confidence": judgment.get("confidence"),
+                "reasoning": judgment.get("reasoning", ""),
+                "matched_finding_id": judgment.get("matched_finding_id"),
+            }
+        )
 
     total = len(findings_list)
     detected_count = sum(1 for f in findings_list if f["detected"] is True)
@@ -86,16 +88,18 @@ def generate_tally(state):
         total_cache_creation_tokens += target_data.get("scan_cache_creation_tokens", 0) or 0
         total_num_turns += target_data.get("scan_num_turns", 0) or 0
         if scan_cost or scan_elapsed:
-            per_scan_costs.append({
-                "target": key,
-                "cost_usd": scan_cost,
-                "elapsed_s": scan_elapsed,
-                "input_tokens": target_data.get("scan_input_tokens", 0) or 0,
-                "output_tokens": target_data.get("scan_output_tokens", 0) or 0,
-                "cache_read_tokens": target_data.get("scan_cache_read_tokens", 0) or 0,
-                "cache_creation_tokens": target_data.get("scan_cache_creation_tokens", 0) or 0,
-                "num_turns": target_data.get("scan_num_turns", 0) or 0,
-            })
+            per_scan_costs.append(
+                {
+                    "target": key,
+                    "cost_usd": scan_cost,
+                    "elapsed_s": scan_elapsed,
+                    "input_tokens": target_data.get("scan_input_tokens", 0) or 0,
+                    "output_tokens": target_data.get("scan_output_tokens", 0) or 0,
+                    "cache_read_tokens": target_data.get("scan_cache_read_tokens", 0) or 0,
+                    "cache_creation_tokens": target_data.get("scan_cache_creation_tokens", 0) or 0,
+                    "num_turns": target_data.get("scan_num_turns", 0) or 0,
+                }
+            )
 
     tally = {
         "generated_at": datetime.now().isoformat(),
@@ -118,8 +122,12 @@ def generate_tally(state):
             "total_cache_creation_tokens": total_cache_creation_tokens,
             "total_num_turns": total_num_turns,
             "scans_counted": len(per_scan_costs),
-            "avg_cost_per_scan_usd": round(total_cost_usd / len(per_scan_costs), 2) if per_scan_costs else 0,
-            "avg_elapsed_per_scan_s": round(total_elapsed_s / len(per_scan_costs)) if per_scan_costs else 0,
+            "avg_cost_per_scan_usd": round(total_cost_usd / len(per_scan_costs), 2)
+            if per_scan_costs
+            else 0,
+            "avg_elapsed_per_scan_s": round(total_elapsed_s / len(per_scan_costs))
+            if per_scan_costs
+            else 0,
             "per_scan": sorted(per_scan_costs, key=lambda x: x["cost_usd"], reverse=True),
         },
         "findings": sorted(findings_list, key=lambda f: (f["benchmark_file"], f["finding_id"])),
@@ -164,7 +172,7 @@ def write_tally_markdown(tally):
     for vtype, counts in sorted(summary["by_type"].items()):
         total = counts["total"]
         det = counts["detected"]
-        rate = f"{det/total:.0%}" if total > 0 else "N/A"
+        rate = f"{det / total:.0%}" if total > 0 else "N/A"
         lines.append(f"| {vtype} | {total} | {det} | {counts['missed']} | {rate} |")
     lines.append("")
 
@@ -174,7 +182,9 @@ def write_tally_markdown(tally):
     for i, f in enumerate(findings, 1):
         det_str = "YES" if f["detected"] is True else ("NO" if f["detected"] is False else "ERR")
         conf = f["confidence"] or "-"
-        lines.append(f"| {i} | {f['benchmark_file']} | {f['finding_id']} | {f['type']} | {det_str} | {conf} |")
+        lines.append(
+            f"| {i} | {f['benchmark_file']} | {f['finding_id']} | {f['type']} | {det_str} | {conf} |"
+        )
     lines.append("")
 
     missed = [f for f in findings if f["detected"] is False]
@@ -197,7 +207,9 @@ def write_tally_markdown(tally):
         lines.append(f"| Total Input Tokens | {cost.get('total_input_tokens', 0):,} |")
         lines.append(f"| Total Output Tokens | {cost.get('total_output_tokens', 0):,} |")
         lines.append(f"| Total Cache Read Tokens | {cost.get('total_cache_read_tokens', 0):,} |")
-        lines.append(f"| Total Cache Creation Tokens | {cost.get('total_cache_creation_tokens', 0):,} |")
+        lines.append(
+            f"| Total Cache Creation Tokens | {cost.get('total_cache_creation_tokens', 0):,} |"
+        )
         lines.append(f"| Total Turns | {cost.get('total_num_turns', 0):,} |")
         lines.append(f"| Scans Counted | {cost.get('scans_counted', 0)} |")
         lines.append("")
@@ -208,7 +220,12 @@ def write_tally_markdown(tally):
             lines.append("| Target | Cost | Time | Tokens (in/out) | Turns |")
             lines.append("|--------|------|------|-----------------|-------|")
             for s in per_scan:
-                total_tokens = s["input_tokens"] + s["output_tokens"] + s["cache_read_tokens"] + s["cache_creation_tokens"]
+                total_tokens = (
+                    s["input_tokens"]
+                    + s["output_tokens"]
+                    + s["cache_read_tokens"]
+                    + s["cache_creation_tokens"]
+                )
                 lines.append(
                     f"| {s['target']} | ${s['cost_usd']:.2f} | {_fmt_duration(s['elapsed_s'])} "
                     f"| {s['input_tokens']:,} / {s['output_tokens']:,} ({total_tokens:,} total) | {s['num_turns']} |"
@@ -224,10 +241,12 @@ def print_summary(tally):
     """Print a concise summary to stdout."""
     s = tally["summary"]
     cost = tally.get("cost", {})
-    print(f"\n{'='*60}")
-    print(f"BENCHMARK RESULTS: {s['detected']}/{s['total_findings']} detected "
-          f"({s['detection_rate']:.1%})")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print(
+        f"BENCHMARK RESULTS: {s['detected']}/{s['total_findings']} detected "
+        f"({s['detection_rate']:.1%})"
+    )
+    print(f"{'=' * 60}")
     print(f"  Detected:  {s['detected']}")
     print(f"  Missed:    {s['missed']}")
     print(f"  Errors:    {s['errors']}")
@@ -236,28 +255,34 @@ def print_summary(tally):
     for vtype, counts in sorted(s["by_type"].items()):
         total = counts["total"]
         det = counts["detected"]
-        rate = f"{det/total:.0%}" if total > 0 else "N/A"
+        rate = f"{det / total:.0%}" if total > 0 else "N/A"
         print(f"  {vtype:20s} {det}/{total} ({rate})")
 
     if cost.get("total_cost_usd") or cost.get("total_elapsed_s"):
-        print(f"\n{'-'*60}")
-        print(f"  COST & PERFORMANCE")
-        print(f"{'-'*60}")
+        print(f"\n{'-' * 60}")
+        print("  COST & PERFORMANCE")
+        print(f"{'-' * 60}")
         print(f"  Total cost:        ${cost['total_cost_usd']:.2f}")
         print(f"  Avg cost/scan:     ${cost.get('avg_cost_per_scan_usd', 0):.2f}")
         print(f"  Total wall time:   {_fmt_duration(cost.get('total_elapsed_s', 0))}")
         print(f"  Avg time/scan:     {_fmt_duration(cost.get('avg_elapsed_per_scan_s', 0))}")
-        total_all_tokens = (cost.get("total_input_tokens", 0) + cost.get("total_output_tokens", 0)
-                           + cost.get("total_cache_read_tokens", 0) + cost.get("total_cache_creation_tokens", 0))
-        print(f"  Total tokens:      {total_all_tokens:,} "
-              f"(in: {cost.get('total_input_tokens', 0):,}, "
-              f"out: {cost.get('total_output_tokens', 0):,}, "
-              f"cache-read: {cost.get('total_cache_read_tokens', 0):,})")
+        total_all_tokens = (
+            cost.get("total_input_tokens", 0)
+            + cost.get("total_output_tokens", 0)
+            + cost.get("total_cache_read_tokens", 0)
+            + cost.get("total_cache_creation_tokens", 0)
+        )
+        print(
+            f"  Total tokens:      {total_all_tokens:,} "
+            f"(in: {cost.get('total_input_tokens', 0):,}, "
+            f"out: {cost.get('total_output_tokens', 0):,}, "
+            f"cache-read: {cost.get('total_cache_read_tokens', 0):,})"
+        )
         print(f"  Total turns:       {cost.get('total_num_turns', 0):,}")
         print(f"  Scans counted:     {cost.get('scans_counted', 0)}")
 
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     if s["missed"] > 0:
-        print(f"\n  To analyze missed findings and get prompt tuning suggestions:")
-        print(f"    python -m local_harness.benchmark.analyze_misses")
+        print("\n  To analyze missed findings and get prompt tuning suggestions:")
+        print("    python -m local_harness.benchmark.analyze_misses")
     print()

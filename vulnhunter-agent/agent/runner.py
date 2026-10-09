@@ -19,12 +19,12 @@ from typing import Any
 from urllib.parse import urlparse
 
 from claude_agent_sdk import (
+    TERMINAL_TASK_STATUSES,
     AssistantMessage,
     ClaudeAgentOptions,
     ClaudeSDKClient,
     ResultMessage,
     SystemMessage,
-    TERMINAL_TASK_STATUSES,
     TaskNotificationMessage,
     TaskStartedMessage,
     TaskUpdatedMessage,
@@ -42,9 +42,6 @@ from tenacity import (
 
 from . import audit as _audit
 from . import audit_extract as _audit_extract
-from .auth import make_token_manager
-from .build_settings import build_claude_settings
-from .config import AgentConfig
 from ._stream_events import (
     SessionTotals,
     _agent_name_from_started,
@@ -55,17 +52,29 @@ from ._stream_events import (
     _log_task_started,
     _log_task_status,
     _log_user_message,
-    _render_block,
-    _result_brief,
-    _tool_brief,
-    _truncate,
     accumulate_result,
     get_verbosity,
     log_session_totals,
-    set_verbosity,
+)
+from ._stream_events import (
+    _render_block as _render_block,
+)
+from ._stream_events import (
+    _result_brief as _result_brief,
+)
+from ._stream_events import (
+    _tool_brief as _tool_brief,
+)
+from ._stream_events import (
+    _truncate as _truncate,
+)
+from ._stream_events import (
+    set_verbosity as set_verbosity,
 )
 from ._transient import classify as _classify_transient
-from ._url import redact as _redact
+from .auth import make_token_manager
+from .build_settings import build_claude_settings
+from .config import AgentConfig
 
 logger = logging.getLogger(__name__)
 
@@ -180,14 +189,9 @@ def _build_vulnhunt_prompt(
         # passing without modification.
         return base
     resolved_repo_url = repo_url if repo_url is not None else clone_path.name
-    resolved_dir = (
-        str(results_dir) if results_dir is not None else "<unset>"
-    )
+    resolved_dir = str(results_dir) if results_dir is not None else "<unset>"
     if enable_bash:
-        bash_line = (
-            "Bash is AVAILABLE for exploit-test execution "
-            "(--enable-bash was passed)."
-        )
+        bash_line = "Bash is AVAILABLE for exploit-test execution (--enable-bash was passed)."
     else:
         # Render the actual non-Bash tools the model has, so the prompt
         # doesn't claim Grep/Edit are available when the TOML allow-list
@@ -199,8 +203,7 @@ def _build_vulnhunt_prompt(
         else:
             tool_names = [t for t in effective_tools if t not in ("Bash", "Agent")]
             tool_phrase = (
-                "/".join(tool_names) if tool_names
-                else "the non-Bash tools in your allow-list"
+                "/".join(tool_names) if tool_names else "the non-Bash tools in your allow-list"
             )
         bash_line = f"Bash is NOT available — use {tool_phrase} only."
     return (
@@ -506,7 +509,7 @@ async def run_vulnhunt(
     read_only: bool = True,
     enable_bash: bool = False,
     backoffs: tuple[float, ...] = _SCAN_RETRY_BACKOFFS,
-    audit_writer: "_audit.AuditWriter | None" = None,
+    audit_writer: _audit.AuditWriter | None = None,
     totals_out: SessionTotals | None = None,
 ) -> Path | None:
     """Run /vulnhunt inside clone_dir and return the results directory it produced.
@@ -545,9 +548,7 @@ async def run_vulnhunt(
         # DEBUG when you actually need to verify what the SDK received.
         prefix = auth_token[:8]
         suffix = auth_token[-4:] if len(auth_token) > 12 else ""
-        logger.debug(
-            "Token forwarded to SDK: %s...%s (len=%d)", prefix, suffix, len(auth_token)
-        )
+        logger.debug("Token forwarded to SDK: %s...%s (len=%d)", prefix, suffix, len(auth_token))
 
     model = model_override or config.anthropic.model
 
@@ -720,8 +721,7 @@ async def run_vulnhunt(
         # there's no per-attempt log on the FINAL one — add an ERROR
         # trace so operators see "exhausted N retries" framing.
         logger.error(
-            "Scan exhausted %d cold-start retry/retries; surfacing transient "
-            "error: %s",
+            "Scan exhausted %d cold-start retry/retries; surfacing transient error: %s",
             len(backoffs),
             exc,
         )
@@ -741,9 +741,7 @@ async def run_vulnhunt(
     # failure so the audit event correctly shows scan_completed with
     # a failure note rather than a spurious success shape.
     if scan_error is None and session_result is None:
-        scan_error = RuntimeError(
-            "scan retry loop exited without a session result"
-        )
+        scan_error = RuntimeError("scan retry loop exited without a session result")
 
     if audit_writer is not None:
         try:
@@ -792,7 +790,7 @@ async def run_vulnhunt(
 
 
 def _emit_scan_completed(
-    audit_writer: "_audit.AuditWriter",
+    audit_writer: _audit.AuditWriter,
     *,
     config: AgentConfig,
     repo_slug: str,
@@ -862,7 +860,7 @@ def _emit_scan_completed(
 
 
 def _emit_scan_completed_safely(
-    audit_writer: "_audit.AuditWriter | None",
+    audit_writer: _audit.AuditWriter | None,
     **kwargs: Any,
 ) -> None:
     """Best-effort wrapper for pre-flight failure paths.
@@ -884,9 +882,7 @@ def _emit_scan_completed_safely(
             "preserving underlying pre-flight error"
         )
     except Exception:  # noqa: BLE001
-        logger.exception(
-            "Failed to emit pre-flight scan_completed audit event"
-        )
+        logger.exception("Failed to emit pre-flight scan_completed audit event")
 
 
 def _build_scan_retrying(*, backoffs: tuple[float, ...]) -> AsyncRetrying:
@@ -917,22 +913,11 @@ def _log_scan_retry(retry_state: RetryCallState) -> None:
     load-bearing for understanding "why did this take twice as long as
     expected", so it's always logged at WARN.
     """
-    delay = (
-        retry_state.next_action.sleep
-        if retry_state.next_action is not None
-        else 0.0
-    )
-    exc = (
-        retry_state.outcome.exception()
-        if retry_state.outcome is not None
-        else None
-    )
-    max_attempts = getattr(
-        retry_state.retry_object.stop, "max_attempt_number", None
-    )
+    delay = retry_state.next_action.sleep if retry_state.next_action is not None else 0.0
+    exc = retry_state.outcome.exception() if retry_state.outcome is not None else None
+    max_attempts = getattr(retry_state.retry_object.stop, "max_attempt_number", None)
     logger.warning(
-        "Scan cold-start transient on attempt %d/%s; sleeping %.0fs "
-        "before retry: %s",
+        "Scan cold-start transient on attempt %d/%s; sleeping %.0fs before retry: %s",
         retry_state.attempt_number,
         max_attempts if max_attempts else "?",
         delay,
@@ -1125,10 +1110,7 @@ async def _run_scan_session(
                             )
                         else:
                             consecutive_rate_limits += 1
-                            if (
-                                consecutive_rate_limits
-                                >= _MAX_CONSECUTIVE_RATE_LIMITS
-                            ):
+                            if consecutive_rate_limits >= _MAX_CONSECUTIVE_RATE_LIMITS:
                                 raise RateLimitError(
                                     f"API returned transient error "
                                     f"{consecutive_rate_limits} consecutive "

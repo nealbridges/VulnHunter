@@ -42,8 +42,9 @@ import json
 import logging
 import re
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from claude_agent_sdk import (
     AssistantMessage,
@@ -61,10 +62,11 @@ from tenacity import (
     wait_none,
 )
 
+from ._transient import classify as _classify_transient
+from ._transient import is_transient_status
 from .auth import TokenProvider
 from .build_settings import build_claude_settings
 from .config import AgentConfig
-from ._transient import classify as _classify_transient, is_transient_status
 
 if TYPE_CHECKING:
     from .audit import AuditWriter
@@ -348,25 +350,15 @@ def _make_retry_logger(
     stage_tag = f"[{stage}] " if stage else ""
 
     def _hook(retry_state: RetryCallState) -> None:
-        delay = (
-            retry_state.next_action.sleep
-            if retry_state.next_action is not None
-            else 0.0
-        )
-        exc = (
-            retry_state.outcome.exception()
-            if retry_state.outcome is not None
-            else None
-        )
+        delay = retry_state.next_action.sleep if retry_state.next_action is not None else 0.0
+        exc = retry_state.outcome.exception() if retry_state.outcome is not None else None
         # `stop_after_attempt(N)` exposes the cap as `max_attempt_number`.
         # Use it directly so the log reads "attempt K of N total" — same
         # framing as runner.py::_log_scan_retry. The previous form
         # (`max_attempts - 1`, "K of N retries") rendered as "1/1" on a
         # first failure with one retry queued, which read as "exhausted"
         # to operators.
-        max_attempts = getattr(
-            retry_state.retry_object.stop, "max_attempt_number", None
-        )
+        max_attempts = getattr(retry_state.retry_object.stop, "max_attempt_number", None)
         logger.info(
             "%s%s transient error (%s); retrying in %.0fs (attempt %d/%s)",
             stage_tag,
@@ -415,9 +407,7 @@ async def call_json(
     """
     retrying = _build_async_retrying(
         backoffs=backoffs,
-        before_sleep=_make_retry_logger(
-            model=model, stage=stage, log_retries=log_retries
-        ),
+        before_sleep=_make_retry_logger(model=model, stage=stage, log_retries=log_retries),
     )
     try:
         async for attempt in retrying:
@@ -484,7 +474,7 @@ async def call_json_with_fallback(
     cost_tracker: CostStats | None = None,
     stage: str = "",
     backoffs: tuple[float, ...] = _TRANSIENT_BACKOFFS,
-    audit_writer: "AuditWriter | None" = None,
+    audit_writer: AuditWriter | None = None,
 ) -> Any:
     """Try primary_model with transient retries; on any LLMError, try
     fallback_model (also with transient retries).

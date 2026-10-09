@@ -124,34 +124,40 @@ class TestValidateFinding:
 class TestCli:
     def test_ok_exit_zero(self, tmp_path, capsys):
         import subprocess
+
         script = Path(__file__).resolve().parents[1] / "scripts" / "validate_findings_draft.py"
         draft = tmp_path / "findings.draft.json"
         draft.write_text(json.dumps({"findings": [_ok_finding()]}))
         result = subprocess.run(
             [sys.executable, str(script), str(draft)],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 0
         assert "ok: 1 findings" in result.stdout
 
     def test_bad_payload_exit_one_with_directed_error(self, tmp_path):
         import subprocess
+
         script = Path(__file__).resolve().parents[1] / "scripts" / "validate_findings_draft.py"
         draft = tmp_path / "findings.draft.json"
         draft.write_text(json.dumps({"findings": [_ok_finding(severity="High+")]}))
         result = subprocess.run(
             [sys.executable, str(script), str(draft)],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 1
         assert "Re-run Step 5a" in result.stderr
 
     def test_missing_file_exit_one(self, tmp_path):
         import subprocess
+
         script = Path(__file__).resolve().parents[1] / "scripts" / "validate_findings_draft.py"
         result = subprocess.run(
             [sys.executable, str(script), str(tmp_path / "missing.json")],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
         assert result.returncode == 1
         assert "not found" in result.stderr

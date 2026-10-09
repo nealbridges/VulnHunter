@@ -11,21 +11,23 @@ failure, per REQ-SCH-006.
 
 from __future__ import annotations
 
-import _skill_bootstrap  # noqa: F401  — adds bundled .venv site-packages to sys.path
-
 import json
 import sys
 from pathlib import Path
 
+import _skill_bootstrap  # noqa: F401  — adds bundled .venv site-packages to sys.path
 from jsonschema import Draft202012Validator
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = REPO_ROOT / "references" / "finding-schema.json"
 
 
 def _format_error(path: str, err, prefix: str = "") -> str:
-    loc = prefix + "/".join(str(p) for p in err.absolute_path) if err.absolute_path else prefix or "<root>"
+    loc = (
+        prefix + "/".join(str(p) for p in err.absolute_path)
+        if err.absolute_path
+        else prefix or "<root>"
+    )
     return f"{path}: {loc}: {err.message}"
 
 

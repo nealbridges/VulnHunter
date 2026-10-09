@@ -20,16 +20,14 @@ Exit codes: 0 clean, 1 validation failure, 2 IO/parse error.
 
 from __future__ import annotations
 
-import _skill_bootstrap  # noqa: F401 — bundled venv sys.path bootstrap
-
 import argparse
 import json
 import re
 import sys
 from pathlib import Path
 
+import _skill_bootstrap  # noqa: F401 — bundled venv sys.path bootstrap
 from jsonschema import Draft202012Validator
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = REPO_ROOT / "references" / "result-schema.json"
@@ -85,10 +83,16 @@ def parse(raw: str) -> tuple[dict, dict]:
 
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--in", dest="input", type=str, default=None,
-                    help="Path to LLM output file; defaults to stdin.")
-    ap.add_argument("--sidecar-out", type=str, default=None,
-                    help="Optional path to write the sidecar JSON.")
+    ap.add_argument(
+        "--in",
+        dest="input",
+        type=str,
+        default=None,
+        help="Path to LLM output file; defaults to stdin.",
+    )
+    ap.add_argument(
+        "--sidecar-out", type=str, default=None, help="Optional path to write the sidecar JSON."
+    )
     args = ap.parse_args(argv[1:])
 
     if args.input:
@@ -116,9 +120,7 @@ def main(argv: list[str]) -> int:
 
     if args.sidecar_out:
         try:
-            Path(args.sidecar_out).write_text(
-                json.dumps(sidecar, indent=2), encoding="utf-8"
-            )
+            Path(args.sidecar_out).write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
         except OSError as exc:
             print(f"error: sidecar write failed: {exc}", file=sys.stderr)
             return 2

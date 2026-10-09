@@ -18,7 +18,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RESET_SCRIPT = REPO_ROOT / "scripts" / "worktree-reset.py"
 
@@ -35,12 +34,26 @@ def _init_repo(repo: Path) -> tuple[Path, str]:
     (repo / "src.py").write_text("x = 1\n")
     subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True, env=env)
     subprocess.run(
-        ["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=T",
-         "commit", "-q", "-m", "init"],
-        check=True, env=env,
+        [
+            "git",
+            "-C",
+            str(repo),
+            "-c",
+            "user.email=t@t",
+            "-c",
+            "user.name=T",
+            "commit",
+            "-q",
+            "-m",
+            "init",
+        ],
+        check=True,
+        env=env,
     )
     sha = subprocess.check_output(
-        ["git", "-C", str(repo), "rev-parse", "HEAD"], text=True, env=env,
+        ["git", "-C", str(repo), "rev-parse", "HEAD"],
+        text=True,
+        env=env,
     ).strip()
     return repo, sha
 
@@ -52,7 +65,9 @@ def _add_worktree(repo: Path, wt: Path, sha: str) -> Path:
     env = {**os.environ, "GIT_TEMPLATE_DIR": ""}
     subprocess.run(
         ["git", "-C", str(repo), "worktree", "add", "--detach", str(wt), sha],
-        check=True, capture_output=True, env=env,
+        check=True,
+        capture_output=True,
+        env=env,
     )
     return wt
 
@@ -66,14 +81,27 @@ def test_reset_refuses_main_worktree(tmp_path):
     repo.mkdir()
     _, sha = _init_repo(repo)
     (repo / "uncommitted.py").write_text("precious work\n")  # would be destroyed
-    (repo / "src.py").write_text("x = 999\n")               # uncommitted edit
+    (repo / "src.py").write_text("x = 999\n")  # uncommitted edit
 
     result = subprocess.run(
-        [sys.executable, str(RESET_SCRIPT),
-         "--worktree", str(repo), "--branch-baseline", sha,
-         "--vuln-id", "VULN-1", "--retry-number", "1", "--reason", "test",
-         "--repo-work-root", str(tmp_path)],
-        capture_output=True, text=True,
+        [
+            sys.executable,
+            str(RESET_SCRIPT),
+            "--worktree",
+            str(repo),
+            "--branch-baseline",
+            sha,
+            "--vuln-id",
+            "VULN-1",
+            "--retry-number",
+            "1",
+            "--reason",
+            "test",
+            "--repo-work-root",
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
     )
     assert result.returncode != 0, "reset did not refuse the main worktree"
     # The precious work must survive — reset must not have run.
@@ -90,11 +118,24 @@ def test_reset_refuses_subdir_of_repo(tmp_path):
     subdir = repo / "src"
     subdir.mkdir()
     result = subprocess.run(
-        [sys.executable, str(RESET_SCRIPT),
-         "--worktree", str(subdir), "--branch-baseline", sha,
-         "--vuln-id", "VULN-1", "--retry-number", "1", "--reason", "test",
-         "--repo-work-root", str(tmp_path)],
-        capture_output=True, text=True,
+        [
+            sys.executable,
+            str(RESET_SCRIPT),
+            "--worktree",
+            str(subdir),
+            "--branch-baseline",
+            sha,
+            "--vuln-id",
+            "VULN-1",
+            "--retry-number",
+            "1",
+            "--reason",
+            "test",
+            "--repo-work-root",
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
     )
     assert result.returncode != 0, "reset did not refuse a non-worktree-root subdir"
 
@@ -112,12 +153,25 @@ def test_reset_restores_baseline(tmp_path):
     log_root = tmp_path / "workroot"
     log_root.mkdir()
     result = subprocess.run(
-        [sys.executable, str(RESET_SCRIPT),
-         "--worktree", str(wt), "--branch-baseline", sha,
-         "--vuln-id", "VULN-1", "--retry-number", "1",
-         "--reason", "test",
-         "--repo-work-root", str(log_root)],
-        capture_output=True, text=True, check=True,
+        [
+            sys.executable,
+            str(RESET_SCRIPT),
+            "--worktree",
+            str(wt),
+            "--branch-baseline",
+            sha,
+            "--vuln-id",
+            "VULN-1",
+            "--retry-number",
+            "1",
+            "--reason",
+            "test",
+            "--repo-work-root",
+            str(log_root),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
     )
     payload = json.loads(result.stdout)
     assert payload["status"] == "ok"
@@ -139,12 +193,24 @@ def test_reset_appends_log(tmp_path):
     log_root.mkdir()
     for i in range(1, 3):
         subprocess.run(
-            [sys.executable, str(RESET_SCRIPT),
-             "--worktree", str(wt), "--branch-baseline", sha,
-             "--vuln-id", "VULN-42", "--retry-number", str(i),
-             "--reason", f"attempt {i}",
-             "--repo-work-root", str(log_root)],
-            check=True, capture_output=True,
+            [
+                sys.executable,
+                str(RESET_SCRIPT),
+                "--worktree",
+                str(wt),
+                "--branch-baseline",
+                sha,
+                "--vuln-id",
+                "VULN-42",
+                "--retry-number",
+                str(i),
+                "--reason",
+                f"attempt {i}",
+                "--repo-work-root",
+                str(log_root),
+            ],
+            check=True,
+            capture_output=True,
         )
 
     log = log_root / "retry_log.jsonl"

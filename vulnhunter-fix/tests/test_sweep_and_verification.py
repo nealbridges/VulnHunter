@@ -1,4 +1,5 @@
 """Coverage tests for sweep-root-causes.py and validate-verification.py."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -7,7 +8,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO_ROOT / "scripts"
@@ -34,6 +34,7 @@ def vv():
 # =============================================================================
 # sweep-root-causes.py
 # =============================================================================
+
 
 def test_sweep_cwe_int_valid(sweep):
     assert sweep._cwe_int("CWE-89") == 89
@@ -66,7 +67,7 @@ def test_sweep_load_patterns_from_file(sweep, tmp_path):
         "cwes: [89]\n"
         "patterns:\n"
         "  - 'execute\\('\n"
-        "  - \"query\\(.*%\"\n"
+        '  - "query\\(.*%"\n'
         "```\n\n"
         "```yaml\n"
         "class: crypto\n"
@@ -103,7 +104,9 @@ def test_sweep_load_results(sweep, tmp_path):
     r1 = tmp_path / "a_result.json"
     r1.write_text(json.dumps({"vuln_id": "VULN-1", "status": "VERIFIED_FULL"}), encoding="utf-8")
     r2 = tmp_path / "b_result.json"
-    r2.write_text(json.dumps({"vuln_id": "VULN-2", "status": "FAILED"}), encoding="utf-8")  # skipped
+    r2.write_text(
+        json.dumps({"vuln_id": "VULN-2", "status": "FAILED"}), encoding="utf-8"
+    )  # skipped
     r3 = tmp_path / "c_result.json"
     r3.write_text("{bad", encoding="utf-8")  # skipped
     findings = sweep._load_results(tmp_path)
@@ -168,38 +171,82 @@ def test_sweep_pass1_grep_backend_respects_routed(sweep, tmp_path):
 
 # --- S4 (12-seg review): sweep downgrade + fail-closed --------------------
 
+
 def _ast_graph_with_unrouted_sibling(tmp_path):
     """Graph where sink_fn has a caller (caller_bad) in a DIFFERENT file than
     the fix touched — an unmitigated Path-B sibling."""
     graph = tmp_path / "g.json"
-    graph.write_text(json.dumps({
-        "schema_version": "1", "graphify_version": "t", "generated_at": "2026-07-07T00:00:00Z",
-        "backend": "ast", "confidence": "high", "content_hash": "sha256:0", "root_dir": str(tmp_path),
-        "nodes": {
-            "auth.py:sink_fn": {"kind": "function", "name": "sink_fn", "file": "auth.py",
-                                "line": 1, "qualified_name": "auth.py:sink_fn", "language": "python"},
-            "other.py:caller_bad": {"kind": "function", "name": "caller_bad", "file": "other.py",
-                                    "line": 5, "qualified_name": "other.py:caller_bad", "language": "python"},
-        },
-        "edges": [{"from": "other.py:caller_bad", "to": "auth.py:sink_fn", "kind": "calls"}],
-    }), encoding="utf-8")
-    triage = tmp_path / "triage"; triage.mkdir(exist_ok=True)
-    (triage / "VULN-1.json").write_text(json.dumps({
-        "vuln_id": "VULN-1", "confidence": "high", "sink_symbol": "auth.py:sink_fn",
-        "callers_of_sink": ["other.py:caller_bad"], "generated_at": "2026-07-07T00:00:00Z",
-    }), encoding="utf-8")
+    graph.write_text(
+        json.dumps(
+            {
+                "schema_version": "1",
+                "graphify_version": "t",
+                "generated_at": "2026-07-07T00:00:00Z",
+                "backend": "ast",
+                "confidence": "high",
+                "content_hash": "sha256:0",
+                "root_dir": str(tmp_path),
+                "nodes": {
+                    "auth.py:sink_fn": {
+                        "kind": "function",
+                        "name": "sink_fn",
+                        "file": "auth.py",
+                        "line": 1,
+                        "qualified_name": "auth.py:sink_fn",
+                        "language": "python",
+                    },
+                    "other.py:caller_bad": {
+                        "kind": "function",
+                        "name": "caller_bad",
+                        "file": "other.py",
+                        "line": 5,
+                        "qualified_name": "other.py:caller_bad",
+                        "language": "python",
+                    },
+                },
+                "edges": [
+                    {"from": "other.py:caller_bad", "to": "auth.py:sink_fn", "kind": "calls"}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    triage = tmp_path / "triage"
+    triage.mkdir(exist_ok=True)
+    (triage / "VULN-1.json").write_text(
+        json.dumps(
+            {
+                "vuln_id": "VULN-1",
+                "confidence": "high",
+                "sink_symbol": "auth.py:sink_fn",
+                "callers_of_sink": ["other.py:caller_bad"],
+                "generated_at": "2026-07-07T00:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
     patterns = tmp_path / "p.md"
     patterns.write_text("```\nclass: injection\ncwes: [89]\npatterns: []\n```\n", encoding="utf-8")
     return graph, triage, patterns
 
 
 def _write_result(tmp_path, files_modified):
-    results = tmp_path / "results"; results.mkdir(exist_ok=True)
-    (results / "VULN-1_result.json").write_text(json.dumps({
-        "vuln_id": "VULN-1", "status": "VERIFIED", "cwe": "CWE-89", "file_path": "auth.py",
-        "completeness_tier": "FULL", "callers_routed_through_fix": [],
-        "files_modified": files_modified,
-    }), encoding="utf-8")
+    results = tmp_path / "results"
+    results.mkdir(exist_ok=True)
+    (results / "VULN-1_result.json").write_text(
+        json.dumps(
+            {
+                "vuln_id": "VULN-1",
+                "status": "VERIFIED",
+                "cwe": "CWE-89",
+                "file_path": "auth.py",
+                "completeness_tier": "FULL",
+                "callers_routed_through_fix": [],
+                "files_modified": files_modified,
+            }
+        ),
+        encoding="utf-8",
+    )
     return results
 
 
@@ -211,9 +258,23 @@ def test_sweep_marks_revised_when_unmitigated_sibling_remains(sweep, tmp_path):
     graph, triage, patterns = _ast_graph_with_unrouted_sibling(tmp_path)
     results = _write_result(tmp_path, files_modified=["auth.py"])  # sibling is in other.py
     out = tmp_path / "sweep.json"
-    rc = sweep.main(["sweep", "--repo-root", str(tmp_path), "--graph", str(graph),
-                     "--patterns", str(patterns), "--results-dir", str(results),
-                     "--triage-dir", str(triage), "--out", str(out)])
+    rc = sweep.main(
+        [
+            "sweep",
+            "--repo-root",
+            str(tmp_path),
+            "--graph",
+            str(graph),
+            "--patterns",
+            str(patterns),
+            "--results-dir",
+            str(results),
+            "--triage-dir",
+            str(triage),
+            "--out",
+            str(out),
+        ]
+    )
     assert rc == 0
     row = json.loads(out.read_text())["rows"][0]
     assert row["remaining"] >= 1, f"unmitigated sibling not counted: {row}"
@@ -226,9 +287,23 @@ def test_sweep_mitigates_sibling_in_files_modified(sweep, tmp_path):
     graph, triage, patterns = _ast_graph_with_unrouted_sibling(tmp_path)
     results = _write_result(tmp_path, files_modified=["auth.py", "other.py"])  # sibling amended
     out = tmp_path / "sweep.json"
-    rc = sweep.main(["sweep", "--repo-root", str(tmp_path), "--graph", str(graph),
-                     "--patterns", str(patterns), "--results-dir", str(results),
-                     "--triage-dir", str(triage), "--out", str(out)])
+    rc = sweep.main(
+        [
+            "sweep",
+            "--repo-root",
+            str(tmp_path),
+            "--graph",
+            str(graph),
+            "--patterns",
+            str(patterns),
+            "--results-dir",
+            str(results),
+            "--triage-dir",
+            str(triage),
+            "--out",
+            str(out),
+        ]
+    )
     assert rc == 0
     row = json.loads(out.read_text())["rows"][0]
     assert row["mitigated"] >= 1, f"Path-A sibling not counted as mitigated: {row}"
@@ -242,8 +317,21 @@ def test_sweep_fails_closed_on_missing_graph(sweep, tmp_path):
     _, _, patterns = _ast_graph_with_unrouted_sibling(tmp_path)
     results = _write_result(tmp_path, files_modified=["auth.py"])
     out = tmp_path / "sweep.json"
-    rc = sweep.main(["sweep", "--repo-root", str(tmp_path), "--graph", str(tmp_path / "nonexistent.json"),
-                     "--patterns", str(patterns), "--results-dir", str(results), "--out", str(out)])
+    rc = sweep.main(
+        [
+            "sweep",
+            "--repo-root",
+            str(tmp_path),
+            "--graph",
+            str(tmp_path / "nonexistent.json"),
+            "--patterns",
+            str(patterns),
+            "--results-dir",
+            str(results),
+            "--out",
+            str(out),
+        ]
+    )
     assert rc != 0, "missing graph did not fail closed"
     assert json.loads(out.read_text()).get("sweep_incomplete") is True
 
@@ -300,24 +388,24 @@ def test_sweep_end_to_end(sweep, tmp_path):
 
     patterns_p = tmp_path / "sweep-patterns.md"
     patterns_p.write_text(
-        "```yaml\n"
-        "class: injection\n"
-        "cwes: [89]\n"
-        "patterns:\n"
-        "  - 'execute\\(.*%'\n"
-        "```\n",
+        "```yaml\nclass: injection\ncwes: [89]\npatterns:\n  - 'execute\\(.*%'\n```\n",
         encoding="utf-8",
     )
 
     results_dir = tmp_path / "manifests"
     results_dir.mkdir()
-    (results_dir / "g_result.json").write_text(json.dumps({
-        "vuln_id": "VULN-1",
-        "cwe": "CWE-89",
-        "status": "VERIFIED_FULL",
-        "sink_symbol": "src/a.py:execute",
-        "callers_routed_through_fix": [],
-    }), encoding="utf-8")
+    (results_dir / "g_result.json").write_text(
+        json.dumps(
+            {
+                "vuln_id": "VULN-1",
+                "cwe": "CWE-89",
+                "status": "VERIFIED_FULL",
+                "sink_symbol": "src/a.py:execute",
+                "callers_routed_through_fix": [],
+            }
+        ),
+        encoding="utf-8",
+    )
 
     ns = type("N", (), {})()
     ns.repo_root = str(tmp_path)
@@ -339,13 +427,21 @@ def test_sweep_grep_fallback_marks_annotation(sweep, tmp_path):
     graph_p.write_text('{"backend": "grep"}', encoding="utf-8")
     patterns_p = tmp_path / "p.md"
     patterns_p.write_text(
-        "```yaml\nclass: crypto\npatterns:\n  - 'md5'\n```\n", encoding="utf-8",
+        "```yaml\nclass: crypto\npatterns:\n  - 'md5'\n```\n",
+        encoding="utf-8",
     )
     results = tmp_path / "res"
     results.mkdir()
-    (results / "r_result.json").write_text(json.dumps({
-        "vuln_id": "VULN-2", "cwe": "CWE-327", "status": "VERIFIED_MITIGATION",
-    }), encoding="utf-8")
+    (results / "r_result.json").write_text(
+        json.dumps(
+            {
+                "vuln_id": "VULN-2",
+                "cwe": "CWE-327",
+                "status": "VERIFIED_MITIGATION",
+            }
+        ),
+        encoding="utf-8",
+    )
 
     ns = type("N", (), {})()
     ns.repo_root = str(tmp_path)
@@ -366,14 +462,21 @@ def test_sweep_main_writes_out(sweep, tmp_path, capsys):
     results = tmp_path / "r"
     results.mkdir()
     out = tmp_path / "out.json"
-    rc = sweep.main([
-        "sweep",
-        "--repo-root", str(tmp_path),
-        "--results-dir", str(results),
-        "--graph", str(graph_p),
-        "--patterns", str(patterns_p),
-        "--out", str(out),
-    ])
+    rc = sweep.main(
+        [
+            "sweep",
+            "--repo-root",
+            str(tmp_path),
+            "--results-dir",
+            str(results),
+            "--graph",
+            str(graph_p),
+            "--patterns",
+            str(patterns_p),
+            "--out",
+            str(out),
+        ]
+    )
     assert rc == 0
     payload = json.loads(out.read_text(encoding="utf-8"))
     assert "rows" in payload
@@ -385,6 +488,7 @@ def test_sweep_pass2_survives_permission_denied_dir(sweep, tmp_path):
     graph.build. Fixed by routing through config.safe_walk_files.
     """
     import os
+
     (tmp_path / "app.py").write_text("cursor.execute('SELECT %s' % x)\n", encoding="utf-8")
     locked = tmp_path / "locked"
     locked.mkdir()
@@ -569,7 +673,9 @@ def test_vv_validate_no_table(vv, tmp_path, capsys):
 def test_vv_validate_missing_citation(vv, tmp_path, capsys):
     """Column 3 says yes but no (file:line)."""
     body = tmp_path / "pr.md"
-    table = _VALID_TABLE.replace("yes (src/a.py:3)      | yes (tests/t.py:5)", "yes                   | yes (tests/t.py:5)")
+    table = _VALID_TABLE.replace(
+        "yes (src/a.py:3)      | yes (tests/t.py:5)", "yes                   | yes (tests/t.py:5)"
+    )
     body.write_text(table, encoding="utf-8")
     worktree = tmp_path / "wt"
     worktree.mkdir()
@@ -596,15 +702,25 @@ def test_vv_column7_high_confidence_strict_match(vv, tmp_path, capsys):
 
     sidecars = tmp_path / "graph_context"
     sidecars.mkdir()
-    (sidecars / "VULN-42.json").write_text(json.dumps({
-        "confidence": "high",
-        "callers_of_sink": ["src/z.py:some_other_caller"],  # not in routed → fail
-    }), encoding="utf-8")
+    (sidecars / "VULN-42.json").write_text(
+        json.dumps(
+            {
+                "confidence": "high",
+                "callers_of_sink": ["src/z.py:some_other_caller"],  # not in routed → fail
+            }
+        ),
+        encoding="utf-8",
+    )
 
     result = tmp_path / "r.json"
-    result.write_text(json.dumps({
-        "callers_routed_through_fix": ["src/b.py:call"],
-    }), encoding="utf-8")
+    result.write_text(
+        json.dumps(
+            {
+                "callers_routed_through_fix": ["src/b.py:call"],
+            }
+        ),
+        encoding="utf-8",
+    )
 
     rc = vv.validate(body, wt, sidecars, result)
     assert rc == 1
@@ -628,12 +744,19 @@ def test_vv_column7_empty_callers_does_not_vacuously_pass(vv, tmp_path, capsys):
 
     sidecars = tmp_path / "graph_context"
     sidecars.mkdir(exist_ok=True)
-    (sidecars / "VULN-42.json").write_text(json.dumps({
-        "confidence": "high",
-        "callers_of_sink": [],   # empty — nothing to verify coverage against
-    }), encoding="utf-8")
+    (sidecars / "VULN-42.json").write_text(
+        json.dumps(
+            {
+                "confidence": "high",
+                "callers_of_sink": [],  # empty — nothing to verify coverage against
+            }
+        ),
+        encoding="utf-8",
+    )
     result = tmp_path / "r.json"
-    result.write_text(json.dumps({"callers_routed_through_fix": ["src/b.py:call"]}), encoding="utf-8")
+    result.write_text(
+        json.dumps({"callers_routed_through_fix": ["src/b.py:call"]}), encoding="utf-8"
+    )
 
     rc = vv.validate(body, wt, sidecars, result)
     assert rc == 1, "bare 'yes' with empty callers_of_sink vacuously passed"
@@ -654,14 +777,24 @@ def test_vv_column7_low_confidence_needs_annotation(vv, tmp_path, capsys):
 
     sidecars = tmp_path / "graph_context"
     sidecars.mkdir()
-    (sidecars / "VULN-42.json").write_text(json.dumps({
-        "confidence": "low",
-        "callers_of_sink": ["src/b.py:call"],
-    }), encoding="utf-8")
+    (sidecars / "VULN-42.json").write_text(
+        json.dumps(
+            {
+                "confidence": "low",
+                "callers_of_sink": ["src/b.py:call"],
+            }
+        ),
+        encoding="utf-8",
+    )
     result = tmp_path / "r.json"
-    result.write_text(json.dumps({
-        "callers_routed_through_fix": ["src/b.py:call"],
-    }), encoding="utf-8")
+    result.write_text(
+        json.dumps(
+            {
+                "callers_routed_through_fix": ["src/b.py:call"],
+            }
+        ),
+        encoding="utf-8",
+    )
 
     rc = vv.validate(body, wt, sidecars, result)
     assert rc == 1
@@ -687,10 +820,18 @@ def test_vv_main_smoke(vv, tmp_path):
     result.write_text(
         json.dumps({"callers_routed_through_fix": ["src/b.py:call"]}), encoding="utf-8"
     )
-    rc = vv.main([
-        "vv", str(body), "--worktree", str(tmp_path),
-        "--sidecars-dir", str(sidecars), "--result", str(result),
-    ])
+    rc = vv.main(
+        [
+            "vv",
+            str(body),
+            "--worktree",
+            str(tmp_path),
+            "--sidecars-dir",
+            str(sidecars),
+            "--result",
+            str(result),
+        ]
+    )
     assert rc == 0
 
 
@@ -698,9 +839,9 @@ def test_vv_main_smoke(vv, tmp_path):
 
 
 def test_sweep_ok_helper(sweep):
-    assert sweep._sweep_ok(0, 0) == "yes (n/a)"   # no siblings
-    assert sweep._sweep_ok(3, 0) == "yes"          # all mitigated
-    assert sweep._sweep_ok(3, 2) == "no"           # siblings remain
+    assert sweep._sweep_ok(0, 0) == "yes (n/a)"  # no siblings
+    assert sweep._sweep_ok(3, 0) == "yes"  # all mitigated
+    assert sweep._sweep_ok(3, 2) == "no"  # siblings remain
 
 
 def test_sweep_row_emits_sweep_ok(sweep, tmp_path):
@@ -710,8 +851,15 @@ def test_sweep_row_emits_sweep_ok(sweep, tmp_path):
     results_dir = tmp_path / "results"
     results_dir.mkdir()
     (results_dir / "g_result.json").write_text(
-        json.dumps({"vuln_id": "VULN-001", "cwe": "CWE-89", "file_path": "a.py",
-                    "status": "VERIFIED_FULL", "callers_routed_through_fix": []}),
+        json.dumps(
+            {
+                "vuln_id": "VULN-001",
+                "cwe": "CWE-89",
+                "file_path": "a.py",
+                "status": "VERIFIED_FULL",
+                "callers_routed_through_fix": [],
+            }
+        ),
         encoding="utf-8",
     )
     repo = tmp_path / "repo"
@@ -720,8 +868,10 @@ def test_sweep_row_emits_sweep_ok(sweep, tmp_path):
     graph = tmp_path / "graph.json"
     graph.write_text(json.dumps({"nodes": {}, "edges": [], "backend": "grep"}), encoding="utf-8")
     ns = type("N", (), {})()
-    ns.repo_root = str(repo); ns.results_dir = str(results_dir)
-    ns.graph = str(graph); ns.patterns = str(REPO_ROOT / "references" / "sweep-patterns.md")
+    ns.repo_root = str(repo)
+    ns.results_dir = str(results_dir)
+    ns.graph = str(graph)
+    ns.patterns = str(REPO_ROOT / "references" / "sweep-patterns.md")
     data = sweep.sweep(ns)
     assert data["rows"], "sweep produced no rows"
     for row in data["rows"]:
@@ -735,12 +885,13 @@ def test_sweep_authz_regex_spares_protected_routes(sweep):
     pats = sweep._load_patterns(REPO_ROOT / "references" / "sweep-patterns.md")
     route_pat = pats["authz"][0]
     import re
+
     protected = '@app.route("/x")\n@login_required\ndef view():\n    pass\n'
     unprotected = '@app.route("/y")\ndef open_view():\n    pass\n'
     deep_guard = '@app.route("/z")\n@cache.cached()\n@admin_required\ndef z():\n    pass\n'
-    assert re.search(route_pat, protected) is None      # guarded → not flagged
+    assert re.search(route_pat, protected) is None  # guarded → not flagged
     assert re.search(route_pat, unprotected) is not None  # unguarded → flagged
-    assert re.search(route_pat, deep_guard) is None       # guard deeper in stack → not flagged
+    assert re.search(route_pat, deep_guard) is None  # guard deeper in stack → not flagged
 
 
 def test_pass2_pattern_skips_oversized_files(sweep, tmp_path):
@@ -751,7 +902,6 @@ def test_pass2_pattern_skips_oversized_files(sweep, tmp_path):
     big = repo / "generated.py"
     big.write_text("x = 1  # is_admin or user\n" + ("# pad\n" * 5), encoding="utf-8")
     # Force it over the cap without writing megabytes to disk.
-    import os
     orig = sweep.MAX_SWEEP_FILE_BYTES
     try:
         sweep.MAX_SWEEP_FILE_BYTES = 10  # tiny cap → the file is "oversized"

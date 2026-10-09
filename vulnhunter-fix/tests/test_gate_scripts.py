@@ -3,6 +3,7 @@
 Covers: scripts/check-severity-mask.py, check-scope.py, check-idempotency.py,
 anti-merge-check.py — the mechanical delivery gates.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -11,7 +12,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO_ROOT / "scripts"
@@ -45,6 +45,7 @@ def anti():
 
 
 # ---- check-severity-mask.py ----
+
 
 def test_sev_clean(sev, tmp_path):
     body = tmp_path / "body.md"
@@ -158,6 +159,7 @@ def test_sev_usage_error(sev, capsys):
 
 # ---- check-idempotency.py ----
 
+
 def test_idem_pr_valid(idem, tmp_path):
     body = tmp_path / "pr.md"
     body.write_text("hello\n<!-- vulnfix-key: abcdef0123456789 -->\n", encoding="utf-8")
@@ -180,8 +182,7 @@ def test_idem_issue_valid(idem, tmp_path):
 def test_idem_tracking_valid(idem, tmp_path):
     body = tmp_path / "track.md"
     body.write_text(
-        "<!-- vulnfix-key: abcdef1234567890 -->\n"
-        "<!-- vulnfix-report-id: 2026-06-30-VULN -->\n",
+        "<!-- vulnfix-key: abcdef1234567890 -->\n<!-- vulnfix-report-id: 2026-06-30-VULN -->\n",
         encoding="utf-8",
     )
     assert idem.main(["check-idempotency.py", "--body", str(body), "--kind", "tracking"]) == 0
@@ -202,30 +203,55 @@ def test_idem_missing_file(idem, tmp_path, capsys):
 
 # ---- anti-merge-check.py ----
 
+
 def test_anti_allowed_low_ratio(anti, capsys):
-    assert anti.main([
-        "anti-merge-check.py",
-        "--files-grouped", "2", "--files-split", "5",
-    ]) == 0
+    assert (
+        anti.main(
+            [
+                "anti-merge-check.py",
+                "--files-grouped",
+                "2",
+                "--files-split",
+                "5",
+            ]
+        )
+        == 0
+    )
     payload = json.loads(capsys.readouterr().out)
     assert payload["allowed"] is True
     assert payload["source_ratio"] == 0.4
 
 
 def test_anti_boundary_exactly_threshold(anti, capsys):
-    assert anti.main([
-        "anti-merge-check.py",
-        "--files-grouped", "3", "--files-split", "5",  # 0.6
-    ]) == 0
+    assert (
+        anti.main(
+            [
+                "anti-merge-check.py",
+                "--files-grouped",
+                "3",
+                "--files-split",
+                "5",  # 0.6
+            ]
+        )
+        == 0
+    )
     payload = json.loads(capsys.readouterr().out)
     assert payload["allowed"] is True
 
 
 def test_anti_disallowed_high_ratio(anti, capsys):
-    assert anti.main([
-        "anti-merge-check.py",
-        "--files-grouped", "4", "--files-split", "5",  # 0.8
-    ]) == 0
+    assert (
+        anti.main(
+            [
+                "anti-merge-check.py",
+                "--files-grouped",
+                "4",
+                "--files-split",
+                "5",  # 0.8
+            ]
+        )
+        == 0
+    )
     payload = json.loads(capsys.readouterr().out)
     assert payload["allowed"] is False
     assert "split into individual PRs" in payload["reason"]
@@ -233,32 +259,62 @@ def test_anti_disallowed_high_ratio(anti, capsys):
 
 def test_anti_test_ratio_rescue(anti, capsys):
     """Src ratio fails but test ratio saves the grouping."""
-    assert anti.main([
-        "anti-merge-check.py",
-        "--files-grouped", "4", "--files-split", "5",
-        "--test-files-grouped", "2", "--test-files-split", "10",
-    ]) == 0
+    assert (
+        anti.main(
+            [
+                "anti-merge-check.py",
+                "--files-grouped",
+                "4",
+                "--files-split",
+                "5",
+                "--test-files-grouped",
+                "2",
+                "--test-files-split",
+                "10",
+            ]
+        )
+        == 0
+    )
     payload = json.loads(capsys.readouterr().out)
     assert payload["allowed"] is True
     assert "test ratio" in payload["reason"]
 
 
 def test_anti_both_ratios_fail(anti, capsys):
-    assert anti.main([
-        "anti-merge-check.py",
-        "--files-grouped", "4", "--files-split", "5",
-        "--test-files-grouped", "8", "--test-files-split", "10",
-    ]) == 0
+    assert (
+        anti.main(
+            [
+                "anti-merge-check.py",
+                "--files-grouped",
+                "4",
+                "--files-split",
+                "5",
+                "--test-files-grouped",
+                "8",
+                "--test-files-split",
+                "10",
+            ]
+        )
+        == 0
+    )
     payload = json.loads(capsys.readouterr().out)
     assert payload["allowed"] is False
 
 
 def test_anti_zero_split(anti, capsys):
     """Divide-by-zero guard: when split=0, ratio defaults to 1.0 (disallowed)."""
-    assert anti.main([
-        "anti-merge-check.py",
-        "--files-grouped", "1", "--files-split", "0",
-    ]) == 0
+    assert (
+        anti.main(
+            [
+                "anti-merge-check.py",
+                "--files-grouped",
+                "1",
+                "--files-split",
+                "0",
+            ]
+        )
+        == 0
+    )
     payload = json.loads(capsys.readouterr().out)
     assert payload["source_ratio"] == 1.0
     assert payload["allowed"] is False
@@ -278,24 +334,38 @@ def test_anti_strict_blocks_disallowed(anti, capsys):
     """S6 (12-seg review): the --strict block path (the mode run-gates.py
     actually uses) was never tested — dropping it would keep tests green while
     enforcement stopped. --strict + disallowed grouping must exit 1."""
-    rc = anti.main([
-        "anti-merge-check.py", "--files-grouped", "4", "--files-split", "5", "--strict",
-    ])
+    rc = anti.main(
+        [
+            "anti-merge-check.py",
+            "--files-grouped",
+            "4",
+            "--files-split",
+            "5",
+            "--strict",
+        ]
+    )
     assert rc == 1
     assert json.loads(capsys.readouterr().out)["allowed"] is False
 
 
 def test_anti_strict_allows_efficient_grouping(anti, capsys):
     """Allow-path: --strict with an efficient grouping exits 0."""
-    rc = anti.main([
-        "anti-merge-check.py", "--files-grouped", "2", "--files-split", "5", "--strict",
-    ])
+    rc = anti.main(
+        [
+            "anti-merge-check.py",
+            "--files-grouped",
+            "2",
+            "--files-split",
+            "5",
+            "--strict",
+        ]
+    )
     assert rc == 0
     assert json.loads(capsys.readouterr().out)["allowed"] is True
 
 
-
 # ---- check-scope.py ----
+
 
 def _make_git_repo(root: Path) -> None:
     subprocess.run(["git", "init", "-b", "main", str(root)], check=True, capture_output=True)
@@ -314,7 +384,8 @@ def _commit_all(root: Path, msg: str) -> None:
     subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
     subprocess.run(
         ["git", "-C", str(root), "commit", "-m", msg],
-        check=True, capture_output=True,
+        check=True,
+        capture_output=True,
     )
 
 
@@ -324,7 +395,9 @@ def test_scope_clean(scope, tmp_path):
     _make_git_repo(root)
     _seed(root, "src/foo.py", "print('base')\n")
     _commit_all(root, "base")
-    subprocess.run(["git", "-C", str(root), "checkout", "-b", "vulnfix"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(root), "checkout", "-b", "vulnfix"], check=True, capture_output=True
+    )
     _seed(root, "src/foo.py", "print('fix')\n")
     _commit_all(root, "fix")
 
@@ -343,7 +416,9 @@ def test_scope_violation(scope, tmp_path, capsys):
     _seed(root, "src/foo.py", "a\n")
     _seed(root, "src/bar.py", "b\n")
     _commit_all(root, "base")
-    subprocess.run(["git", "-C", str(root), "checkout", "-b", "vulnfix"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(root), "checkout", "-b", "vulnfix"], check=True, capture_output=True
+    )
     _seed(root, "src/foo.py", "aa\n")
     _seed(root, "src/bar.py", "bb\n")  # bar not allowed
     _commit_all(root, "fix")
@@ -363,7 +438,9 @@ def test_scope_test_file_allowed(scope, tmp_path):
     _make_git_repo(root)
     _seed(root, "src/foo.py", "a\n")
     _commit_all(root, "base")
-    subprocess.run(["git", "-C", str(root), "checkout", "-b", "vulnfix"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(root), "checkout", "-b", "vulnfix"], check=True, capture_output=True
+    )
     _seed(root, "src/foo.py", "aa\n")
     _seed(root, "tests/test_foo.py", "def test(): pass\n")
     _commit_all(root, "fix")

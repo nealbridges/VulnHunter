@@ -15,12 +15,11 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from .schema import Backend, Confidence, Edge, GraphDocument, Node, SCHEMA_VERSION
 from .config import iter_source_files, language_for_path
-
+from .schema import SCHEMA_VERSION, GraphDocument, Node
 
 CALL_PATTERN_LANG = {
     "python": re.compile(r"^\s*def\s+(\w+)\s*\("),
@@ -32,7 +31,7 @@ CALL_PATTERN_LANG = {
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 def build_fallback_graph(root: Path, content_hash: str) -> GraphDocument:
@@ -125,9 +124,23 @@ def grep_callers_of(root: Path, symbol_name: str) -> list[str]:
         # here re.escape'd before being embedded into the regex; `root_abs`
         # is a resolved Path. argv is a list, no shell interpretation.
         proc = subprocess.run(  # nosec B603
-            [grep, "-rIin", "--include=*.py", "--include=*.go", "--include=*.java",
-             "--include=*.ts", "--include=*.tsx", "--include=*.js", "-E", pattern, str(root_abs)],
-            capture_output=True, text=True, check=False, timeout=30,
+            [
+                grep,
+                "-rIin",
+                "--include=*.py",
+                "--include=*.go",
+                "--include=*.java",
+                "--include=*.ts",
+                "--include=*.tsx",
+                "--include=*.js",
+                "-E",
+                pattern,
+                str(root_abs),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
         )
     except (OSError, subprocess.TimeoutExpired):
         return []

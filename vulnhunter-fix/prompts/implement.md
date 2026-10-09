@@ -176,6 +176,7 @@ Use the masked naming pattern per REQ-SEC-002/003: `fix/code-quality-<descriptor
 
 ```python
 from vulnhunter_fix.delivery import compute_idempotency_key, compute_masked_branch_name
+
 key = compute_idempotency_key(location, cwe, root_cause)
 branch_name = compute_masked_branch_name(cwe, key)
 ```
@@ -203,6 +204,7 @@ Requirements:
 Example for SQL injection:
 ```python
 """Exploit demo: VULN-001 SQL Injection in user lookup."""
+
 from app.db import get_user  # import the vulnerable function
 
 malicious_input = "admin' OR '1'='1' --"
@@ -244,8 +246,10 @@ Requirements:
 Example for SQL injection (Python repo with `tests/` directory):
 ```python
 """Security test: VULN-001 — user lookup must use parameterized queries."""
+
 import pytest
 from app.db import get_user  # actual production function
+
 
 def test_sql_special_chars_do_not_alter_query():
     """Input with SQL metacharacters must not affect query logic."""

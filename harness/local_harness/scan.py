@@ -2,15 +2,15 @@
 
 import json
 import os
-import shlex
 import shutil
-import subprocess
 import tempfile
 import threading
 import time
 from collections import namedtuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+
+from vulnhunter_common import hostcmd
 
 from .config import (
     MAX_SCAN_WORKERS,
@@ -130,7 +130,7 @@ def is_rate_limit_failure(log_file_path):
                     return event.get("api_error_status") == 429
             except json.JSONDecodeError:
                 continue
-    except (IOError, OSError):
+    except OSError:
         pass
     return False
 
@@ -156,8 +156,12 @@ def extract_cost_from_log(log_file_path):
                     model_usage = event.get("modelUsage", {})
                     total_input = sum(m.get("inputTokens", 0) for m in model_usage.values())
                     total_output = sum(m.get("outputTokens", 0) for m in model_usage.values())
-                    total_cache_read = sum(m.get("cacheReadInputTokens", 0) for m in model_usage.values())
-                    total_cache_creation = sum(m.get("cacheCreationInputTokens", 0) for m in model_usage.values())
+                    total_cache_read = sum(
+                        m.get("cacheReadInputTokens", 0) for m in model_usage.values()
+                    )
+                    total_cache_creation = sum(
+                        m.get("cacheCreationInputTokens", 0) for m in model_usage.values()
+                    )
                     return {
                         "total_cost_usd": event.get("total_cost_usd", 0),
                         "input_tokens": total_input,
@@ -169,7 +173,7 @@ def extract_cost_from_log(log_file_path):
                     }
             except json.JSONDecodeError:
                 continue
-    except (IOError, OSError):
+    except OSError:
         pass
     return {}
 
@@ -203,8 +207,13 @@ def scan_folder(folder_path, log_file=None, readonly=False):
     print(f"  [{ts()}] [{label}] STARTING scan", flush=True)
     start = time.time()
 
-    host = os.environ.get("VULNHUNT_HOST_CMD", "").strip()
-    if not host:
+    # hostcmd owns the VULNHUNT_HOST_CMD contract (resolution, argv shape
+    # with the prompt file appended LAST, merged-stderr streaming drain).
+    # This call site keeps its own timeout semantics: a Timer kill after
+    # SCAN_TIMEOUT while the caller drains stdout line by line.
+    try:
+        host = hostcmd.resolve()
+    except hostcmd.HostCommandError:
         print(
             f"  [{ts()}] [{label}] Error: VULNHUNT_HOST_CMD is not set. "
             "Set it to this harness's headless one-shot. The prompt file "
@@ -217,17 +226,7 @@ def scan_folder(folder_path, log_file=None, readonly=False):
     prompt_file = os.path.join(prompt_dir, "prompt.txt")
     with open(prompt_file, "w") as handle:
         handle.write(prompt)
-    argv = shlex.split(host) + [prompt_file]
-    proc = subprocess.Popen(
-        argv,
-        stdout=subprocess.PIPE,
-        # Merge stderr into stdout (which we drain below) rather than piping it
-        # to its own buffer no one reads — an unread stderr pipe deadlocks the
-        # child once it writes more than the pipe buffer (~64 KB).
-        stderr=subprocess.STDOUT,
-        text=True,
-        cwd=folder_path,
-    )
+    proc = hostcmd.popen(host, prompt_file, cwd=folder_path)
 
     event_count = 0
     timed_out = False
@@ -250,7 +249,7 @@ def scan_folder(folder_path, log_file=None, readonly=False):
                 log.flush()
 
                 try:
-                    event = json.loads(line)
+                    json.loads(line)
                 except json.JSONDecodeError:
                     continue
 
@@ -274,17 +273,28 @@ def scan_folder(folder_path, log_file=None, readonly=False):
         cost_data = {}
     else:
         cost_data = extract_cost_from_log(log_file)
-        cost_str = f", ${cost_data['total_cost_usd']:.2f}" if cost_data.get("total_cost_usd") else ""
+        cost_str = (
+            f", ${cost_data['total_cost_usd']:.2f}" if cost_data.get("total_cost_usd") else ""
+        )
         tokens_str = ""
         if cost_data.get("input_tokens") or cost_data.get("output_tokens"):
-            total_tokens = (cost_data.get("input_tokens", 0) + cost_data.get("output_tokens", 0)
-                           + cost_data.get("cache_read_tokens", 0) + cost_data.get("cache_creation_tokens", 0))
+            total_tokens = (
+                cost_data.get("input_tokens", 0)
+                + cost_data.get("output_tokens", 0)
+                + cost_data.get("cache_read_tokens", 0)
+                + cost_data.get("cache_creation_tokens", 0)
+            )
             tokens_str = f", {total_tokens:,} tokens"
-        print(f"  [{ts()}] [{label}] FINISHED in {elapsed:.0f}s "
-              f"(exit {proc.returncode}, {event_count} events{cost_str}{tokens_str})", flush=True)
+        print(
+            f"  [{ts()}] [{label}] FINISHED in {elapsed:.0f}s "
+            f"(exit {proc.returncode}, {event_count} events{cost_str}{tokens_str})",
+            flush=True,
+        )
 
     results_dir = find_results_dir(folder_path)
-    return ScanResult(folder_path, label, proc.returncode, event_count, elapsed, results_dir, cost_data)
+    return ScanResult(
+        folder_path, label, proc.returncode, event_count, elapsed, results_dir, cost_data
+    )
 
 
 def scan_folder_with_retry(folder_path, log_filename=None, readonly=False):
@@ -299,8 +309,11 @@ def scan_folder_with_retry(folder_path, log_filename=None, readonly=False):
 
     for attempt in range(SCAN_MAX_RETRIES + 1):
         if attempt > 0:
-            print(f"  [{ts()}] [{label}] RETRY {attempt}/{SCAN_MAX_RETRIES} "
-                  f"after {backoff:.0f}s backoff", flush=True)
+            print(
+                f"  [{ts()}] [{label}] RETRY {attempt}/{SCAN_MAX_RETRIES} "
+                f"after {backoff:.0f}s backoff",
+                flush=True,
+            )
             time.sleep(backoff)
             backoff = min(backoff * SCAN_RETRY_BACKOFF_MULTIPLIER, SCAN_RETRY_MAX_BACKOFF)
 
@@ -314,12 +327,18 @@ def scan_folder_with_retry(folder_path, log_filename=None, readonly=False):
         actual_log = os.path.join(folder_path, log_filename or "benchmark_scan.log")
         if result.returncode != 0 and is_rate_limit_failure(actual_log):
             if attempt < SCAN_MAX_RETRIES:
-                print(f"  [{ts()}] [{label}] 429 rate limit detected "
-                      f"(attempt {attempt + 1}/{SCAN_MAX_RETRIES + 1})", flush=True)
+                print(
+                    f"  [{ts()}] [{label}] 429 rate limit detected "
+                    f"(attempt {attempt + 1}/{SCAN_MAX_RETRIES + 1})",
+                    flush=True,
+                )
                 continue
             else:
-                print(f"  [{ts()}] [{label}] 429 rate limit — "
-                      f"exhausted all {SCAN_MAX_RETRIES} retries", flush=True)
+                print(
+                    f"  [{ts()}] [{label}] 429 rate limit — "
+                    f"exhausted all {SCAN_MAX_RETRIES} retries",
+                    flush=True,
+                )
 
         return result._replace(elapsed=total_elapsed)
 
@@ -335,8 +354,10 @@ def scan_targets(targets, max_workers=None, status_interval=300, log_filename=No
     if max_workers is None:
         max_workers = MAX_SCAN_WORKERS
 
-    print(f"\n[{ts()}] Starting scans for {len(targets)} targets "
-          f"(max {max_workers} parallel)", flush=True)
+    print(
+        f"\n[{ts()}] Starting scans for {len(targets)} targets (max {max_workers} parallel)",
+        flush=True,
+    )
 
     results = []
     completed_keys = set()
@@ -345,7 +366,9 @@ def scan_targets(targets, max_workers=None, status_interval=300, log_filename=No
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_target = {
-            executor.submit(scan_folder_with_retry, t["clone_dir"], log_filename=log_filename, readonly=readonly): t
+            executor.submit(
+                scan_folder_with_retry, t["clone_dir"], log_filename=log_filename, readonly=readonly
+            ): t
             for t in targets
         }
         for future in as_completed(future_to_target):
@@ -356,16 +379,23 @@ def scan_targets(targets, max_workers=None, status_interval=300, log_filename=No
                 completed_keys.add(target["key"])
             except Exception as e:
                 print(f"  [{ts()}] [{target['key']}] EXCEPTION: {e}", flush=True)
-                results.append((target["key"],
-                                ScanResult(target["clone_dir"], target["key"], -1, 0, 0, None, {})))
+                results.append(
+                    (
+                        target["key"],
+                        ScanResult(target["clone_dir"], target["key"], -1, 0, 0, None, {}),
+                    )
+                )
                 completed_keys.add(target["key"])
 
             now = time.time()
             if now - last_status_time >= status_interval:
                 last_status_time = now
                 pending = [t["key"] for t in targets if t["key"] not in completed_keys]
-                print(f"\n  [{ts()}] STATUS: {len(completed_keys)}/{total} complete, "
-                      f"{len(pending)} still running:", flush=True)
+                print(
+                    f"\n  [{ts()}] STATUS: {len(completed_keys)}/{total} complete, "
+                    f"{len(pending)} still running:",
+                    flush=True,
+                )
                 for k in pending:
                     print(f"    - {k}", flush=True)
                 print(flush=True)

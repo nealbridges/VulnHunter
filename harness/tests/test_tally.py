@@ -9,21 +9,48 @@ def _sample_state():
     return {
         "model": "test-model",
         "judgments": {
-            "F1": {"detected": True, "type": "SQLi", "benchmark_file": "a.json",
-                   "repo_name": "repo", "commit_hash": "abcdef123456",
-                   "confidence": "high", "reasoning": "found", "matched_finding_id": "S1"},
-            "F2": {"detected": False, "type": "XSS", "benchmark_file": "a.json",
-                   "repo_name": "repo", "commit_hash": "abcdef123456",
-                   "confidence": "low", "reasoning": "missed it", "matched_finding_id": None},
-            "F3": {"detected": None, "type": "SQLi", "benchmark_file": "b.json",
-                   "repo_name": "repo2", "commit_hash": "",
-                   "confidence": None, "reasoning": "error", "matched_finding_id": None},
+            "F1": {
+                "detected": True,
+                "type": "SQLi",
+                "benchmark_file": "a.json",
+                "repo_name": "repo",
+                "commit_hash": "abcdef123456",
+                "confidence": "high",
+                "reasoning": "found",
+                "matched_finding_id": "S1",
+            },
+            "F2": {
+                "detected": False,
+                "type": "XSS",
+                "benchmark_file": "a.json",
+                "repo_name": "repo",
+                "commit_hash": "abcdef123456",
+                "confidence": "low",
+                "reasoning": "missed it",
+                "matched_finding_id": None,
+            },
+            "F3": {
+                "detected": None,
+                "type": "SQLi",
+                "benchmark_file": "b.json",
+                "repo_name": "repo2",
+                "commit_hash": "",
+                "confidence": None,
+                "reasoning": "error",
+                "matched_finding_id": None,
+            },
         },
         "scan_targets": {
-            "t1": {"status": "scanned", "scan_total_cost_usd": 2.0, "scan_elapsed_s": 120,
-                   "scan_input_tokens": 100, "scan_output_tokens": 50,
-                   "scan_cache_read_tokens": 10, "scan_cache_creation_tokens": 5,
-                   "scan_num_turns": 8},
+            "t1": {
+                "status": "scanned",
+                "scan_total_cost_usd": 2.0,
+                "scan_elapsed_s": 120,
+                "scan_input_tokens": 100,
+                "scan_output_tokens": 50,
+                "scan_cache_read_tokens": 10,
+                "scan_cache_creation_tokens": 5,
+                "scan_num_turns": 8,
+            },
             "t2": {"status": "scan_failed"},
         },
     }
@@ -84,9 +111,11 @@ def test_write_tally_markdown_no_cost(monkeypatch, tmp_path):
     out = tmp_path / "report.md"
     monkeypatch.setattr(tally, "RESULTS_DIR", str(tmp_path))
     monkeypatch.setattr(tally, "TALLY_REPORT", str(out))
-    state = {"model": "m", "judgments": {
-        "F1": {"detected": True, "type": "SQLi", "benchmark_file": "a.json"}},
-        "scan_targets": {}}
+    state = {
+        "model": "m",
+        "judgments": {"F1": {"detected": True, "type": "SQLi", "benchmark_file": "a.json"}},
+        "scan_targets": {},
+    }
     t = tally.generate_tally(state)
     tally.write_tally_markdown(t)
     text = out.read_text()
@@ -104,9 +133,11 @@ def test_print_summary(capsys):
 
 
 def test_print_summary_no_cost_no_miss(capsys):
-    state = {"model": "m", "judgments": {
-        "F1": {"detected": True, "type": "SQLi", "benchmark_file": "a.json"}},
-        "scan_targets": {}}
+    state = {
+        "model": "m",
+        "judgments": {"F1": {"detected": True, "type": "SQLi", "benchmark_file": "a.json"}},
+        "scan_targets": {},
+    }
     t = tally.generate_tally(state)
     tally.print_summary(t)
     out = capsys.readouterr().out

@@ -1,5 +1,6 @@
 """Shared constants for the VulnHunter test harness."""
 
+import contextlib
 import json
 import os
 import tempfile
@@ -67,8 +68,6 @@ def atomic_write_json(path, obj, *, indent=2, sort_keys=False):
             json.dump(obj, f, indent=indent, sort_keys=sort_keys)
         os.replace(tmp, path)
     except BaseException:
-        try:
+        with contextlib.suppress(OSError):
             os.remove(tmp)
-        except OSError:
-            pass
         raise

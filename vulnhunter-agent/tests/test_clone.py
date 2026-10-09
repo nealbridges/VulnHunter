@@ -7,10 +7,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from agent import clone as clone_mod
 from agent.clone import _derive_repo_name, shallow_clone
-
 
 # ---------------------------------------------------------------------------
 # _derive_repo_name
@@ -84,9 +82,7 @@ class TestShallowClone:
         monkeypatch.setattr(
             clone_mod.subprocess, "run", lambda *a, **k: called.append(a) or _FakeCompleted(0)
         )
-        out = shallow_clone(
-            "https://github.com/org/myrepo", tmp_path, re_clone=False
-        )
+        out = shallow_clone("https://github.com/org/myrepo", tmp_path, re_clone=False)
         assert out == target
         assert called == []
 
@@ -98,9 +94,7 @@ class TestShallowClone:
         target = tmp_path / "myrepo"
         target.mkdir()
         (target / "marker.txt").write_text("old content")
-        out = shallow_clone(
-            "https://github.com/org/myrepo", tmp_path, re_clone=True
-        )
+        out = shallow_clone("https://github.com/org/myrepo", tmp_path, re_clone=True)
         assert out == target
         assert len(captured_runs) == 1
         # The marker file from the previous "clone" must be gone.
@@ -109,9 +103,7 @@ class TestShallowClone:
     def test_subprocess_returns_zero_returns_path(
         self, tmp_path: Path, captured_runs: list[dict[str, Any]]
     ) -> None:
-        out = shallow_clone(
-            "https://github.com/org/myrepo", tmp_path
-        )
+        out = shallow_clone("https://github.com/org/myrepo", tmp_path)
         assert out == tmp_path / "myrepo"
         assert len(captured_runs) == 1
 

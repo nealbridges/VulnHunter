@@ -67,7 +67,7 @@ def _github_default_headers() -> dict[str, str]:
 
 def _emit_finding_opened(
     *,
-    audit_writer: "_audit.AuditWriter | None",
+    audit_writer: _audit.AuditWriter | None,
     config: AgentConfig,
     finding: Finding,
     url: str,
@@ -118,9 +118,7 @@ def _emit_finding_opened(
                 proposed_fix_strategy=finding.fix_strategy,
                 proposed_fix_why=finding.severity_rationale,
                 poc_file=_audit_extract.relativize(finding.poc_path, results_dir),
-                exploit_test_file=_audit_extract.relativize(
-                    finding.exploit_test_path, results_dir
-                ),
+                exploit_test_file=_audit_extract.relativize(finding.exploit_test_path, results_dir),
                 github_issue_url=url,
                 # Transition, not initial open — the initial open was
                 # already emitted from __main__ right after the scan.
@@ -243,8 +241,7 @@ async def _ensure_label(
         return
     if get.status_code != 404:
         raise IssuesStageError(
-            f"checking label {label!r} on {owner}/{name}: "
-            f"{get.status_code} {get.text[:200]}"
+            f"checking label {label!r} on {owner}/{name}: {get.status_code} {get.text[:200]}"
         )
     resolved_color = color or _LABEL_COLORS.get(label, _DEFAULT_LABEL_COLOR)
     body = {
@@ -252,9 +249,7 @@ async def _ensure_label(
         "color": resolved_color,
         "description": description,
     }
-    post = await client.post(
-        f"{api}/repos/{owner}/{name}/labels", json=body
-    )
+    post = await client.post(f"{api}/repos/{owner}/{name}/labels", json=body)
     if post.status_code in (200, 201):
         logger.info("Created label %r on %s/%s", label, owner, name)
         return
@@ -264,9 +259,7 @@ async def _ensure_label(
     # validation failure (e.g. invalid label name or color) before we
     # blow up the whole stage.
     if post.status_code == 422:
-        recheck = await client.get(
-            f"{api}/repos/{owner}/{name}/labels/{encoded}"
-        )
+        recheck = await client.get(f"{api}/repos/{owner}/{name}/labels/{encoded}")
         if recheck.status_code == 200:
             logger.debug(
                 "Label %r already exists on %s/%s (created concurrently)",
@@ -276,8 +269,7 @@ async def _ensure_label(
             )
             return
     raise IssuesStageError(
-        f"creating label {label!r} on {owner}/{name}: "
-        f"{post.status_code} {post.text[:200]}"
+        f"creating label {label!r} on {owner}/{name}: {post.status_code} {post.text[:200]}"
     )
 
 
@@ -288,9 +280,7 @@ async def _ensure_all_labels(
     verify: str | bool,
 ) -> None:
     if not get_github_token("scan", config):
-        raise IssuesStageError(
-            "scan_token is required to ensure labels and post issues."
-        )
+        raise IssuesStageError("scan_token is required to ensure labels and post issues.")
     owner, name = parse_owner_repo(target_repo_url)
     api = api_base(config.github.host)
     timeout = config.issues.request_timeout_seconds
@@ -301,9 +291,7 @@ async def _ensure_all_labels(
         auth=BrokerTokenAuth("scan", config),
     ) as client:
         for label in config.issues.labels:
-            await _ensure_label(
-                client, api=api, owner=owner, name=name, label=label
-            )
+            await _ensure_label(client, api=api, owner=owner, name=name, label=label)
 
 
 async def _create_issue(
@@ -332,15 +320,11 @@ async def _create_issue(
     last_status = 0
     last_text = ""
     for attempt in range(2):
-        resp = await client.post(
-            f"{api}/repos/{owner}/{name}/issues", json=payload
-        )
+        resp = await client.post(f"{api}/repos/{owner}/{name}/issues", json=payload)
         if resp.status_code == 201:
             html_url = resp.json().get("html_url")
             if not html_url:
-                raise IssuePostError(
-                    f"GitHub returned 201 but no html_url for {title!r}"
-                )
+                raise IssuePostError(f"GitHub returned 201 but no html_url for {title!r}")
             return str(html_url)
         last_status = resp.status_code
         last_text = resp.text[:300]
@@ -378,9 +362,7 @@ async def _close_issue(
     last_status = 0
     last_text = ""
     for attempt in range(2):
-        resp = await client.patch(
-            f"{api}/repos/{owner}/{name}/issues/{number}", json=payload
-        )
+        resp = await client.patch(f"{api}/repos/{owner}/{name}/issues/{number}", json=payload)
         if resp.status_code in (200, 201):
             return
         last_status = resp.status_code
@@ -396,9 +378,7 @@ async def _close_issue(
                     _RETRY_BACKOFF_SECONDS,
                 )
             await asyncio.sleep(_RETRY_BACKOFF_SECONDS)
-    raise IssuePostError(
-        f"PATCH close issue #{number} failed: {last_status} {last_text}"
-    )
+    raise IssuePostError(f"PATCH close issue #{number} failed: {last_status} {last_text}")
 
 
 async def _post_issue_comment(
@@ -444,9 +424,7 @@ async def _post_issue_comment(
                     _RETRY_BACKOFF_SECONDS,
                 )
             await asyncio.sleep(_RETRY_BACKOFF_SECONDS)
-    raise IssuePostError(
-        f"POST comment on #{number} failed: {last_status} {last_text}"
-    )
+    raise IssuePostError(f"POST comment on #{number} failed: {last_status} {last_text}")
 
 
 def _iso_from_results_timestamp(results_dir_name: str) -> str:
@@ -459,9 +437,7 @@ def _iso_from_results_timestamp(results_dir_name: str) -> str:
     if not ts or ts == "unknown":
         return ""
     try:
-        parsed = _dt.datetime.strptime(ts, "%Y-%m-%d-%H%M%S").replace(
-            tzinfo=_dt.timezone.utc
-        )
+        parsed = _dt.datetime.strptime(ts, "%Y-%m-%d-%H%M%S").replace(tzinfo=_dt.UTC)
     except ValueError:
         return ""
     return parsed.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -513,7 +489,7 @@ def _build_clean_scan_ctx(
 
 def _emit_clean_scan_notified(
     *,
-    audit_writer: "_audit.AuditWriter | None",
+    audit_writer: _audit.AuditWriter | None,
     config: AgentConfig,
     report_id: str,
     repo_slug: str,
@@ -555,7 +531,7 @@ async def _post_clean_scan_notice(
     target_repo_url: str,
     config: AgentConfig,
     commit_sha: str,
-    audit_writer: "_audit.AuditWriter | None",
+    audit_writer: _audit.AuditWriter | None,
     audit_report_id: str,
     audit_repo_slug: str,
 ) -> CleanScanOutcome:
@@ -592,9 +568,7 @@ async def _post_clean_scan_notice(
         # anticipate — is allowed to fail the run. logger.exception
         # preserves the traceback for post-mortem while we return a
         # tidy "skipped" outcome.
-        logger.exception(
-            "Unexpected clean-scan notice failure; downgrading to skipped"
-        )
+        logger.exception("Unexpected clean-scan notice failure; downgrading to skipped")
         return CleanScanOutcome(
             url="",
             mode="skipped",
@@ -610,7 +584,7 @@ async def _post_clean_scan_notice_inner(
     target_repo_url: str,
     config: AgentConfig,
     commit_sha: str,
-    audit_writer: "_audit.AuditWriter | None",
+    audit_writer: _audit.AuditWriter | None,
     audit_report_id: str,
     audit_repo_slug: str,
 ) -> CleanScanOutcome:
@@ -631,9 +605,7 @@ async def _post_clean_scan_notice_inner(
     # (which is parsed from the results-dir name at second granularity).
     # The audit stream uses ms precision via event_time_now(); this
     # timestamp is only for the receipt body's Scan-completed cell.
-    scan_completed_at = _dt.datetime.now(_dt.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%SZ"
-    )
+    scan_completed_at = _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     ctx = _build_clean_scan_ctx(
         results_dir=results_dir,
         report_url=report_url,
@@ -703,16 +675,12 @@ async def _post_clean_scan_notice_inner(
             # (deterministic tiebreak) rather than creating a duplicate.
             target = min(opens, key=lambda o: o.number)
             if len(opens) > 1:
-                strays = sorted(
-                    o.number for o in opens if o.number != target.number
-                )
+                strays = sorted(o.number for o in opens if o.number != target.number)
                 # Cap the log line so a pathological repo with dozens
                 # of strays doesn't produce an unreadable WARN.
                 shown = strays[:_MAX_STRAYS_IN_LOG]
                 overflow = len(strays) - len(shown)
-                stray_repr = (
-                    f"{shown} (+{overflow} more)" if overflow else str(shown)
-                )
+                stray_repr = f"{shown} (+{overflow} more)" if overflow else str(shown)
                 logger.warning(
                     "%d open clean-scan issues on %s/%s (expected 0 or 1); "
                     "commenting on the oldest (#%d). Other open issues: %s",
@@ -848,9 +816,7 @@ def _issue_number_from_url(html_url: str) -> int:
     try:
         return int(tail)
     except ValueError as exc:
-        raise IssuePostError(
-            f"cannot parse issue number from html_url {html_url!r}"
-        ) from exc
+        raise IssuePostError(f"cannot parse issue number from html_url {html_url!r}") from exc
 
 
 async def post_issues(
@@ -860,7 +826,7 @@ async def post_issues(
     target_repo_url: str,
     config: AgentConfig,
     token_manager: TokenProvider,
-    audit_writer: "_audit.AuditWriter | None" = None,
+    audit_writer: _audit.AuditWriter | None = None,
     audit_report_id: str = "",
     audit_repo_slug: str = "",
     audit_repo_properties: RepoProperties | None = None,
@@ -884,7 +850,10 @@ async def post_issues(
 
     if extracted is None:
         extracted = await issues_extract.extract_findings(
-            results_dir, config, token_manager, cost_tracker=summary.cost,
+            results_dir,
+            config,
+            token_manager,
+            cost_tracker=summary.cost,
             audit_writer=audit_writer,
         )
     if not extracted.findings:
@@ -907,9 +876,7 @@ async def post_issues(
             )
         return summary
 
-    await _ensure_all_labels(
-        target_repo_url=target_repo_url, config=config, verify=verify
-    )
+    await _ensure_all_labels(target_repo_url=target_repo_url, config=config, verify=verify)
 
     open_issues = issues_fetch.fetch_open_issues_with_label(
         target_repo_url,
@@ -925,9 +892,7 @@ async def post_issues(
         cost_tracker=summary.cost,
         audit_writer=audit_writer,
     )
-    duplicate_map = {
-        d.finding_id: d for d in decisions if d.matched_issues
-    }
+    duplicate_map = {d.finding_id: d for d in decisions if d.matched_issues}
 
     owner, name = parse_owner_repo(target_repo_url)
     api = api_base(config.github.host)
@@ -974,9 +939,7 @@ async def post_issues(
                     labels=config.issues.labels,
                     log_retries=config.logging.retries,
                 )
-                summary.posted.append(
-                    PostedIssue(finding_id=f.id, title=title, url=url)
-                )
+                summary.posted.append(PostedIssue(finding_id=f.id, title=title, url=url))
                 logger.info("Posted %s → %s", f.id, url)
                 _emit_finding_opened(
                     audit_writer=audit_writer,
@@ -989,9 +952,7 @@ async def post_issues(
                     repo_properties=audit_repo_properties,
                 )
             except IssuePostError as exc:
-                summary.failed.append(
-                    FailedIssue(finding_id=f.id, title=title, error=str(exc))
-                )
+                summary.failed.append(FailedIssue(finding_id=f.id, title=title, error=str(exc)))
                 logger.warning("Failed to post %s: %s", f.id, exc)
 
     return summary

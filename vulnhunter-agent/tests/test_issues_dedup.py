@@ -5,11 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from agent import issues_dedup as dedup_mod
 from agent.issues_dedup import dedup
 from agent.issues_extract import Finding
 from agent.issues_fetch import OpenIssue
+
 from tests._helpers import FakeTokenManager as _FakeTokenManager
 
 
@@ -37,9 +37,7 @@ def _finding(fid: str, *, key: str = "", **overrides: object) -> Finding:
 
 
 def _issue(n: int, body: str = "") -> OpenIssue:
-    return OpenIssue(
-        number=n, title=f"issue {n}", body=body, html_url=f"u/{n}", labels=[]
-    )
+    return OpenIssue(number=n, title=f"issue {n}", body=body, html_url=f"u/{n}", labels=[])
 
 
 def _populated_config(populated_agent_config: Any) -> Any:
@@ -54,9 +52,7 @@ class TestKeyFastPath:
         async def _empty(**kw: Any) -> Any:
             return {"duplicates": []}
 
-        monkeypatch.setattr(
-            dedup_mod._llm, "call_json_with_fallback", _empty
-        )
+        monkeypatch.setattr(dedup_mod._llm, "call_json_with_fallback", _empty)
         f1 = _finding("VULN-001", key="aaa")
         f2 = _finding("VULN-002", key="bbb")
         issues = [_issue(42, body="text\n<!-- vulnfix-key: aaa -->\n")]

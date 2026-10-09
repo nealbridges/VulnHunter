@@ -17,7 +17,6 @@ import argparse
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 
 def _looks_like_ref(value: str) -> bool:
@@ -37,10 +36,16 @@ def check(args) -> int:
         )
         return 1
     if not _looks_like_ref(args.branch):
-        print(f"error: --branch value looks like a flag or malformed ref: {args.branch!r}", file=sys.stderr)
+        print(
+            f"error: --branch value looks like a flag or malformed ref: {args.branch!r}",
+            file=sys.stderr,
+        )
         return 2
     if not _looks_like_ref(base_ref):
-        print(f"error: --base-ref value looks like a flag or malformed ref: {base_ref!r}", file=sys.stderr)
+        print(
+            f"error: --base-ref value looks like a flag or malformed ref: {base_ref!r}",
+            file=sys.stderr,
+        )
         return 2
     git = shutil.which("git")
     if git is None:
@@ -53,9 +58,11 @@ def check(args) -> int:
         # so files main picked up after the branch forked aren't counted as
         # scope violations (12-seg review S5).
         result = subprocess.run(  # nosec B603
-            [git, "-C", args.repo_root, "diff", "--name-only",
-             f"{base_ref}...{args.branch}", "--"],
-            capture_output=True, text=True, check=True, timeout=60,
+            [git, "-C", args.repo_root, "diff", "--name-only", f"{base_ref}...{args.branch}", "--"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=60,
         )
     except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as exc:
         print(f"error: git diff failed: {exc}", file=sys.stderr)
@@ -83,8 +90,11 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="Gate 3 scope (REQ-GAT-004).")
     ap.add_argument("--repo-root", required=True)
     ap.add_argument("--branch", required=True)
-    ap.add_argument("--base-ref", default="main",
-                    help="Base ref for the three-dot merge-base diff (default: main).")
+    ap.add_argument(
+        "--base-ref",
+        default="main",
+        help="Base ref for the three-dot merge-base diff (default: main).",
+    )
     ap.add_argument("--files-modified", nargs="*", default=[], required=True)
     ap.add_argument("--test-file", default=None)
     args = ap.parse_args(argv[1:])

@@ -120,9 +120,7 @@ def build_claude_settings(
     scan_id: str = "",
 ) -> str:
     """Return a JSON string matching Claude Code's settings file schema."""
-    autocompact_pct = resolve_autocompact_pct(
-        model, cfg.scan.autocompact_pct_override
-    )
+    autocompact_pct = resolve_autocompact_pct(model, cfg.scan.autocompact_pct_override)
     no_proxy = cfg.scan.no_proxy
     env: dict[str, str] = {
         "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": str(autocompact_pct),
@@ -184,14 +182,10 @@ def build_claude_settings(
     # progress before the CLI returns a "Request timed out" tool result
     # to the orchestrator. Set 0 in config to fall through to the CLI default.
     if cfg.scan.async_agent_stall_timeout_ms > 0:
-        env["CLAUDE_ASYNC_AGENT_STALL_TIMEOUT_MS"] = str(
-            cfg.scan.async_agent_stall_timeout_ms
-        )
+        env["CLAUDE_ASYNC_AGENT_STALL_TIMEOUT_MS"] = str(cfg.scan.async_agent_stall_timeout_ms)
 
     if cfg.telemetry.enabled and cfg.telemetry.otel_exporter_otlp_endpoint:
-        resource_attributes = (
-            cfg.telemetry.resource_attributes or _DEFAULT_OTEL_RESOURCE_ATTRIBUTES
-        )
+        resource_attributes = cfg.telemetry.resource_attributes or _DEFAULT_OTEL_RESOURCE_ATTRIBUTES
         if scan_id:
             resource_attributes = f"{resource_attributes},scan.id={scan_id}"
         env.update(

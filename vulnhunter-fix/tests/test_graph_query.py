@@ -8,12 +8,10 @@ AST-preferred path and the grep fallback.
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -29,7 +27,6 @@ from vulnhunter_fix.graph.config import (
 )
 from vulnhunter_fix.graph.fallback import _enclosing_symbol, build_fallback_graph, grep_callers_of
 from vulnhunter_fix.graph.schema import SCHEMA_VERSION, Edge, GraphDocument, Node
-
 
 PY_FIXTURE = REPO_ROOT / "tests" / "graph_fixtures" / "python"
 GO_FIXTURE = REPO_ROOT / "tests" / "graph_fixtures" / "go"
@@ -115,8 +112,16 @@ def test_schema_from_dict_accepts_legacy_edge_keys():
         "confidence": "low",
         "content_hash": "",
         "root_dir": "",
-        "nodes": {"a:x": {"kind": "function", "name": "x", "file": "a", "line": 1,
-                          "qualified_name": "a:x", "language": "python"}},
+        "nodes": {
+            "a:x": {
+                "kind": "function",
+                "name": "x",
+                "file": "a",
+                "line": 1,
+                "qualified_name": "a:x",
+                "language": "python",
+            }
+        },
         "edges": [{"src": "a:x", "dst": "b:y", "kind": "calls"}],
     }
     doc = GraphDocument.from_dict(data)
@@ -147,6 +152,7 @@ def test_content_hash_is_order_independent(tmp_path, monkeypatch):
     different filesystems -> spurious cache invalidation, defeating REQ-GRA-005.
     The hash must not depend on file iteration order."""
     import vulnhunter_fix.graph.build as buildmod
+
     (tmp_path / "a.py").write_text("x = 1\n")
     (tmp_path / "b.py").write_text("y = 2\n")
     a, b = tmp_path / "a.py", tmp_path / "b.py"
@@ -205,14 +211,35 @@ def test_normalizer_skips_non_code_nodes():
     polluting god_nodes/counts and risking prose in graph.json. Non-code kinds
     must be skipped; code nodes kept."""
     from vulnhunter_fix.graph.build import _iter_normalized_graphify_entities
-    raw = {"nodes": [
-        {"id": "a_foo", "label": "foo()", "source_file": "a.py",
-         "source_location": "L1", "kind": "function", "name": "foo"},
-        {"id": "a_doc", "label": "module docstring", "source_file": "a.py",
-         "source_location": "L1", "kind": "docstring", "name": "<docstring>"},
-        {"id": "a_cmt", "label": "comment", "source_file": "a.py",
-         "source_location": "L2", "kind": "comment", "name": "<comment>"},
-    ]}
+
+    raw = {
+        "nodes": [
+            {
+                "id": "a_foo",
+                "label": "foo()",
+                "source_file": "a.py",
+                "source_location": "L1",
+                "kind": "function",
+                "name": "foo",
+            },
+            {
+                "id": "a_doc",
+                "label": "module docstring",
+                "source_file": "a.py",
+                "source_location": "L1",
+                "kind": "docstring",
+                "name": "<docstring>",
+            },
+            {
+                "id": "a_cmt",
+                "label": "comment",
+                "source_file": "a.py",
+                "source_location": "L2",
+                "kind": "comment",
+                "name": "<comment>",
+            },
+        ]
+    }
     nodes = list(_iter_normalized_graphify_entities(raw, REPO_ROOT))
     names = {n.name for n in nodes}
     assert "foo" in names, "code node was dropped"
@@ -289,14 +316,42 @@ def sample_doc():
         content_hash="",
         root_dir=str(REPO_ROOT),
         nodes={
-            "a.py:foo": Node(id="a.py:foo", kind="function", name="foo", file="a.py",
-                             line=1, qualified_name="a.py:foo", language="python"),
-            "a.py:bar": Node(id="a.py:bar", kind="function", name="bar", file="a.py",
-                             line=5, qualified_name="a.py:bar", language="python"),
-            "b.py:baz": Node(id="b.py:baz", kind="function", name="baz", file="b.py",
-                             line=1, qualified_name="b.py:baz", language="python"),
-            "b.py:qux": Node(id="b.py:qux", kind="function", name="qux", file="b.py",
-                             line=5, qualified_name="b.py:qux", language="python"),
+            "a.py:foo": Node(
+                id="a.py:foo",
+                kind="function",
+                name="foo",
+                file="a.py",
+                line=1,
+                qualified_name="a.py:foo",
+                language="python",
+            ),
+            "a.py:bar": Node(
+                id="a.py:bar",
+                kind="function",
+                name="bar",
+                file="a.py",
+                line=5,
+                qualified_name="a.py:bar",
+                language="python",
+            ),
+            "b.py:baz": Node(
+                id="b.py:baz",
+                kind="function",
+                name="baz",
+                file="b.py",
+                line=1,
+                qualified_name="b.py:baz",
+                language="python",
+            ),
+            "b.py:qux": Node(
+                id="b.py:qux",
+                kind="function",
+                name="qux",
+                file="b.py",
+                line=5,
+                qualified_name="b.py:qux",
+                language="python",
+            ),
         },
         edges=[
             Edge(src="a.py:foo", dst="a.py:bar", kind="calls"),
@@ -341,7 +396,7 @@ def test_query_blast_radius_accepts_file_symbol_form(sample_doc):
     by_line = q.blast_radius("b.py:12")["reachable_files"]
     assert by_symbol == bare
     assert by_line == bare
-    assert "a.py" in by_symbol   # non-empty — the bug produced []
+    assert "a.py" in by_symbol  # non-empty — the bug produced []
 
 
 def test_query_god_nodes_ranks_by_degree(sample_doc):
@@ -380,18 +435,33 @@ def test_query_callers_of_matches_qualified_name_when_node_id_differs():
     confidence:high — a fix-masking false negative that feeds 'no vulnerable
     callers' → superset → FULL. Must also match node.qualified_name."""
     doc = GraphDocument(
-        schema_version=SCHEMA_VERSION, graphify_version="0.8.51", generated_at="",
-        backend="ast", confidence="high", content_hash="", root_dir=str(REPO_ROOT),
+        schema_version=SCHEMA_VERSION,
+        graphify_version="0.8.51",
+        generated_at="",
+        backend="ast",
+        confidence="high",
+        content_hash="",
+        root_dir=str(REPO_ROOT),
         nodes={
             # node id != qualified_name (the real-graphify shape)
             "auth.mod:check_password": Node(
-                id="auth.mod:check_password", kind="function", name="check_password",
-                file="sample_auth.py", line=5, qualified_name="sample_auth.py:check_password",
-                language="python"),
+                id="auth.mod:check_password",
+                kind="function",
+                name="check_password",
+                file="sample_auth.py",
+                line=5,
+                qualified_name="sample_auth.py:check_password",
+                language="python",
+            ),
             "auth.mod:authenticate": Node(
-                id="auth.mod:authenticate", kind="function", name="authenticate",
-                file="sample_auth.py", line=1, qualified_name="sample_auth.py:authenticate",
-                language="python"),
+                id="auth.mod:authenticate",
+                kind="function",
+                name="authenticate",
+                file="sample_auth.py",
+                line=1,
+                qualified_name="sample_auth.py:authenticate",
+                language="python",
+            ),
         },
         edges=[Edge(src="auth.mod:authenticate", dst="auth.mod:check_password", kind="calls")],
     )

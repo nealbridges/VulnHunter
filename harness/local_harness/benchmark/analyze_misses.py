@@ -18,7 +18,6 @@ import glob
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -28,8 +27,19 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+# Repo root, for the shared contract layer (vulnhunter_common) — installed
+# as c1-vulnhunter-common in CI; the path insert keeps in-place runs working.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
-from local_harness.config import BENCHMARK_DIR, MODEL, PHASES_DIR, RESULTS_DIR, STATE_FILE, atomic_write_json
+from local_harness.config import (
+    BENCHMARK_DIR,
+    MODEL,
+    PHASES_DIR,
+    RESULTS_DIR,
+    STATE_FILE,
+    atomic_write_json,
+)
+from vulnhunter_common import hostcmd
 
 # Phase prompt basenames, resolved against config.PHASES_DIR (which honors
 # VULNHUNT_SKILLS_DIR and falls back to the vulnhunt/ copy in this repo).
@@ -76,9 +86,38 @@ Output ONLY valid JSON:
 
 
 _CODE_EXTS = {
-    "py", "js", "ts", "jsx", "tsx", "java", "go", "rb", "php", "c", "cpp", "cc",
-    "h", "hpp", "cs", "kt", "kts", "scala", "rs", "swift", "m", "mm", "sh",
-    "json", "yaml", "yml", "xml", "html", "sql", "tf", "gradle", "properties",
+    "py",
+    "js",
+    "ts",
+    "jsx",
+    "tsx",
+    "java",
+    "go",
+    "rb",
+    "php",
+    "c",
+    "cpp",
+    "cc",
+    "h",
+    "hpp",
+    "cs",
+    "kt",
+    "kts",
+    "scala",
+    "rs",
+    "swift",
+    "m",
+    "mm",
+    "sh",
+    "json",
+    "yaml",
+    "yml",
+    "xml",
+    "html",
+    "sql",
+    "tf",
+    "gradle",
+    "properties",
 }
 
 
@@ -90,24 +129,26 @@ def extract_identifiers(description):
     # directory separator or ends in a known code/config extension. Without
     # this filter, prose like "e.g." or version strings like "1.2.3" get
     # mistaken for files and produce spurious loss-phase evidence.
-    for candidate in re.findall(r'[\w/.-]+\.\w{1,4}', description):
+    for candidate in re.findall(r"[\w/.-]+\.\w{1,4}", description):
         ext = candidate.rsplit(".", 1)[-1].lower()
         if "/" in candidate or ext in _CODE_EXTS:
             identifiers.append(candidate)
 
-    function_names = re.findall(r'(?:function|handler|endpoint|method)\s+(\w+)|(\w+)\(\)', description)
+    function_names = re.findall(
+        r"(?:function|handler|endpoint|method)\s+(\w+)|(\w+)\(\)", description
+    )
     for match in function_names:
         name = match[0] or match[1]
         if name and len(name) > 3:
             identifiers.append(name)
 
-    route_patterns = re.findall(r'(?:GET|POST|PUT|DELETE|PATCH)\s+(/[\w/{}\-]+)', description)
+    route_patterns = re.findall(r"(?:GET|POST|PUT|DELETE|PATCH)\s+(/[\w/{}\-]+)", description)
     identifiers.extend(route_patterns)
 
-    api_patterns = re.findall(r'/api/[\w/\-{}]+', description)
+    api_patterns = re.findall(r"/api/[\w/\-{}]+", description)
     identifiers.extend(api_patterns)
 
-    camel_names = re.findall(r'\b[a-z]+(?:[A-Z][a-z]+){1,}\b', description)
+    camel_names = re.findall(r"\b[a-z]+(?:[A-Z][a-z]+){1,}\b", description)
     identifiers.extend([n for n in camel_names if len(n) > 5])
 
     return list(set(identifiers))
@@ -118,7 +159,7 @@ def search_file_for_identifiers(filepath, identifiers, context_lines=3):
     if not os.path.isfile(filepath):
         return []
 
-    with open(filepath, "r", errors="replace") as f:
+    with open(filepath, errors="replace") as f:
         lines = f.readlines()
 
     matches = []
@@ -128,20 +169,27 @@ def search_file_for_identifiers(filepath, identifiers, context_lines=3):
         # substrings; path/route identifiers still use substring matching.
         if re.fullmatch(r"\w+", ident):
             pattern = re.compile(r"\b" + re.escape(ident) + r"\b", re.IGNORECASE)
-            matcher = lambda line, p=pattern: p.search(line) is not None
+
+            def matcher(line, p=pattern):
+                return p.search(line) is not None
         else:
-            matcher = lambda line, i=ident: i.lower() in line.lower()
+
+            def matcher(line, i=ident):
+                return i.lower() in line.lower()
+
         for i, line in enumerate(lines):
             if matcher(line):
                 start = max(0, i - context_lines)
                 end = min(len(lines), i + context_lines + 1)
                 context = "".join(lines[start:end])
-                matches.append({
-                    "identifier": ident,
-                    "file": filepath,
-                    "line": i + 1,
-                    "context": context.strip(),
-                })
+                matches.append(
+                    {
+                        "identifier": ident,
+                        "file": filepath,
+                        "line": i + 1,
+                        "context": context.strip(),
+                    }
+                )
                 break
     return matches
 
@@ -159,7 +207,7 @@ def locate_loss_phase(results_dir, finding):
     phase2b_path = os.path.join(results_dir, "phase2b_output.md")
     phase2b_matches = search_file_for_identifiers(phase2b_path, identifiers)
     if phase2b_matches:
-        with open(phase2b_path, "r", errors="replace") as f:
+        with open(phase2b_path, errors="replace") as f:
             phase2b_content = f.read()
         reject_patterns = ["REJECTED", "FALSE POSITIVE", "false positive", "rejected"]
         for pattern in reject_patterns:
@@ -194,7 +242,7 @@ def locate_loss_phase(results_dir, finding):
     class_agent = _type_to_class(finding_type)
 
     # Gather what phase2 results exist for context
-    evidence = f"Input enumerated in phase1 but not traced to a candidate in phase2. "
+    evidence = "Input enumerated in phase1 but not traced to a candidate in phase2. "
     evidence += f"Expected class agent: {class_agent}. "
     if phase1_matches:
         evidence += f"Phase1 match: {phase1_matches[0]['context'][:200]}"
@@ -218,13 +266,24 @@ def _infer_class_from_filename(filename):
 def _type_to_class(finding_type):
     """Map vulnerability type to the expected class agent."""
     type_map = {
-        "SQLi": "inj", "PathTraversal": "inj", "SSRF": "inj",
-        "CommandInjection": "inj", "XXE": "inj", "CodeEval": "inj",
-        "XSS": "inj", "OpenRedirect": "inj",
-        "CSRF": "nav", "IDOR": "nav", "AuthBypass": "nav",
-        "MissingAuth": "nav", "AuditSpoofing": "nav",
-        "IPSpoofing": "nav", "MassAssignment": "nav",
-        "RaceCondition": "log", "DoS": "log", "CryptoWeakness": "log",
+        "SQLi": "inj",
+        "PathTraversal": "inj",
+        "SSRF": "inj",
+        "CommandInjection": "inj",
+        "XXE": "inj",
+        "CodeEval": "inj",
+        "XSS": "inj",
+        "OpenRedirect": "inj",
+        "CSRF": "nav",
+        "IDOR": "nav",
+        "AuthBypass": "nav",
+        "MissingAuth": "nav",
+        "AuditSpoofing": "nav",
+        "IPSpoofing": "nav",
+        "MassAssignment": "nav",
+        "RaceCondition": "log",
+        "DoS": "log",
+        "CryptoWeakness": "log",
     }
     return type_map.get(finding_type, "nav")
 
@@ -242,18 +301,18 @@ def build_diagnostic_prompt(finding, phase_key, evidence, results_dir, repo_dir)
     prompt_paths = resolve_prompt_paths(phase_key)
     scan_log_path = os.path.join(repo_dir, "benchmark_scan.log")
 
-    return f"""Finding {finding['finding_id']} was NOT detected. Figure out where the scanner went amiss.
+    return f"""Finding {finding["finding_id"]} was NOT detected. Figure out where the scanner went amiss.
 
 ## Ground Truth Finding
-- **ID**: {finding['finding_id']}
-- **Type**: {finding['type']}
-- **Description**: {finding['description']}
+- **ID**: {finding["finding_id"]}
+- **Type**: {finding["type"]}
+- **Description**: {finding["description"]}
 
 ## Investigation Paths
 - Ground truth file: {gt_path}
 - Scanner results directory: {results_dir}/
 - Scan log (JSONL, use grep): {scan_log_path}
-- Relevant prompt file(s): {', '.join(prompt_paths)}
+- Relevant prompt file(s): {", ".join(prompt_paths)}
 - All prompt files: {PHASES_DIR}/
 
 ## Pre-analysis Hint (may be wrong — verify)
@@ -269,33 +328,43 @@ def invoke_diagnostic(finding, phase_key, evidence, results_dir, repo_dir):
     fid = finding["finding_id"]
     prompt = build_diagnostic_prompt(finding, phase_key, evidence, results_dir, repo_dir)
 
-    host = os.environ.get("VULNHUNT_HOST_CMD", "").strip()
-    if not host:
-        print(f"    [{fid}] VULNHUNT_HOST_CMD is not set", flush=True)
-        return {"root_cause": "VULNHUNT_HOST_CMD is not set", "prompt_file": "unknown",
-                "section_to_change": "", "suggested_change": "",
-                "change_type": "", "false_positive_risk": "unknown",
-                "risk_explanation": ""}
+    # hostcmd owns the VULNHUNT_HOST_CMD contract (resolution, argv shape,
+    # transcript-on-stdout); this call site keeps its fixed 1200s budget.
+    try:
+        host = hostcmd.resolve()
+    except hostcmd.HostCommandError as exc:
+        print(f"    [{fid}] {exc}", flush=True)
+        return {
+            "root_cause": "VULNHUNT_HOST_CMD is not set",
+            "prompt_file": "unknown",
+            "section_to_change": "",
+            "suggested_change": "",
+            "change_type": "",
+            "false_positive_risk": "unknown",
+            "risk_explanation": "",
+        }
 
     print(f"    [{fid}] Invoking host command, timeout 1200s ...", flush=True)
     prompt_dir = tempfile.mkdtemp(prefix="vulnhunt-diagnose-")
     prompt_file = os.path.join(prompt_dir, "prompt.txt")
     with open(prompt_file, "w") as handle:
         handle.write(DIAGNOSTIC_SYSTEM_PROMPT + "\n\n" + prompt)
-    cmd = shlex.split(host) + [prompt_file]
 
     start = time.time()
     try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=1200,
-        )
+        result = hostcmd.run(host, prompt_file, timeout=1200)
     except subprocess.TimeoutExpired:
         elapsed = time.time() - start
         print(f"    [{fid}] TIMED OUT after {elapsed:.0f}s", flush=True)
-        return {"root_cause": "diagnostic timed out", "prompt_file": "unknown",
-                "section_to_change": "", "suggested_change": "",
-                "change_type": "", "false_positive_risk": "unknown",
-                "risk_explanation": ""}
+        return {
+            "root_cause": "diagnostic timed out",
+            "prompt_file": "unknown",
+            "section_to_change": "",
+            "suggested_change": "",
+            "change_type": "",
+            "false_positive_risk": "unknown",
+            "risk_explanation": "",
+        }
     finally:
         shutil.rmtree(prompt_dir, ignore_errors=True)
 
@@ -304,12 +373,20 @@ def invoke_diagnostic(finding, phase_key, evidence, results_dir, repo_dir):
         print(f"    [{fid}] FAILED (exit {result.returncode}) after {elapsed:.0f}s", flush=True)
         if result.stderr:
             print(f"    [{fid}] stderr: {result.stderr.strip()[:200]}", flush=True)
-        return {"root_cause": f"diagnostic failed: exit {result.returncode}",
-                "prompt_file": "unknown", "section_to_change": "",
-                "suggested_change": "", "change_type": "",
-                "false_positive_risk": "unknown", "risk_explanation": ""}
+        return {
+            "root_cause": f"diagnostic failed: exit {result.returncode}",
+            "prompt_file": "unknown",
+            "section_to_change": "",
+            "suggested_change": "",
+            "change_type": "",
+            "false_positive_risk": "unknown",
+            "risk_explanation": "",
+        }
 
-    print(f"    [{fid}] Completed in {elapsed:.0f}s ({len(result.stdout):,} chars response)", flush=True)
+    print(
+        f"    [{fid}] Completed in {elapsed:.0f}s ({len(result.stdout):,} chars response)",
+        flush=True,
+    )
     return _parse_diagnostic_output(result.stdout)
 
 
@@ -320,13 +397,18 @@ def _parse_diagnostic_output(raw_output):
     end = text.rfind("}")
     if start != -1 and end != -1:
         try:
-            return json.loads(text[start:end + 1])
+            return json.loads(text[start : end + 1])
         except json.JSONDecodeError:
             pass
-    return {"root_cause": "failed to parse diagnostic output",
-            "prompt_file": "unknown", "section_to_change": text[:500],
-            "suggested_change": "", "change_type": "",
-            "false_positive_risk": "unknown", "risk_explanation": ""}
+    return {
+        "root_cause": "failed to parse diagnostic output",
+        "prompt_file": "unknown",
+        "section_to_change": text[:500],
+        "suggested_change": "",
+        "change_type": "",
+        "false_positive_risk": "unknown",
+        "risk_explanation": "",
+    }
 
 
 def write_analysis_json(analyses):
@@ -348,15 +430,21 @@ def write_analysis_report(analyses):
     for a in analyses:
         lines.append(f"## {a['finding_id']} — {a['type']} in {a['repo_name']}\n")
         lines.append(f"**Lost at phase**: {a['loss_phase']}")
-        lines.append(f"**Responsible prompt(s)**: {', '.join(PHASE_TO_PROMPT.get(a['loss_phase'], ['unknown']))}")
+        lines.append(
+            f"**Responsible prompt(s)**: {', '.join(PHASE_TO_PROMPT.get(a['loss_phase'], ['unknown']))}"
+        )
         lines.append(f"**Evidence**: {a['evidence'][:300]}\n")
 
         diag = a.get("diagnostic", {})
         lines.append(f"**Root cause**: {diag.get('root_cause', 'unknown')}\n")
         lines.append(f"**Prompt file to change**: {diag.get('prompt_file', 'unknown')}")
         lines.append(f"**Section to change**: {diag.get('section_to_change', 'unknown')}\n")
-        lines.append(f"**Suggested change** ({diag.get('change_type', 'add')}):\n```\n{diag.get('suggested_change', '')}\n```\n")
-        lines.append(f"**FP risk**: {diag.get('false_positive_risk', 'unknown')} — {diag.get('risk_explanation', '')}\n")
+        lines.append(
+            f"**Suggested change** ({diag.get('change_type', 'add')}):\n```\n{diag.get('suggested_change', '')}\n```\n"
+        )
+        lines.append(
+            f"**FP risk**: {diag.get('false_positive_risk', 'unknown')} — {diag.get('risk_explanation', '')}\n"
+        )
         lines.append("---\n")
 
     with open(ANALYSIS_REPORT, "w") as f:
@@ -366,12 +454,13 @@ def write_analysis_report(analyses):
 
 def main():
     parser = argparse.ArgumentParser(description="Analyze missed benchmark findings")
-    parser.add_argument("--finding", type=str, default=None,
-                        help="Analyze a specific finding ID only")
-    parser.add_argument("--state-file", type=str, default=STATE_FILE,
-                        help="Override state file path")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Print full artifact excerpts")
+    parser.add_argument(
+        "--finding", type=str, default=None, help="Analyze a specific finding ID only"
+    )
+    parser.add_argument(
+        "--state-file", type=str, default=STATE_FILE, help="Override state file path"
+    )
+    parser.add_argument("--verbose", action="store_true", help="Print full artifact excerpts")
     args = parser.parse_args()
 
     if not os.path.isfile(args.state_file):
@@ -388,15 +477,18 @@ def main():
         if judgment.get("detected") is False:
             if args.finding and fid != args.finding:
                 continue
-            misses.append({
-                "finding_id": fid,
-                "type": judgment.get("type", ""),
-                "description": _get_finding_description(fid, state),
-                "repo_name": judgment.get("repo_name", ""),
-                "scan_target": judgment.get("scan_target", ""),
-                "results_dir": state["scan_targets"].get(
-                    judgment.get("scan_target", ""), {}).get("results_dir"),
-            })
+            misses.append(
+                {
+                    "finding_id": fid,
+                    "type": judgment.get("type", ""),
+                    "description": _get_finding_description(fid, state),
+                    "repo_name": judgment.get("repo_name", ""),
+                    "scan_target": judgment.get("scan_target", ""),
+                    "results_dir": state["scan_targets"]
+                    .get(judgment.get("scan_target", ""), {})
+                    .get("results_dir"),
+                }
+            )
 
     if not misses:
         if args.finding:
@@ -405,9 +497,9 @@ def main():
             print("No missed findings to analyze. All ground truth findings were detected!")
         sys.exit(0)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"ANALYZING {len(misses)} MISSED FINDING(S) (3 workers)")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     def _analyze_one(miss):
         """Analyze a single missed finding. Returns the analysis dict."""
@@ -417,8 +509,12 @@ def main():
 
             if not miss["results_dir"] or not os.path.isdir(miss["results_dir"]):
                 print(f"    [{fid}] No results directory available, skipping")
-                return {**miss, "loss_phase": "no_results", "evidence": "",
-                        "diagnostic": {"root_cause": "scan produced no results"}}
+                return {
+                    **miss,
+                    "loss_phase": "no_results",
+                    "evidence": "",
+                    "diagnostic": {"root_cause": "scan produced no results"},
+                }
 
             phase_key, evidence = locate_loss_phase(miss["results_dir"], miss)
             print(f"    [{fid}] Lost at: {phase_key}")
@@ -435,8 +531,12 @@ def main():
             return {**miss, "loss_phase": phase_key, "evidence": evidence, "diagnostic": diagnostic}
         except Exception as e:
             print(f"    [{fid}] ERROR: {e}", flush=True)
-            return {**miss, "loss_phase": "error", "evidence": "",
-                    "diagnostic": {"root_cause": f"analysis error: {e}"}}
+            return {
+                **miss,
+                "loss_phase": "error",
+                "evidence": "",
+                "diagnostic": {"root_cause": f"analysis error: {e}"},
+            }
 
     analyses = []
     with ThreadPoolExecutor(max_workers=3) as executor:
@@ -449,9 +549,9 @@ def main():
     write_analysis_json(analyses)
     write_analysis_report(analyses)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"ANALYSIS COMPLETE: {len(analyses)} miss(es) diagnosed")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  Report: {ANALYSIS_REPORT}")
     print(f"  JSON:   {ANALYSIS_JSON}\n")
 

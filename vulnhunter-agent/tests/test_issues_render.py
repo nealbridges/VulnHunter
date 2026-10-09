@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import re
 
-import pytest
-
 from agent.issues_extract import ExtractedReport, Finding
 from agent.issues_render import (
     CleanScanContext,
@@ -115,8 +113,7 @@ class TestRenderBody:
         )
         assert (
             "https://example.com/x/blob/main/r/README.md"
-            "#vuln-003-query-parameter-injection-via-lastevaluatedkey"
-            in body
+            "#vuln-003-query-parameter-injection-via-lastevaluatedkey" in body
         )
 
     def test_no_anchor_when_id_missing(self) -> None:
@@ -206,9 +203,7 @@ class TestBuildReportUrl:
 class TestGithubAnchor:
     def test_real_world_example(self) -> None:
         # The anchor format the user pointed to in the deep-link request.
-        out = _github_anchor(
-            "VULN-003: Query parameter injection via lastEvaluatedKey"
-        )
+        out = _github_anchor("VULN-003: Query parameter injection via lastEvaluatedKey")
         assert out == "vuln-003-query-parameter-injection-via-lastevaluatedkey"
 
     def test_strips_punctuation(self) -> None:
@@ -288,9 +283,7 @@ class TestCleanScanBody:
         # A URL containing bare ) would break the markdown link. Cheap
         # defense: percent-encode both parens.
         body = render_clean_scan_body(
-            _clean_scan_ctx(
-                report_url="https://example.com/path(with)parens/README.md"
-            )
+            _clean_scan_ctx(report_url="https://example.com/path(with)parens/README.md")
         )
         # The link brackets close cleanly on the encoded URL...
         assert "https://example.com/path%28with%29parens/README.md" in body

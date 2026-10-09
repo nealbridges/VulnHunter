@@ -12,8 +12,6 @@ import logging
 from typing import Any
 
 import pytest
-
-from agent import runner
 from agent.runner import (
     _log_assistant_message,
     _log_result,
@@ -26,7 +24,6 @@ from agent.runner import (
     _tool_brief,
     set_verbosity,
 )
-
 
 # ---------------------------------------------------------------------------
 # Lightweight stand-ins for SDK content blocks. Real SDK blocks are
@@ -103,9 +100,7 @@ class TestToolBrief:
         assert out == "scan stuff"
 
     def test_agent_with_prompt_when_no_description(self) -> None:
-        out = _tool_brief(
-            "Agent", {"subagent_type": "general-purpose", "prompt": "do thing"}
-        )
+        out = _tool_brief("Agent", {"subagent_type": "general-purpose", "prompt": "do thing"})
         assert out == "general-purpose: do thing"
 
     def test_agent_without_prompt_or_description(self) -> None:
@@ -217,9 +212,7 @@ class TestLogAssistantMessageExtra:
             _log_assistant_message(msg)
         assert any("<empty>" in r.message for r in caplog.records)
 
-    def test_text_block_with_empty_text_skipped(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_text_block_with_empty_text_skipped(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(0)
         # Block has type-name TextBlock-ish: the helper checks str(type(block).__name__)
         block = _Block(text="")
@@ -240,9 +233,7 @@ class TestLogAssistantMessageExtra:
         # No full repr at v=0
         assert not any("file_path" in r.message for r in caplog.records)
 
-    def test_tool_use_block_v1_includes_full_input(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_tool_use_block_v1_includes_full_input(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(1)
         block = _Block(name="Read", input={"file_path": "/x"})
         block.__class__.__name__ = "ToolUseBlock"
@@ -251,9 +242,7 @@ class TestLogAssistantMessageExtra:
             _log_assistant_message(msg)
         assert any("file_path" in r.message for r in caplog.records)
 
-    def test_thinking_block_silent_under_v2(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_thinking_block_silent_under_v2(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(1)
         block = _Block(text="hidden thoughts")
         block.__class__.__name__ = "ThinkingBlock"
@@ -262,9 +251,7 @@ class TestLogAssistantMessageExtra:
             _log_assistant_message(msg)
         assert not any("hidden thoughts" in r.message for r in caplog.records)
 
-    def test_thinking_block_visible_at_v2(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_thinking_block_visible_at_v2(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(2)
         block = _Block(text="hidden thoughts")
         block.__class__.__name__ = "ThinkingBlock"
@@ -273,9 +260,7 @@ class TestLogAssistantMessageExtra:
             _log_assistant_message(msg)
         assert any("hidden thoughts" in r.message for r in caplog.records)
 
-    def test_other_block_type_at_v0_silent(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_other_block_type_at_v0_silent(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(0)
         block = _Block(content="some result")
         block.__class__.__name__ = "ToolResultBlock"
@@ -285,9 +270,7 @@ class TestLogAssistantMessageExtra:
         # ToolResultBlock at v=0 in assistant content is silent.
         assert not any("some result" in r.message for r in caplog.records)
 
-    def test_other_block_type_at_v1_visible(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_other_block_type_at_v1_visible(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(1)
         block = _Block(content="some result")
         block.__class__.__name__ = "ToolResultBlock"
@@ -317,18 +300,14 @@ class TestLogUserMessageExtra:
             _log_user_message(msg)
         assert any("<empty>" in r.message for r in caplog.records)
 
-    def test_string_content_terse_at_v0(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_string_content_terse_at_v0(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(0)
         msg = _msg(content="hello")
         with caplog.at_level(logging.INFO, logger="agent.runner"):
             _log_user_message(msg)
         assert any("↳" in r.message and "hello" in r.message for r in caplog.records)
 
-    def test_string_content_full_at_v1(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_string_content_full_at_v1(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(1)
         msg = _msg(content="hello")
         with caplog.at_level(logging.INFO, logger="agent.runner"):
@@ -410,18 +389,14 @@ class TestLogTaskStartedExtra:
 
 
 class TestLogTaskStatusExtra:
-    def test_non_terminal_status_silent_at_v0(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_non_terminal_status_silent_at_v0(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(0)
         msg = _msg(task_id="t1", status="running", summary=None, output_file=None)
         with caplog.at_level(logging.INFO, logger="agent.runner"):
             _log_task_status(msg)
         assert not any(r.message for r in caplog.records)
 
-    def test_non_terminal_status_visible_at_v1(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_non_terminal_status_visible_at_v1(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(1)
         msg = _msg(
             task_id="t1",
@@ -459,9 +434,7 @@ class TestLogTaskStatusExtra:
 
 
 class TestLogSystemMessageExtra:
-    def test_init_with_data_at_v2_dumps_blob(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_init_with_data_at_v2_dumps_blob(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(2)
         msg = _msg(subtype="init", data={"slash_commands": ["vulnhunt"], "extra": 1})
         with caplog.at_level(logging.INFO, logger="agent.runner"):
@@ -475,18 +448,14 @@ class TestLogSystemMessageExtra:
             _log_system_message(msg)
         assert not any("task_progress" in r.message for r in caplog.records)
 
-    def test_task_progress_visible_at_v1(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_task_progress_visible_at_v1(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(1)
         msg = _msg(subtype="task_progress", data={"task_id": "x"})
         with caplog.at_level(logging.INFO, logger="agent.runner"):
             _log_system_message(msg)
         assert any("task_progress" in r.message for r in caplog.records)
 
-    def test_error_subtype_logged_at_error_level(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_error_subtype_logged_at_error_level(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(0)
         msg = _msg(subtype="error", data={"is_error": True, "msg": "boom"})
         with caplog.at_level(logging.DEBUG, logger="agent.runner"):
@@ -509,9 +478,7 @@ class TestLogSystemMessageExtra:
             _log_system_message(msg)
         assert any(r.levelno == logging.ERROR for r in caplog.records)
 
-    def test_other_subtype_at_v2_includes_data(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_other_subtype_at_v2_includes_data(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(2)
         msg = _msg(subtype="ping", data={"hello": "world"})
         with caplog.at_level(logging.INFO, logger="agent.runner"):
@@ -544,16 +511,12 @@ class TestLogResultExtra:
 # ---------------------------------------------------------------------------
 
 
-_LEAKED_URL = (
-    "https://x-access-token:ghp_supersecret@github.com/owner/repo.git"
-)
+_LEAKED_URL = "https://x-access-token:ghp_supersecret@github.com/owner/repo.git"
 _REDACTED_FRAGMENT = "https://***@github.com/owner/repo.git"
 
 
 class TestRedactionInLogs:
-    def test_user_string_content_at_v0_is_redacted(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_user_string_content_at_v0_is_redacted(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(0)
         msg = _msg(content=f"origin url: {_LEAKED_URL}")
         with caplog.at_level(logging.INFO, logger="agent.runner"):
@@ -562,9 +525,7 @@ class TestRedactionInLogs:
         assert "ghp_supersecret" not in joined
         assert _REDACTED_FRAGMENT in joined
 
-    def test_user_string_content_at_v1_is_redacted(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_user_string_content_at_v1_is_redacted(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(1)
         msg = _msg(content=f"origin url: {_LEAKED_URL}")
         with caplog.at_level(logging.INFO, logger="agent.runner"):
@@ -572,9 +533,7 @@ class TestRedactionInLogs:
         joined = "\n".join(r.message for r in caplog.records)
         assert "ghp_supersecret" not in joined
 
-    def test_tool_result_block_content_redacted(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_tool_result_block_content_redacted(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(0)
         block = _Block(content=f"remote.origin.url={_LEAKED_URL}")
         block.__class__.__name__ = "ToolResultBlock"
@@ -584,9 +543,7 @@ class TestRedactionInLogs:
         joined = "\n".join(r.message for r in caplog.records)
         assert "ghp_supersecret" not in joined
 
-    def test_assistant_text_block_redacted(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_assistant_text_block_redacted(self, caplog: pytest.LogCaptureFixture) -> None:
         """The model can echo back URLs it saw in tool output. TextBlock
         prose is logged verbatim (no truncation) so it has its own
         redact() call, not just the _truncate-mediated one."""
@@ -599,9 +556,7 @@ class TestRedactionInLogs:
         joined = "\n".join(r.message for r in caplog.records)
         assert "ghp_supersecret" not in joined
 
-    def test_tool_use_block_input_redacted_at_v1(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_tool_use_block_input_redacted_at_v1(self, caplog: pytest.LogCaptureFixture) -> None:
         """An input dict whose repr contains a token-bearing URL is
         scrubbed when v=1 logs it via _truncate(repr(...))."""
         set_verbosity(1)

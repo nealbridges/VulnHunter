@@ -145,8 +145,7 @@ class TestParseSummaryTable:
     def test_multi_cwe_with_comma(self) -> None:
         """Comma-separated multi-CWE rows must also parse."""
         content = (
-            "| VULN-010 | Path issues | CWE-22, CWE-23 | Medium | "
-            "test.py — PASS | Confirmed |"
+            "| VULN-010 | Path issues | CWE-22, CWE-23 | Medium | test.py — PASS | Confirmed |"
         )
         findings = parse_summary_table(content)
         assert len(findings) == 1

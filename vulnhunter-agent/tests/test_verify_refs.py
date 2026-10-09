@@ -13,10 +13,10 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from agent import _llm
 from agent import verify_refs as refs_mod
 from agent.verify_refs import _coerce_sources, extract_cross_repo_references
+
 from tests._helpers import FakeTokenManager as _TM
 
 
@@ -94,11 +94,7 @@ class TestCoerceSources:
         assert out[0]["repo_hint"] == "https://github.com/org/svc"
 
     def test_blank_repo_hint_drops_entry(self) -> None:
-        parsed = {
-            "requested_sources": [
-                {"claim_excerpt": "x", "repo_hint": "   ", "reason": "y"}
-            ]
-        }
+        parsed = {"requested_sources": [{"claim_excerpt": "x", "repo_hint": "   ", "reason": "y"}]}
         assert _coerce_sources(parsed) == []
 
     @pytest.mark.parametrize(

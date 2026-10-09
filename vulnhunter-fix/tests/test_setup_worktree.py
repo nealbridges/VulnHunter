@@ -13,12 +13,7 @@ import os
 import subprocess
 from pathlib import Path
 
-import pytest
-
-
-SCRIPT = (
-    Path(__file__).resolve().parents[1] / "scripts" / "setup_worktree.sh"
-)
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "setup_worktree.sh"
 
 
 def _init_repo(tmp_path: Path, default_branch: str = "main") -> Path:
@@ -29,13 +24,9 @@ def _init_repo(tmp_path: Path, default_branch: str = "main") -> Path:
     subprocess.run(["git", "config", "user.name", "t"], cwd=repo, check=True)
     (repo / "README").write_text("hello\n")
     subprocess.run(["git", "add", "README"], cwd=repo, check=True)
-    subprocess.run(
-        ["git", "commit", "-q", "-m", "initial"], cwd=repo, check=True
-    )
+    subprocess.run(["git", "commit", "-q", "-m", "initial"], cwd=repo, check=True)
     # Rename whatever the default branch is to the requested name.
-    subprocess.run(
-        ["git", "branch", "-M", default_branch], cwd=repo, check=True
-    )
+    subprocess.run(["git", "branch", "-M", default_branch], cwd=repo, check=True)
     return repo
 
 
@@ -103,20 +94,27 @@ class TestSetupWorktree:
         assert p1 != p2
         assert Path(p1).exists() and Path(p2).exists()
 
-    def test_falls_back_to_gh_default_when_no_base_supplied(
-        self, tmp_path, monkeypatch
-    ):
+    def test_falls_back_to_gh_default_when_no_base_supplied(self, tmp_path, monkeypatch):
         # When `gh` is unavailable we expect the script to fall back to
         # "main" rather than crashing. Simulate that by setting PATH to
         # a directory with only `git`.
         repo = _init_repo(tmp_path)
         stub_dir = tmp_path / "stub-path"
         stub_dir.mkdir()
-        for tool in ("git", "bash", "mkdir", "sed", "tr", "cat", "echo",
-                      "grep", "printf", "rm", "ls"):
-            real = subprocess.run(
-                ["which", tool], capture_output=True, text=True
-            ).stdout.strip()
+        for tool in (
+            "git",
+            "bash",
+            "mkdir",
+            "sed",
+            "tr",
+            "cat",
+            "echo",
+            "grep",
+            "printf",
+            "rm",
+            "ls",
+        ):
+            real = subprocess.run(["which", tool], capture_output=True, text=True).stdout.strip()
             if real:
                 os.symlink(real, stub_dir / tool)
         env = os.environ.copy()
@@ -173,7 +171,8 @@ class TestSetupWorktree:
         # "sql-injection-fix") so the show-ref check finds it.
         subprocess.run(
             ["git", "branch", "vulnfix/sql-injection-fix", "main"],
-            cwd=repo, check=True,
+            cwd=repo,
+            check=True,
         )
 
         result = _run_setup(repo, "abcdef0123456789", "sql-injection-fix", "main")
@@ -187,11 +186,15 @@ class TestSetupWorktree:
         wt = Path(payload["path"])
         head = subprocess.run(
             ["git", "-C", str(wt), "rev-parse", "HEAD"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout.strip()
         main_head = subprocess.run(
             ["git", "-C", str(repo), "rev-parse", "main"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout.strip()
         assert head == main_head, (
             "reattached worktree should point at the same commit as "

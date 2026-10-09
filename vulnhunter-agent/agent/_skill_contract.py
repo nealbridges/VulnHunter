@@ -26,7 +26,7 @@ SCAN_GLOBS = (
     "vulnhunt-fix-verify/*.md",
     "vulnhunt-fix-verify/phases/*.md",
     "vulnhunter-run/*.md",
-    "skills/*/SKILL.md",          # new-generation skills (operator procedures)
+    "skills/*/SKILL.md",  # new-generation skills (operator procedures)
     "skills/*/phases/*.md",
     "skills/*/references/*.md",
 )
@@ -61,10 +61,10 @@ AREA_BY_PREFIX = {
 @dataclass(frozen=True)
 class Requirement:
     req_id: str
-    source: str          # repo-relative file path
-    line: int            # 1-based line of the sentence start
-    keyword: str         # MUST / SHALL / SHOULD (with optional NOT)
-    text: str            # the sentence
+    source: str  # repo-relative file path
+    line: int  # 1-based line of the sentence start
+    keyword: str  # MUST / SHALL / SHOULD (with optional NOT)
+    text: str  # the sentence
 
 
 def _sentences(text: str) -> list[tuple[int, str]]:
@@ -93,15 +93,17 @@ def _sentences(text: str) -> list[tuple[int, str]]:
             ch = text[end]
             if ch in ".;":
                 # boundary only if followed by whitespace/EOF (not "e.g.", "0.5")
-                nxt = text[end + 1: end + 3]
-                if end + 1 >= n or nxt[:1] in (" ", "\t", "\r", "\n", "") or (
-                    nxt[:1] == "\n" and nxt[1:2] == "\n"
+                nxt = text[end + 1 : end + 3]
+                if (
+                    end + 1 >= n
+                    or nxt[:1] in (" ", "\t", "\r", "\n", "")
+                    or (nxt[:1] == "\n" and nxt[1:2] == "\n")
                 ):
                     end += 1
                     break
                 end += 1
                 continue
-            if ch == "\n" and text[end + 1: end + 2] == "\n":
+            if ch == "\n" and text[end + 1 : end + 2] == "\n":
                 end += 2  # blank line: paragraph break without punctuation
                 break
             end += 1
@@ -121,28 +123,34 @@ def extract_requirements() -> list[Requirement]:
             if not path.is_file():
                 continue
             rel = path.relative_to(REPO_ROOT).as_posix()
-            area = next((a for prefix, a in AREA_BY_PREFIX.items()
-                         if rel == prefix or rel.startswith(prefix + "/")), "MISC")
+            area = next(
+                (
+                    a
+                    for prefix, a in AREA_BY_PREFIX.items()
+                    if rel == prefix or rel.startswith(prefix + "/")
+                ),
+                "MISC",
+            )
             text = path.read_text(encoding="utf-8")
-            captured = False
             for line_no, sentence in _sentences(text):
                 match = NORMATIVE_RE.search(sentence)
                 if match:
-                    captured = True
                     counters[area] = counters.get(area, 0) + 1
-                    requirements.append(Requirement(
-                        req_id=f"VH-{area}-{counters[area]:03d}",
-                        source=rel,
-                        line=line_no,
-                        keyword=match.group(1),
-                        text=sentence,
-                    ))
+                    requirements.append(
+                        Requirement(
+                            req_id=f"VH-{area}-{counters[area]:03d}",
+                            source=rel,
+                            line=line_no,
+                            keyword=match.group(1),
+                            text=sentence,
+                        )
+                    )
             # Definition tables: rows of a "mapping" table whose first cell is a
             # SHOUTY_CODE define the vocabulary (e.g. the verdict mapping in
             # phase2_verify.md). These are requirements even without normative
             # keywords — the table *defines* the contract. One requirement per
             # row, keyword column `defines`, line = the row's line in the file.
-            if captured is False or True:  # tables are additive, not exclusive
+            if True:  # tables are additive, not exclusive
                 requirements.extend(_definition_table_rows(rel, path, counters, area))
     return requirements
 
@@ -170,13 +178,15 @@ def _definition_table_rows(
             continue
         condition = line.split("|")[2].strip() if line.count("|") >= 2 else ""
         counters[area] = counters.get(area, 0) + 1
-        out.append(Requirement(
-            req_id=f"VH-{area}-{counters[area]:03d}",
-            source=rel,
-            line=idx,
-            keyword="defines",
-            text=f"{row.group(1)} — {condition}"[:400],
-        ))
+        out.append(
+            Requirement(
+                req_id=f"VH-{area}-{counters[area]:03d}",
+                source=rel,
+                line=idx,
+                keyword="defines",
+                text=f"{row.group(1)} — {condition}"[:400],
+            )
+        )
     return out
 
 

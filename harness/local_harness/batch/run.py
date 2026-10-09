@@ -16,7 +16,6 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from .utils import collect_results, parse_repo_list, scan_status
 from local_harness.clone import shallow_clone
 from local_harness.config import (
     BATCH_CLONE_BASE_DIR,
@@ -25,6 +24,7 @@ from local_harness.config import (
 )
 from local_harness.scan import clean_incomplete_results, has_valid_results, scan_targets, ts
 
+from .utils import collect_results, parse_repo_list, scan_status
 
 _GITHUB_COMPONENT_RE = re.compile(r"[A-Za-z0-9._-]+")
 
@@ -133,7 +133,10 @@ def cmd_scan(args):
         for f in folders:
             removed = clean_incomplete_results(f, log_filename=BATCH_LOG_FILENAME)
             if removed:
-                print(f"  [{ts()}] Cleaned incomplete results in {os.path.basename(f)}: {removed}", flush=True)
+                print(
+                    f"  [{ts()}] Cleaned incomplete results in {os.path.basename(f)}: {removed}",
+                    flush=True,
+                )
         skipped = [f for f in folders if has_valid_results(f)]
         folders = [f for f in folders if not has_valid_results(f)]
         if skipped:
@@ -146,14 +149,15 @@ def cmd_scan(args):
         print(f"[{ts()}] All repos already have results. Nothing to scan.")
         sys.exit(0)
 
-    targets = [
-        {"clone_dir": folder, "key": os.path.basename(folder)}
-        for folder in folders
-    ]
+    targets = [{"clone_dir": folder, "key": os.path.basename(folder)} for folder in folders]
 
     start = time.time()
-    results = scan_targets(targets, max_workers=args.max_workers, log_filename=BATCH_LOG_FILENAME,
-                           readonly=args.readonly)
+    results = scan_targets(
+        targets,
+        max_workers=args.max_workers,
+        log_filename=BATCH_LOG_FILENAME,
+        readonly=args.readonly,
+    )
     elapsed = time.time() - start
 
     # Phase 3: Summary
@@ -164,7 +168,7 @@ def cmd_scan(args):
     successes = 0
     failures = 0
     total_cost = 0.0
-    for target_key, r in results:
+    for _target_key, r in results:
         ok = r.returncode == 0
         successes += ok
         failures += not ok
@@ -174,8 +178,10 @@ def cmd_scan(args):
         cost_str = f"${cost:.2f}" if cost else "-"
         print(f"  {status:12s} | {r.elapsed:5.0f}s | {cost_str:>7s} | {r.label}")
 
-    print(f"\n  {successes} succeeded, {failures} failed, "
-          f"{elapsed:.0f}s total, ${total_cost:.2f} total cost")
+    print(
+        f"\n  {successes} succeeded, {failures} failed, "
+        f"{elapsed:.0f}s total, ${total_cost:.2f} total cost"
+    )
     if clone_failures:
         print(f"  {len(clone_failures)} repo(s) skipped due to clone failure")
 
@@ -195,20 +201,30 @@ def main():
     subparsers = parser.add_subparsers(dest="command")
 
     scan_parser = subparsers.add_parser("scan", help="Clone and scan repos")
-    scan_parser.add_argument("--re-clone", action="store_true",
-                             help="Remove and re-clone repos that already exist")
-    scan_parser.add_argument("--resume", action="store_true",
-                             help="Skip repos that already have a completed scan report")
-    scan_parser.add_argument("--max-workers", type=int, default=MAX_SCAN_WORKERS,
-                             help=f"Parallel scan workers (default: {MAX_SCAN_WORKERS})")
-    scan_parser.add_argument("--readonly", action="store_true",
-                             help="Read-only scan: skip dependency installation and code execution")
+    scan_parser.add_argument(
+        "--re-clone", action="store_true", help="Remove and re-clone repos that already exist"
+    )
+    scan_parser.add_argument(
+        "--resume", action="store_true", help="Skip repos that already have a completed scan report"
+    )
+    scan_parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=MAX_SCAN_WORKERS,
+        help=f"Parallel scan workers (default: {MAX_SCAN_WORKERS})",
+    )
+    scan_parser.add_argument(
+        "--readonly",
+        action="store_true",
+        help="Read-only scan: skip dependency installation and code execution",
+    )
 
     subparsers.add_parser("status", help="Check scan progress")
 
     collect_parser = subparsers.add_parser("collect", help="Collect results for upload")
-    collect_parser.add_argument("--upload-dir", type=str, default=None,
-                                help="Override upload destination directory")
+    collect_parser.add_argument(
+        "--upload-dir", type=str, default=None, help="Override upload destination directory"
+    )
 
     args = parser.parse_args()
 

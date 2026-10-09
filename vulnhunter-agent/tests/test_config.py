@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from agent.config import (
     AgentConfig,
     _coerce,
@@ -13,7 +12,6 @@ from agent.config import (
     _resolve_config_path,
     load_config,
 )
-
 
 # ---------------------------------------------------------------------------
 # _resolve_config_path
@@ -31,24 +29,18 @@ class TestResolveConfigPath:
         with pytest.raises(FileNotFoundError):
             _resolve_config_path(tmp_path / "does-not-exist.toml")
 
-    def test_env_path_existing(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_env_path_existing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         cfg = tmp_path / "cfg.toml"
         cfg.write_text("")
         monkeypatch.setenv("VULNHUNT_AGENT_CONFIG", str(cfg))
         assert _resolve_config_path(None) == cfg.resolve()
 
-    def test_env_path_missing_raises(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_env_path_missing_raises(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("VULNHUNT_AGENT_CONFIG", str(tmp_path / "missing.toml"))
         with pytest.raises(FileNotFoundError):
             _resolve_config_path(None)
 
-    def test_falls_back_to_package_relative_config(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_falls_back_to_package_relative_config(self, monkeypatch: pytest.MonkeyPatch) -> None:
         # The package ships with a config.toml; this should be picked up.
         monkeypatch.delenv("VULNHUNT_AGENT_CONFIG", raising=False)
         result = _resolve_config_path(None)
@@ -160,9 +152,7 @@ class TestLoadConfig:
         monkeypatch.setenv("VULNHUNT_OAUTH_CLIENT_ID", "cid")
         monkeypatch.setenv("VULNHUNT_OAUTH_CLIENT_SECRET", "csec")
 
-    def test_all_from_env_no_toml(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
+    def test_all_from_env_no_toml(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         self._set_required_env(monkeypatch)
         # Put VULNHUNT_AGENT_CONFIG at a missing path? No — that raises.
         # Instead, monkeypatch the package default to a missing filename so
@@ -214,9 +204,7 @@ client_secret = "tomlcsec"
         assert cfg.oauth.client_id == "envcid"
         assert cfg.anthropic.bedrock_base_url == "https://from-toml.example.com"
 
-    def test_publish_enabled_with_empty_destination_raises(
-        self, tmp_path: Path
-    ) -> None:
+    def test_publish_enabled_with_empty_destination_raises(self, tmp_path: Path) -> None:
         path = tmp_path / "cfg.toml"
         path.write_text(
             """
@@ -269,9 +257,7 @@ client_secret = "y"
         with pytest.raises(ValueError):
             load_config(path)
 
-    def test_default_github_host(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
+    def test_default_github_host(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         self._set_required_env(monkeypatch)
         from agent import config as cfg_mod
 
@@ -279,9 +265,7 @@ client_secret = "y"
         cfg = load_config()
         assert cfg.github.host == "github.com"
 
-    def test_dual_tokens_from_env(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
+    def test_dual_tokens_from_env(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         """Env-var resolution: each new [github] field is reachable."""
         self._set_required_env(monkeypatch)
         from agent import config as cfg_mod
@@ -289,9 +273,7 @@ client_secret = "y"
         monkeypatch.setattr(cfg_mod, "_DEFAULT_CONFIG_FILENAME", "no-such.toml")
         monkeypatch.setenv("VULNHUNT_GITHUB_SCAN_TOKEN", "ghp_scan_env")
         monkeypatch.setenv("VULNHUNT_GITHUB_REPORTS_TOKEN", "ghp_reports_env")
-        monkeypatch.setenv(
-            "VULNHUNT_GITHUB_BROKER_TOKEN_DIR", "/tmp/broker-tokens/scan-1"
-        )
+        monkeypatch.setenv("VULNHUNT_GITHUB_BROKER_TOKEN_DIR", "/tmp/broker-tokens/scan-1")
         cfg = load_config()
         assert cfg.github.scan_token == "ghp_scan_env"
         assert cfg.github.reports_token == "ghp_reports_env"
@@ -360,9 +342,7 @@ client_secret = "y"
         cfg = load_config(path)
         assert cfg.source_path == path.resolve()
 
-    def test_source_path_none_when_no_toml(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_source_path_none_when_no_toml(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self._set_required_env(monkeypatch)
         from agent import config as cfg_mod
 
@@ -370,9 +350,7 @@ client_secret = "y"
         cfg = load_config()
         assert cfg.source_path is None
 
-    def test_allowed_tools_from_env_csv(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_allowed_tools_from_env_csv(self, monkeypatch: pytest.MonkeyPatch) -> None:
         self._set_required_env(monkeypatch)
         monkeypatch.setenv("VULNHUNT_SCAN_ALLOWED_TOOLS", "Read, Grep , Bash")
         from agent import config as cfg_mod
@@ -487,9 +465,7 @@ model = "m"
         with pytest.raises(ValueError, match="auth_mode"):
             load_config(path)
 
-    def test_bedrock_sigv4_profile_from_env(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_bedrock_sigv4_profile_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("VULNHUNT_ANTHROPIC_AUTH_MODE", "bedrock_sigv4")
         monkeypatch.setenv("VULNHUNT_ANTHROPIC_MODEL", "us.anthropic.claude-opus-4-8")
         monkeypatch.setenv("VULNHUNT_ANTHROPIC_AWS_REGION", "us-east-1")
@@ -582,9 +558,7 @@ retries = true
         assert cfg.logging.per_turn_usage is True
         assert cfg.logging.retries is True
 
-    def test_env_var_overrides_toml(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_env_var_overrides_toml(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         path = tmp_path / "cfg.toml"
         path.write_text(
             """

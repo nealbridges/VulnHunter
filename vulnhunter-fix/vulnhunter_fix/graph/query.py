@@ -23,8 +23,8 @@ from __future__ import annotations
 
 import json
 from collections import Counter, defaultdict, deque
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from .fallback import grep_callers_of
 from .schema import GraphDocument
@@ -41,7 +41,9 @@ class GraphQuery:
 
     def __init__(self, doc: GraphDocument, source_root: str | Path | None = None) -> None:
         self._doc = doc
-        self._source_root = Path(source_root).resolve() if source_root else Path(doc.root_dir).resolve()
+        self._source_root = (
+            Path(source_root).resolve() if source_root else Path(doc.root_dir).resolve()
+        )
         self._by_file: dict[str, list[str]] = defaultdict(list)
         for nid, node in doc.nodes.items():
             self._by_file[node.file].append(nid)
@@ -70,8 +72,18 @@ class GraphQuery:
             "confidence": self._doc.confidence,
             "file": file,
             "nodes": [self._doc.nodes[nid].name for nid in node_ids],
-            "imports": [dst for nid in node_ids for dst, kind in self._out_edges.get(nid, []) if kind == "imports"],
-            "importers": [src for nid in node_ids for src, kind in self._in_edges.get(nid, []) if kind == "imports"],
+            "imports": [
+                dst
+                for nid in node_ids
+                for dst, kind in self._out_edges.get(nid, [])
+                if kind == "imports"
+            ],
+            "importers": [
+                src
+                for nid in node_ids
+                for src, kind in self._in_edges.get(nid, [])
+                if kind == "imports"
+            ],
         }
 
     def _resolve_file_key(self, ref: str) -> str:
@@ -108,7 +120,11 @@ class GraphQuery:
             for src, _kind in self._in_edges.get(nid, []):
                 frontier.append((src, depth + 1))
         result_files.discard(file)
-        return {"confidence": self._doc.confidence, "file": file, "reachable_files": sorted(result_files)}
+        return {
+            "confidence": self._doc.confidence,
+            "file": file,
+            "reachable_files": sorted(result_files),
+        }
 
     def god_nodes(self, top_n: int = 10) -> list[dict]:
         degrees = Counter()
@@ -246,8 +262,9 @@ class GraphQuery:
             # module-qualified (e.g. `auth.mod:check_password`) and differ
             # from the `file:symbol` form a finding carries — the raw-id-only
             # match returned [] and masked the fix (12-seg review S2, CRITICAL).
-            by_qual = [nid for nid, node in self._doc.nodes.items()
-                       if node.qualified_name == symbol]
+            by_qual = [
+                nid for nid, node in self._doc.nodes.items() if node.qualified_name == symbol
+            ]
             if by_qual:
                 return by_qual
             # `file:line` form (line is all digits) — resolve to the enclosing
@@ -260,8 +277,11 @@ class GraphQuery:
             # back to the bare symbol name scoped to that file (path-form drift
             # between the finding location and the graph's file field).
             if file and tail:
-                scoped = [nid for nid, node in self._doc.nodes.items()
-                          if node.name == tail and node.file == file]
+                scoped = [
+                    nid
+                    for nid, node in self._doc.nodes.items()
+                    if node.name == tail and node.file == file
+                ]
                 if scoped:
                     return scoped
             return []

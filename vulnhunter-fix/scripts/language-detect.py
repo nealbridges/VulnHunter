@@ -20,15 +20,13 @@ Prints a JSON object on stdout:
 
 from __future__ import annotations
 
-import _skill_bootstrap  # noqa: F401  — adds bundled .venv site-packages to sys.path
-
 import json
 import sys
 from collections import Counter
 from pathlib import Path
 
+import _skill_bootstrap  # noqa: F401  — adds bundled .venv site-packages to sys.path
 from vulnhunter_fix.graph.config import safe_walk_files
-
 
 MANIFEST_MAP = {
     "go.mod": ("go", "high"),
@@ -82,7 +80,7 @@ def detect(root: Path) -> dict:
             signals.append(f"manifest:{name}→{lang}")
 
     if manifest_hits:
-        high_conf_langs = [l for l, c in manifest_hits.items() if c == "high"]
+        high_conf_langs = [line for line, c in manifest_hits.items() if c == "high"]
         if high_conf_langs:
             # tsconfig.json + package.json both present → prefer typescript
             if "typescript" in manifest_hits:
@@ -108,12 +106,18 @@ def detect(root: Path) -> dict:
             counter[lang] += 1
 
     if not counter:
-        return {"language": None, "confidence": "low", "signals": signals + ["no source files found"]}
+        return {
+            "language": None,
+            "confidence": "low",
+            "signals": signals + ["no source files found"],
+        }
 
     winner, count = counter.most_common(1)[0]
     total = sum(counter.values())
     confidence = "high" if count / total >= 0.7 else "medium"
-    signals.append(f"suffix-vote: {winner}={count}/{total} ({', '.join(f'{k}={v}' for k, v in counter.most_common(4))})")
+    signals.append(
+        f"suffix-vote: {winner}={count}/{total} ({', '.join(f'{k}={v}' for k, v in counter.most_common(4))})"
+    )
     return {"language": winner, "confidence": confidence, "signals": signals}
 
 

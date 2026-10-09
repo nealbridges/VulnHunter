@@ -37,7 +37,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-
 SCHEMA_VERSION = "1"
 
 NodeKind = Literal["function", "class", "module", "file"]
@@ -100,7 +99,7 @@ class GraphDocument:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "GraphDocument":
+    def from_dict(cls, data: dict) -> GraphDocument:
         nodes = {
             nid: Node(
                 id=nid,

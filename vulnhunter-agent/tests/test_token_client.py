@@ -8,16 +8,14 @@ retry that absorbs the wrapper's tmpfile→rename window.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 from unittest.mock import patch
 
+import httpx
 import pytest
-
 from agent.config import AgentConfig, GitHubConfig
 from agent.token_client import BrokerTokenAuth, get_github_token
-
-import httpx
 
 
 def _gh(
@@ -44,30 +42,22 @@ def _write_broker(dir_: Path, role: str, token: str) -> None:
 class TestStandaloneMode:
     """broker_token_dir unset → literal tokens from config."""
 
-    def test_scan_returns_literal(
-        self, agent_config: Callable[..., AgentConfig]
-    ) -> None:
+    def test_scan_returns_literal(self, agent_config: Callable[..., AgentConfig]) -> None:
         cfg = agent_config(github=_gh(scan_token="ghs_scan_xyz", reports_token="ghs_rep"))
         assert get_github_token("scan", cfg) == "ghs_scan_xyz"
 
-    def test_reports_returns_literal(
-        self, agent_config: Callable[..., AgentConfig]
-    ) -> None:
+    def test_reports_returns_literal(self, agent_config: Callable[..., AgentConfig]) -> None:
         cfg = agent_config(github=_gh(scan_token="x", reports_token="ghs_rep_xyz"))
         assert get_github_token("reports", cfg) == "ghs_rep_xyz"
 
-    def test_empty_literal_returns_empty(
-        self, agent_config: Callable[..., AgentConfig]
-    ) -> None:
+    def test_empty_literal_returns_empty(self, agent_config: Callable[..., AgentConfig]) -> None:
         # Standalone with no token configured returns "" — caller (validate /
         # preflight / module) decides whether to reject.
         cfg = agent_config(github=_gh())
         assert get_github_token("scan", cfg) == ""
         assert get_github_token("reports", cfg) == ""
 
-    def test_unknown_role_raises(
-        self, agent_config: Callable[..., AgentConfig]
-    ) -> None:
+    def test_unknown_role_raises(self, agent_config: Callable[..., AgentConfig]) -> None:
         cfg = agent_config(github=_gh(scan_token="x"))
         with pytest.raises(ValueError, match="unknown GitHub role"):
             get_github_token("nope", cfg)  # type: ignore[arg-type]
@@ -121,9 +111,8 @@ class TestBrokerMode:
     ) -> None:
         (tmp_path / "scan.json").write_text("{not json")
         cfg = agent_config(github=_gh(broker_token_dir=str(tmp_path)))
-        with patch("agent.token_client.time.sleep"):
-            with pytest.raises(json.JSONDecodeError):
-                get_github_token("scan", cfg)
+        with patch("agent.token_client.time.sleep"), pytest.raises(json.JSONDecodeError):
+            get_github_token("scan", cfg)
 
     def test_rename_window_recovery(
         self,

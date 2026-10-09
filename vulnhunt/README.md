@@ -55,7 +55,7 @@ methodology instead of improvised analysis.
 | 1 · Recon | `phases/phase1_recon.md` | Build the input inventory, partition the codebase, annotate production reachability. |
 | 2 · Hunt | `phases/phase2_hunt.md` + `phase2_class_{inj,nav,log}.md` | Parallel class agents (injection / navigation-&-access / logic-&-crypto) trace inputs to sinks per partition, plus one sink-driven audit agent. |
 | 2b · Verify | `phases/phase2b_verify.md` | Adversarial pass that tries to *disprove* each candidate; ~half are eliminated. |
-| 3 · Reproduce | `phases/phase3_reproduce_test.md` + `phase3c_fixes.md` | Write PoCs, executable exploit tests, and fix strategies. |
+| 3 · Build PoC, Measure Impact | `phases/phase3a_build_poc.md` + `phase3b_measure_impact.md` + `phase3c_fixes.md` | Execute the finding's Runtime, build the working PoC, measure impact in the class's unit, write fix strategies. |
 | 3d · Sweep | `phases/phase3d_sweep.md` | Grep every confirmed root-cause pattern across the whole codebase. |
 | 4 · Report | `phases/phase4_report.md` | Orchestrator compiles the final report. |
 

@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from agent.audit import (
     AuditPaths,
     AuditWriteError,
@@ -30,7 +29,6 @@ from agent.audit import (
     writer_from_config,
 )
 from agent.config import AuditConfig
-
 
 # ---------------------------------------------------------------------------
 # ULID
@@ -108,7 +106,7 @@ class TestAuditWriter:
         w.emit_audit({"event_id": "2", "event_type": "scan_completed"})
         w.close()
         lines = (tmp_path / "audit.jsonl").read_text().splitlines()
-        assert [json.loads(l)["event_id"] for l in lines] == ["1", "2"]
+        assert [json.loads(line)["event_id"] for line in lines] == ["1", "2"]
 
     def test_emit_finding_goes_to_findings_file(self, tmp_path: Path) -> None:
         w = _writer(tmp_path)
@@ -151,9 +149,7 @@ class TestAuditWriter:
         assert "secret-token" not in line
         assert "***" in line
 
-    def test_stdout_mirror(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_stdout_mirror(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         w = AuditWriter(
             paths=AuditPaths(
                 events=tmp_path / "audit.jsonl",
@@ -375,7 +371,9 @@ class TestFindingEvents:
             opened=False,
         )
         # opened_at is dropped during serialization (None value).
-        assert "opened_at" not in json.loads(json.dumps({k: v for k, v in e.items() if v is not None}))
+        assert "opened_at" not in json.loads(
+            json.dumps({k: v for k, v in e.items() if v is not None})
+        )
         assert e["status"] == "RESOLVED"
 
     def test_finding_event_defaults_cwe_when_missing(self) -> None:
@@ -487,10 +485,10 @@ class TestWriterFromConfig:
         # through to defaults.
         toml = tmp_path / "cfg.toml"
         toml.write_text(
-            '[anthropic]\n'
+            "[anthropic]\n"
             'bedrock_base_url = "https://bedrock.example.com"\n'
             'model = "claude-opus-4-8"\n'
-            '[oauth]\n'
+            "[oauth]\n"
             'token_endpoint = "https://oauth.example.com/token"\n'
             'client_id = "cid"\n'
             'client_secret = "csecret"\n'
@@ -770,10 +768,11 @@ class TestDispositionEmissionSkipsWhenNoTransition:
         )
         writer.close()
 
-        audit_lines = [json.loads(l) for l in (tmp_path / "audit.jsonl").read_text().splitlines()]
+        audit_lines = [
+            json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()
+        ]
         finding_lines = [
-            json.loads(l)
-            for l in (tmp_path / "findings.jsonl").read_text().splitlines()
+            json.loads(line) for line in (tmp_path / "findings.jsonl").read_text().splitlines()
         ]
         # Two verify_decision audit events (one per disposition).
         assert len(audit_lines) == 2
@@ -793,8 +792,8 @@ class TestDispositionEmissionSkipsWhenNoTransition:
         from agent import verify as verify_module
         from agent.audit import (
             AuditPaths,
-            AuditWriter,
             AuditWriteError,
+            AuditWriter,
         )
         from agent.config import AuditConfig
         from agent.repo_properties import RepoProperties
@@ -988,9 +987,7 @@ class TestPreScanAuditTrail:
             await runner_mod.run_vulnhunt(clone, cfg, audit_writer=writer)
         writer.close()
 
-        events = [
-            json.loads(l) for l in (tmp_path / "audit.jsonl").read_text().splitlines()
-        ]
+        events = [json.loads(line) for line in (tmp_path / "audit.jsonl").read_text().splitlines()]
         # Both scan_started and scan_completed must exist.
         types = [e["event_type"] for e in events]
         assert "scan_started" in types

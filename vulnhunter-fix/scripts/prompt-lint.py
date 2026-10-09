@@ -18,7 +18,6 @@ import argparse
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PROMPTS_DIR = REPO_ROOT / "prompts"
 
@@ -43,8 +42,7 @@ def lint(prompts_dir: Path) -> int:
         text = path.read_text(encoding="utf-8")
         if REQUIRED_REFERENCE not in text:
             violations.append(
-                f"{path}: does not reference {REQUIRED_REFERENCE!r} — "
-                "drift risk (REQ-CWE-010)"
+                f"{path}: does not reference {REQUIRED_REFERENCE!r} — drift risk (REQ-CWE-010)"
             )
     common = prompts_dir / REQUIRED_REFERENCE
     if not common.is_file():

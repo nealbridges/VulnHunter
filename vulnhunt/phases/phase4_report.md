@@ -27,10 +27,21 @@ NOT get their own summary-table rows.
 
 ### Summary
 
-| ID | Title | CWE | Severity | Exploit Test | Status |
-|---|---|---|---|---|---|
-| VULN-001 | [title] | CWE-XXX | High+/High/Medium/Low/Informational | PASS/FAIL | Confirmed/Fixed/Verified |
-| ... | ... | ... | ... | ... | ... |
+| ID | Title | CWE | Severity | Runtime | Exploit Test | Measured Impact | Status |
+|---|---|---|---|---|---|---|---|
+| VULN-001 | [title] | CWE-XXX | High+/High/Medium/Low/Informational | docker:image@tag / in-process:desc / static | PASS/FAIL | [the number in the class's impact unit] | Confirmed/Fixed/Verified |
+| ... | ... | ... | ... | ... | ... | ... | ... |
+
+The `Runtime` column copies the finding's Phase 2b `Runtime:` line. The
+`Measured Impact` column carries the Phase 3b measurement — the number in the
+class's impact unit, with its denominator ("3 of 20 payloads returned
+victim-tenant rows; 17 rejected fail-closed"), never the mechanism sentence.
+
+**Confirmed invariant**: a row cannot be marked `Confirmed` unless it has (a)
+an executed artifact in the recorded runtime — or a static trace where the
+finding's recorded runtime is `static`, with its justification — and (b) a
+Measured Impact number. A Confirmed row missing either is incomplete: go back
+to Phase 3a/3b, do not narrate past the gap.
 
 Then for each finding, provide the full detail:
 
@@ -44,8 +55,10 @@ Then for each finding, provide the full detail:
 | **Location** | file:line (primary instance) |
 | **Entry Point** | ... |
 | **Data Flow** | source -> ... -> sink |
+| **Runtime** | the finding's recorded `Runtime:` line (Phase 2b) |
 | **PoC** | `${VULNHUNT_DIR}/poc/VULN-NNN_description.md` |
 | **Exploit Test** | `${VULNHUNT_DIR}/exploit_tests/test_vuln_NNN.py` — PASS/FAIL + reason |
+| **Measured Impact** | the Phase 3b block: unit, result, basis, denominator, negative space |
 | **Fix** | [inline diff or link] |
 | **Root Cause** | [shared root cause name, if this instance is part of a sweep group] |
 | **Status** | Confirmed / Fixed / Verified |

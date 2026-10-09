@@ -9,19 +9,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from claude_agent_sdk import (
-    AssistantMessage,
-    ResultMessage,
-    SystemMessage,
-    TaskNotificationMessage,
-    TaskStartedMessage,
-    TextBlock,
-    ThinkingBlock,
-    ToolResultBlock,
-    ToolUseBlock,
-    UserMessage,
-)
-
 from agent import runner as runner_mod
 from agent.runner import (
     AuthRejectedError,
@@ -43,7 +30,18 @@ from agent.runner import (
     run_vulnhunt,
     set_verbosity,
 )
-
+from claude_agent_sdk import (
+    AssistantMessage,
+    ResultMessage,
+    SystemMessage,
+    TaskNotificationMessage,
+    TaskStartedMessage,
+    TextBlock,
+    ThinkingBlock,
+    ToolResultBlock,
+    ToolUseBlock,
+    UserMessage,
+)
 
 # ---------------------------------------------------------------------------
 # _model_tag
@@ -99,9 +97,7 @@ class TestBuildVulnhuntPrompt:
         assert "skip instructions related to getting dependencies" in prompt
 
     def test_read_only_false_omits_suffix(self, tmp_path: Path) -> None:
-        prompt = _build_vulnhunt_prompt(
-            tmp_path, "claude-opus-4-8", read_only=False
-        )
+        prompt = _build_vulnhunt_prompt(tmp_path, "claude-opus-4-8", read_only=False)
         assert "read-only scan" not in prompt
 
 
@@ -130,8 +126,7 @@ def _patch_skill_candidates(
         def __new__(cls, *args: object, **kwargs: object) -> Path:  # type: ignore[misc]
             if (
                 len(args) == 1
-                and str(args[0])
-                == "/home/appuser/.claude/skills"  # container default root
+                and str(args[0]) == "/home/appuser/.claude/skills"  # container default root
             ):
                 return container
             return real_path_cls(*args, **kwargs)  # type: ignore[arg-type]
@@ -173,9 +168,7 @@ class TestVulnhuntSkillPath:
         _patch_skill_candidates(monkeypatch, container=container, home=home)
         assert _vulnhunt_skill_path() == home_skill
 
-    def test_neither_returns_none(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
+    def test_neither_returns_none(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         _patch_skill_candidates(
             monkeypatch,
             container=tmp_path / "no-container",
@@ -245,9 +238,7 @@ def _reset_verbosity():
 
 
 class TestLogAssistantMessage:
-    def test_text_block_always_shown(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_text_block_always_shown(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(0)
         msg = AssistantMessage(content=[TextBlock(text="hello world")], model="m")
         with caplog.at_level(logging.INFO, logger="agent.runner"):
@@ -267,9 +258,7 @@ class TestLogAssistantMessage:
         # At v=0 the full repr of input is NOT shown.
         assert "{'file_path'" not in joined
 
-    def test_tool_use_format_v1_includes_full_input(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_tool_use_format_v1_includes_full_input(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(1)
         msg = AssistantMessage(
             content=[ToolUseBlock(id="x", name="Read", input={"file_path": "/p"})],
@@ -280,9 +269,7 @@ class TestLogAssistantMessage:
         joined = "\n".join(r.getMessage() for r in caplog.records)
         assert "file_path" in joined and "/p" in joined
 
-    def test_thinking_block_only_at_v2(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_thinking_block_only_at_v2(self, caplog: pytest.LogCaptureFixture) -> None:
         msg = AssistantMessage(
             content=[ThinkingBlock(thinking="deep thoughts", signature="sig")],
             model="m",
@@ -303,9 +290,7 @@ class TestLogAssistantMessage:
 
 
 class TestLogUserMessage:
-    def test_tool_result_terse_at_v0(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_tool_result_terse_at_v0(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(0)
         msg = UserMessage(
             content=[
@@ -324,16 +309,10 @@ class TestLogUserMessage:
         assert "line1" in joined
         assert "line2" not in joined
 
-    def test_tool_result_full_at_v1(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_tool_result_full_at_v1(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(1)
         msg = UserMessage(
-            content=[
-                ToolResultBlock(
-                    tool_use_id="abc", content="line1\nline2\nline3"
-                )
-            ],
+            content=[ToolResultBlock(tool_use_id="abc", content="line1\nline2\nline3")],
         )
         with caplog.at_level(logging.INFO, logger="agent.runner"):
             _log_user_message(msg)
@@ -410,9 +389,7 @@ class TestLogTaskStatus:
         # 'completed' surfaces.
         assert "completed" in joined
 
-    def test_all_statuses_at_v1(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_all_statuses_at_v1(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(1)
         running = TaskNotificationMessage(
             subtype="task_notification",
@@ -429,9 +406,7 @@ class TestLogTaskStatus:
         joined = "\n".join(r.getMessage() for r in caplog.records)
         assert "running" in joined
 
-    def test_agent_name_rendered_at_v0(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_agent_name_rendered_at_v0(self, caplog: pytest.LogCaptureFixture) -> None:
         # Friendly subagent name is surfaced in the [name] bracket on
         # terminal status logs so multi-agent fan-outs are readable.
         set_verbosity(0)
@@ -450,9 +425,7 @@ class TestLogTaskStatus:
         joined = "\n".join(r.getMessage() for r in caplog.records)
         assert "[INJ partition 1]" in joined
 
-    def test_no_brackets_when_agent_name_absent(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_no_brackets_when_agent_name_absent(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(0)
         completed = TaskNotificationMessage(
             subtype="task_notification",
@@ -520,9 +493,7 @@ class TestAgentNameFromStarted:
 
 
 class TestLogPerTurnUsage:
-    def test_root_orchestrator_labelled_root(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_root_orchestrator_labelled_root(self, caplog: pytest.LogCaptureFixture) -> None:
         msg = AssistantMessage(
             content=[TextBlock(text="x")],
             model="opus-4-7",
@@ -543,9 +514,7 @@ class TestLogPerTurnUsage:
         assert "out=50" in line
         assert "cache_read=1000" in line
 
-    def test_subagent_uses_registry_label(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_subagent_uses_registry_label(self, caplog: pytest.LogCaptureFixture) -> None:
         msg = AssistantMessage(
             content=[TextBlock(text="x")],
             model="opus-4-7",
@@ -574,9 +543,7 @@ class TestLogPerTurnUsage:
         line = "\n".join(r.getMessage() for r in caplog.records)
         assert "agent=agent[toolu_ab]" in line  # 8-char prefix
 
-    def test_delta_updates_per_agent(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_delta_updates_per_agent(self, caplog: pytest.LogCaptureFixture) -> None:
         # Two sequential turns from the same subagent: second Δ should be
         # measured against the first turn's timestamp, not run_start.
         msg = AssistantMessage(
@@ -598,9 +565,7 @@ class TestLogPerTurnUsage:
 
 
 class TestLogSystemMessage:
-    def test_init_with_vulnhunt_emits_check(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_init_with_vulnhunt_emits_check(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(0)
         msg = SystemMessage(subtype="init", data={"slash_commands": ["vulnhunt", "help"]})
         with caplog.at_level(logging.INFO, logger="agent.runner"):
@@ -624,9 +589,7 @@ class TestLogSystemMessage:
         warns = [r for r in caplog.records if r.levelname == "WARNING"]
         assert not warns
 
-    def test_init_without_vulnhunt_warns(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_init_without_vulnhunt_warns(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(0)
         msg = SystemMessage(subtype="init", data={"slash_commands": ["help"]})
         with caplog.at_level(logging.WARNING, logger="agent.runner"):
@@ -634,9 +597,7 @@ class TestLogSystemMessage:
         joined = "\n".join(r.getMessage() for r in caplog.records)
         assert "No vulnhunt* slash command loaded" in joined
 
-    def test_task_progress_silent_at_v0(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_task_progress_silent_at_v0(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(0)
         msg = SystemMessage(subtype="task_progress", data={"step": "x"})
         with caplog.at_level(logging.INFO, logger="agent.runner"):
@@ -645,9 +606,7 @@ class TestLogSystemMessage:
         joined = "\n".join(r.getMessage() for r in caplog.records)
         assert "task_progress" not in joined and "step" not in joined
 
-    def test_full_data_dump_at_v2(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_full_data_dump_at_v2(self, caplog: pytest.LogCaptureFixture) -> None:
         set_verbosity(2)
         msg = SystemMessage(subtype="custom", data={"key": "value-marker"})
         with caplog.at_level(logging.INFO, logger="agent.runner"):
@@ -692,7 +651,7 @@ class _FakeAsyncClient:
         self._scripts = list(scripts)
         self.queries: list[str] = []
 
-    async def __aenter__(self) -> "_FakeAsyncClient":
+    async def __aenter__(self) -> _FakeAsyncClient:
         return self
 
     async def __aexit__(self, *exc: object) -> bool:
@@ -746,12 +705,8 @@ def _patch_run_vulnhunt_environment(
             return "fake-token"
 
     monkeypatch.setattr(runner_mod, "make_token_manager", lambda *a, **k: FakeMgr())
-    monkeypatch.setattr(
-        runner_mod, "build_claude_settings", lambda *a, **k: '{"env":{}}'
-    )
-    monkeypatch.setattr(
-        runner_mod, "ClaudeSDKClient", lambda *a, **k: fake_client
-    )
+    monkeypatch.setattr(runner_mod, "build_claude_settings", lambda *a, **k: '{"env":{}}')
+    monkeypatch.setattr(runner_mod, "ClaudeSDKClient", lambda *a, **k: fake_client)
     monkeypatch.setattr(runner_mod, "_vulnhunt_skill_path", lambda: skill_path)
     return fake_client
 
@@ -840,8 +795,8 @@ async def test_run_vulnhunt_continuation_loop(
     fake = _patch_run_vulnhunt_environment(
         monkeypatch,
         scripts=[
-            [started, _result_message()],     # first turn: pending task remains
-            [completed, _result_message()],   # second turn: drains pending
+            [started, _result_message()],  # first turn: pending task remains
+            [completed, _result_message()],  # second turn: drains pending
         ],
         skill_path=tmp_path / "skill",
     )
@@ -891,9 +846,7 @@ async def test_run_vulnhunt_stall_cap_logs_warning_when_no_tasks_complete(
         [_result_message()],
         [_result_message()],
     ]
-    _patch_run_vulnhunt_environment(
-        monkeypatch, scripts=scripts, skill_path=tmp_path / "skill"
-    )
+    _patch_run_vulnhunt_environment(monkeypatch, scripts=scripts, skill_path=tmp_path / "skill")
     with caplog.at_level(logging.WARNING, logger="agent.runner"):
         await run_vulnhunt(clone, populated_agent_config)
     joined = "\n".join(r.getMessage() for r in caplog.records)
@@ -974,9 +927,7 @@ async def test_run_vulnhunt_terminal_event_resets_stall_counter(
         # Cycle 3: t2 completes — pending now empty so loop exits cleanly.
         [completed_t2, _result_message()],
     ]
-    _patch_run_vulnhunt_environment(
-        monkeypatch, scripts=scripts, skill_path=tmp_path / "skill"
-    )
+    _patch_run_vulnhunt_environment(monkeypatch, scripts=scripts, skill_path=tmp_path / "skill")
     with caplog.at_level(logging.WARNING, logger="agent.runner"):
         await run_vulnhunt(clone, populated_agent_config)
     joined = "\n".join(r.getMessage() for r in caplog.records)
@@ -1341,9 +1292,7 @@ class TestRateLimitDetectors:
         )
 
     def test_system_message_no_data_ignored(self) -> None:
-        assert not _is_rate_limit_system_message(
-            SystemMessage(subtype="init", data=None)
-        )
+        assert not _is_rate_limit_system_message(SystemMessage(subtype="init", data=None))
 
     def test_result_message_is_error_false_not_rate_limit(self) -> None:
         assert not _is_rate_limit_result(_result_message())
@@ -1510,9 +1459,7 @@ def _patch_run_vulnhunt_environment_multi_attempt(
         return client
 
     monkeypatch.setattr(runner_mod, "make_token_manager", lambda *a, **k: FakeMgr())
-    monkeypatch.setattr(
-        runner_mod, "build_claude_settings", lambda *a, **k: '{"env":{}}'
-    )
+    monkeypatch.setattr(runner_mod, "build_claude_settings", lambda *a, **k: '{"env":{}}')
     monkeypatch.setattr(runner_mod, "ClaudeSDKClient", make_client)
     monkeypatch.setattr(runner_mod, "_vulnhunt_skill_path", lambda: skill_path)
     return created
@@ -1547,9 +1494,7 @@ async def test_run_vulnhunt_cold_start_rate_limit_retries(
         ],
         skill_path=tmp_path / "skill",
     )
-    out = await run_vulnhunt(
-        clone, populated_agent_config, backoffs=_TEST_NO_DELAY_BACKOFFS
-    )
+    out = await run_vulnhunt(clone, populated_agent_config, backoffs=_TEST_NO_DELAY_BACKOFFS)
     # Python pre-created the results dir; assert run_vulnhunt returned it.
     assert out is not None
     assert out.parent == clone
@@ -1583,9 +1528,7 @@ async def test_run_vulnhunt_mid_stream_rate_limit_does_not_retry(
         ],
         skill_path=tmp_path / "skill",
     )
-    out = await run_vulnhunt(
-        clone, populated_agent_config, backoffs=_TEST_NO_DELAY_BACKOFFS
-    )
+    out = await run_vulnhunt(clone, populated_agent_config, backoffs=_TEST_NO_DELAY_BACKOFFS)
     # Python pre-created the results dir; assert run_vulnhunt returned it.
     assert out is not None
     assert out.parent == clone
@@ -1616,9 +1559,7 @@ async def test_run_vulnhunt_rate_limit_result_message_retries(
         ],
         skill_path=tmp_path / "skill",
     )
-    out = await run_vulnhunt(
-        clone, populated_agent_config, backoffs=_TEST_NO_DELAY_BACKOFFS
-    )
+    out = await run_vulnhunt(clone, populated_agent_config, backoffs=_TEST_NO_DELAY_BACKOFFS)
     # Python pre-created the results dir; assert run_vulnhunt returned it.
     assert out is not None
     assert out.parent == clone
@@ -1650,11 +1591,8 @@ async def test_run_vulnhunt_rate_limit_exhausts_retries(
         per_attempt_scripts=per_attempt_scripts,
         skill_path=tmp_path / "skill",
     )
-    with caplog.at_level(logging.ERROR, logger="agent.runner"):
-        with pytest.raises(RateLimitError):
-            await run_vulnhunt(
-                clone, populated_agent_config, backoffs=_TEST_NO_DELAY_BACKOFFS
-            )
+    with caplog.at_level(logging.ERROR, logger="agent.runner"), pytest.raises(RateLimitError):
+        await run_vulnhunt(clone, populated_agent_config, backoffs=_TEST_NO_DELAY_BACKOFFS)
     # All scripted attempts were consumed.
     assert len(created) == len(per_attempt_scripts)
     msgs = "\n".join(r.getMessage() for r in caplog.records)
@@ -1689,9 +1627,7 @@ async def test_run_vulnhunt_assistant_resets_rate_limit_counter(
         ],
         skill_path=tmp_path / "skill",
     )
-    out = await run_vulnhunt(
-        clone, populated_agent_config, backoffs=_TEST_NO_DELAY_BACKOFFS
-    )
+    out = await run_vulnhunt(clone, populated_agent_config, backoffs=_TEST_NO_DELAY_BACKOFFS)
     # Python pre-created the results dir; assert run_vulnhunt returned it.
     assert out is not None
     assert out.parent == clone
@@ -1757,9 +1693,7 @@ class TestGitContext:
         ctx = runner_mod._git_context(tmp_path)
         assert ctx["repo_url"] == "https://github.com/example-org/example"
 
-    def test_git_suffix_stripped(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
+    def test_git_suffix_stripped(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         _stub_git_runner(monkeypatch, origin="https://github.com/example-org/example.git")
         ctx = runner_mod._git_context(tmp_path)
         assert ctx["repo_url"] == "https://github.com/example-org/example"
@@ -1860,9 +1794,7 @@ class TestComputeResultsDir:
         assert out.parent == clone
         assert out.name.startswith("myrepo_VULNHUNT_RESULTS_opus48_")
         # Timestamp tail looks like YYYY-MM-DD-HHMMSS.
-        assert re.match(
-            r".*_VULNHUNT_RESULTS_opus48_\d{4}-\d{2}-\d{2}-\d{6}$", out.name
-        )
+        assert re.match(r".*_VULNHUNT_RESULTS_opus48_\d{4}-\d{2}-\d{2}-\d{6}$", out.name)
 
     def test_unique_per_call(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         # Two calls in the same second should still differ because
@@ -1953,9 +1885,7 @@ class TestBuildVulnhuntPromptPreStaged:
         prompt = _build_vulnhunt_prompt(tmp_path, "claude-opus-4-8")
         assert "Pre-resolved scan metadata" not in prompt
 
-    def test_bash_line_renders_effective_tools_when_present(
-        self, tmp_path: Path
-    ) -> None:
+    def test_bash_line_renders_effective_tools_when_present(self, tmp_path: Path) -> None:
         """Bug-fix (PR #20 review): the read-only bash_line used to hard-
         code "Read/Grep/Glob/Write/Edit only", which lied to the model
         when the TOML allow-list didn't include Grep / Edit. Now the
@@ -1977,9 +1907,7 @@ class TestBuildVulnhuntPromptPreStaged:
         assert "Grep" not in prompt
         assert "Edit" not in prompt
 
-    def test_bash_line_with_grep_and_edit_in_allow_list(
-        self, tmp_path: Path
-    ) -> None:
+    def test_bash_line_with_grep_and_edit_in_allow_list(self, tmp_path: Path) -> None:
         prompt = _build_vulnhunt_prompt(
             tmp_path,
             "claude-opus-4-8",
@@ -1993,9 +1921,7 @@ class TestBuildVulnhuntPromptPreStaged:
         assert "Grep" in prompt
         assert "Edit" in prompt
 
-    def test_bash_line_falls_back_when_no_effective_tools_supplied(
-        self, tmp_path: Path
-    ) -> None:
+    def test_bash_line_falls_back_when_no_effective_tools_supplied(self, tmp_path: Path) -> None:
         """``effective_tools=None`` is the legacy path (test callers that
         bypass ``run_vulnhunt``). Falls back to a vague-but-honest
         phrasing rather than hard-coding a list that may not match."""
@@ -2008,14 +1934,9 @@ class TestBuildVulnhuntPromptPreStaged:
             enable_bash=False,
             effective_tools=None,
         )
-        assert (
-            "Bash is NOT available — use the non-Bash tools in your "
-            "allow-list only." in prompt
-        )
+        assert "Bash is NOT available — use the non-Bash tools in your allow-list only." in prompt
 
-    def test_bash_line_enable_bash_ignores_effective_tools(
-        self, tmp_path: Path
-    ) -> None:
+    def test_bash_line_enable_bash_ignores_effective_tools(self, tmp_path: Path) -> None:
         """When Bash IS available, the bash_line doesn't enumerate other
         tools — just states Bash is available."""
         prompt = _build_vulnhunt_prompt(
@@ -2070,7 +1991,7 @@ async def test_run_vulnhunt_strips_bash_from_allowed_tools(
         def __init__(self, opts: Any) -> None:
             captured_options.append(opts)
 
-        async def __aenter__(self) -> "_CapturingClient":
+        async def __aenter__(self) -> _CapturingClient:
             return self
 
         async def __aexit__(self, *a: object) -> bool:
@@ -2082,6 +2003,7 @@ async def test_run_vulnhunt_strips_bash_from_allowed_tools(
         def receive_response(self):
             async def _gen():
                 yield _result_message()
+
             return _gen()
 
     class _FakeMgr:
@@ -2118,7 +2040,7 @@ async def test_run_vulnhunt_appends_bash_when_enable_bash_true(
         def __init__(self, opts: Any) -> None:
             captured_options.append(opts)
 
-        async def __aenter__(self) -> "_CapturingClient":
+        async def __aenter__(self) -> _CapturingClient:
             return self
 
         async def __aexit__(self, *a: object) -> bool:
@@ -2130,6 +2052,7 @@ async def test_run_vulnhunt_appends_bash_when_enable_bash_true(
         def receive_response(self):
             async def _gen():
                 yield _result_message()
+
             return _gen()
 
     class _FakeMgr:
@@ -2170,7 +2093,7 @@ async def test_run_vulnhunt_warns_on_enable_bash_with_read_only(
         def __init__(self, _opts: object) -> None:
             pass
 
-        async def __aenter__(self) -> "_Client":
+        async def __aenter__(self) -> _Client:
             return self
 
         async def __aexit__(self, *a: object) -> bool:
@@ -2182,6 +2105,7 @@ async def test_run_vulnhunt_warns_on_enable_bash_with_read_only(
         def receive_response(self):
             async def _gen():
                 yield _result_message()
+
             return _gen()
 
     class _FakeMgr:
@@ -2198,12 +2122,11 @@ async def test_run_vulnhunt_warns_on_enable_bash_with_read_only(
     _stub_git_runner(monkeypatch)
 
     with caplog.at_level(logging.WARNING, logger="agent.runner"):
-        await run_vulnhunt(
-            clone, populated_agent_config, enable_bash=True, read_only=True
-        )
+        await run_vulnhunt(clone, populated_agent_config, enable_bash=True, read_only=True)
     joined = "\n".join(r.getMessage() for r in caplog.records)
     assert "enable_bash=True with read_only=True" in joined
     assert "misconfiguration" in joined
+
 
 @pytest.mark.asyncio
 async def test_run_vulnhunt_refuses_when_prior_results_exist(
@@ -2247,7 +2170,7 @@ async def test_run_vulnhunt_injects_pre_staged_values_into_prompt(
         def __init__(self, _opts: Any) -> None:
             pass
 
-        async def __aenter__(self) -> "_Client":
+        async def __aenter__(self) -> _Client:
             return self
 
         async def __aexit__(self, *a: object) -> bool:
@@ -2259,6 +2182,7 @@ async def test_run_vulnhunt_injects_pre_staged_values_into_prompt(
         def receive_response(self):
             async def _gen():
                 yield _result_message()
+
             return _gen()
 
     class _FakeMgr:

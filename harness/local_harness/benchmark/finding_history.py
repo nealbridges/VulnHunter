@@ -67,10 +67,9 @@ def get_stable_findings(threshold=3):
     stable = set()
 
     for finding_id, data in history.items():
-        entries = (
-            [(ts, True) for ts in data.get("detected", [])]
-            + [(ts, False) for ts in data.get("missed", [])]
-        )
+        entries = [(ts, True) for ts in data.get("detected", [])] + [
+            (ts, False) for ts in data.get("missed", [])
+        ]
         # Secondary key makes ordering deterministic when a detected and a
         # missed entry share the same second-granularity timestamp.
         entries.sort(key=lambda x: (x[0], x[1]))

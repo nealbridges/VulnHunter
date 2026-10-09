@@ -30,16 +30,36 @@ import re
 import sys
 from pathlib import Path
 
-
 CWE_CLASS_ROUTING = {
-    287: "authz", 290: "authz", 306: "authz", 639: "authz",
-    862: "authz", 863: "authz", 915: "authz",
-    22: "injection", 78: "injection", 79: "injection", 89: "injection",
-    94: "injection", 352: "injection", 434: "injection", 502: "injection",
-    601: "injection", 611: "injection", 918: "injection",
-    295: "crypto", 326: "crypto", 327: "crypto", 328: "crypto",
-    330: "crypto", 345: "crypto", 347: "crypto",
-    117: "resource", 200: "resource", 362: "resource", 400: "resource",
+    287: "authz",
+    290: "authz",
+    306: "authz",
+    639: "authz",
+    862: "authz",
+    863: "authz",
+    915: "authz",
+    22: "injection",
+    78: "injection",
+    79: "injection",
+    89: "injection",
+    94: "injection",
+    352: "injection",
+    434: "injection",
+    502: "injection",
+    601: "injection",
+    611: "injection",
+    918: "injection",
+    295: "crypto",
+    326: "crypto",
+    327: "crypto",
+    328: "crypto",
+    330: "crypto",
+    345: "crypto",
+    347: "crypto",
+    117: "resource",
+    200: "resource",
+    362: "resource",
+    400: "resource",
     532: "resource",
 }
 
@@ -128,7 +148,10 @@ def _load_results(results_dir: Path) -> list[dict]:
         except (OSError, json.JSONDecodeError):
             continue
         if isinstance(data, dict) and data.get("status") in (
-            "VERIFIED", "VERIFIED_FULL", "VERIFIED_MITIGATION", "VERIFIED_WORKAROUND"
+            "VERIFIED",
+            "VERIFIED_FULL",
+            "VERIFIED_MITIGATION",
+            "VERIFIED_WORKAROUND",
         ):
             findings.append(data)
     return findings
@@ -153,8 +176,9 @@ def _load_triage_sidecar(triage_dir: Path | None, vuln_id: str) -> dict:
     return data if isinstance(data, dict) else {}
 
 
-def pass1_symbol(graph: dict, sink_symbol: str, routed: list[str],
-                 repo_root: "Path | None" = None) -> list[str]:
+def pass1_symbol(
+    graph: dict, sink_symbol: str, routed: list[str], repo_root: Path | None = None
+) -> list[str]:
     """Return callers of sink_symbol not present in routed list (siblings).
 
     Under a grep-backed graph there are no call edges to walk, so the AST
@@ -178,8 +202,12 @@ def pass1_symbol(graph: dict, sink_symbol: str, routed: list[str],
         return sorted({c for c in callers if c and c not in routed_set})
     # AST path: hand-walk in-edges to the sink (tolerates from/to and src/dst).
     edges = graph.get("edges", [])
-    sinks = [nid for nid, node in (graph.get("nodes") or {}).items()
-             if node.get("qualified_name") == sink_symbol or node.get("name") == sink_symbol.split(":")[-1]]
+    sinks = [
+        nid
+        for nid, node in (graph.get("nodes") or {}).items()
+        if node.get("qualified_name") == sink_symbol
+        or node.get("name") == sink_symbol.split(":")[-1]
+    ]
     if not sinks:
         return []
     siblings: list[str] = []
@@ -215,7 +243,9 @@ def _sweep_ok(found: int, remaining: int) -> str:
 MAX_SWEEP_FILE_BYTES = 1_000_000
 
 
-def pass2_pattern(repo_root: Path, patterns: list[str], exclude_files: set[str]) -> list[tuple[str, int, str]]:
+def pass2_pattern(
+    repo_root: Path, patterns: list[str], exclude_files: set[str]
+) -> list[tuple[str, int, str]]:
     """Return (file, line, pattern) triples matching pattern set, skipping exclude_files.
 
     Uses the shared permission-guarded walker from
@@ -226,8 +256,28 @@ def pass2_pattern(repo_root: Path, patterns: list[str], exclude_files: set[str])
     from vulnhunter_fix.graph.config import safe_walk_files
 
     hits: list[tuple[str, int, str]] = []
-    sweep_suffixes = {".py", ".go", ".java", ".ts", ".tsx", ".js", ".jsx", ".yaml", ".yml", ".tf", ".json"}
-    sweep_excluded_dirs = {".git", ".venv", "node_modules", "__pycache__", "build", "dist", "vendor"}
+    sweep_suffixes = {
+        ".py",
+        ".go",
+        ".java",
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx",
+        ".yaml",
+        ".yml",
+        ".tf",
+        ".json",
+    }
+    sweep_excluded_dirs = {
+        ".git",
+        ".venv",
+        "node_modules",
+        "__pycache__",
+        "build",
+        "dist",
+        "vendor",
+    }
     for path in safe_walk_files(repo_root, excluded_dir_parts=sweep_excluded_dirs):
         try:
             if path.suffix not in sweep_suffixes:
@@ -252,7 +302,7 @@ def pass2_pattern(repo_root: Path, patterns: list[str], exclude_files: set[str])
         for pat in patterns:
             try:
                 for m in re.finditer(pat, text):
-                    line_no = text[:m.start()].count("\n") + 1
+                    line_no = text[: m.start()].count("\n") + 1
                     hits.append((rel, line_no, pat))
             except re.error:
                 continue
@@ -305,9 +355,8 @@ def sweep(args) -> dict:
         # (Path B) REMAIN and force the FULL->MITIGATION downgrade. This is
         # the mechanical downgrade decision that was prose-only ("set by
         # executor" — the executor no longer exists) (12-seg review S4).
-        mitigated = (
-            sum(1 for s in siblings_pass1 if s.split(":", 1)[0] in files_modified)
-            + sum(1 for f, _ln, _p in pass2_hits if f in files_modified)
+        mitigated = sum(1 for s in siblings_pass1 if s.split(":", 1)[0] in files_modified) + sum(
+            1 for f, _ln, _p in pass2_hits if f in files_modified
         )
         remaining = found - mitigated
         sweep_revised = remaining > 0
@@ -350,8 +399,11 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--graph", required=True)
     ap.add_argument("--patterns", required=True)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--triage-dir", default=None,
-                    help="Directory of triage sidecars (SCH-5); required for reliable Pass-1 anchoring.")
+    ap.add_argument(
+        "--triage-dir",
+        default=None,
+        help="Directory of triage sidecars (SCH-5); required for reliable Pass-1 anchoring.",
+    )
     args = ap.parse_args(argv[1:])
 
     result = sweep(args)
@@ -359,12 +411,17 @@ def main(argv: list[str]) -> int:
     # Fail closed when the graph was unavailable — pass-1 anchoring could not
     # run, so a "no siblings" result is not trustworthy (12-seg review S4).
     if result.get("sweep_incomplete"):
-        print(json.dumps({
-            "status": "sweep_incomplete",
-            "reason": "graph missing or unparseable — Pass-1 anchoring impossible; "
-                      "sweep result is not trustworthy",
-            "out": args.out,
-        }), file=sys.stderr)
+        print(
+            json.dumps(
+                {
+                    "status": "sweep_incomplete",
+                    "reason": "graph missing or unparseable — Pass-1 anchoring impossible; "
+                    "sweep result is not trustworthy",
+                    "out": args.out,
+                }
+            ),
+            file=sys.stderr,
+        )
         return 3
     print(json.dumps({"status": "ok", "rows": len(result["rows"]), "out": args.out}))
     return 0

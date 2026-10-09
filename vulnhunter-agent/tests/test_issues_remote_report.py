@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from agent import issues_remote_report as remote_mod
 from agent.issues_remote_report import (
     DownloadedReport,
@@ -144,8 +143,7 @@ class TestDownloadLatestReport:
         try:
             assert (result.path / "README.md").is_file()
             assert result.rel_path_in_dest == (
-                "src_owner/src_name/abc1234/"
-                "src_name_VULNHUNT_RESULTS_opus47_2026-06-23-141824"
+                "src_owner/src_name/abc1234/src_name_VULNHUNT_RESULTS_opus47_2026-06-23-141824"
             )
         finally:
             result.cleanup()
@@ -216,16 +214,12 @@ class TestDownloadLatestReport:
         result.cleanup()
         assert not workdir.exists(), f"workdir {workdir} survived cleanup"
 
-    def test_missing_destination_raises(
-        self, populated_agent_config: Any
-    ) -> None:
+    def test_missing_destination_raises(self, populated_agent_config: Any) -> None:
         from dataclasses import replace
 
         cfg = replace(
             populated_agent_config,
-            publish=replace(
-                populated_agent_config.publish, destination_repo=""
-            ),
+            publish=replace(populated_agent_config.publish, destination_repo=""),
         )
         with pytest.raises(RemoteReportError, match="destination_repo"):
             download_latest_report(
@@ -262,9 +256,7 @@ class TestDownloadLatestReport:
         (dest / "src_owner" / "src_name" / "stuff" / "subdir").mkdir(parents=True)
         cfg = self._cfg_authed(populated_agent_config)
         self._stub_clone(monkeypatch, dest)
-        with pytest.raises(
-            RemoteReportError, match="No \\*VULNHUNT_RESULTS\\*"
-        ):
+        with pytest.raises(RemoteReportError, match="No \\*VULNHUNT_RESULTS\\*"):
             download_latest_report(
                 "https://github.com/src_owner/src_name",
                 config=cfg,
@@ -298,9 +290,7 @@ class TestDownloadLatestReport:
 
         recorded_workdirs: list[Path] = []
 
-        def failing_run(
-            cmd: list[str], *, cwd: Any = None, timeout: int = 300
-        ) -> Any:
+        def failing_run(cmd: list[str], *, cwd: Any = None, timeout: int = 300) -> Any:
             if cmd[:2] == ["git", "clone"]:
                 recorded_workdirs.append(Path(cmd[-1]))
                 raise RemoteReportError("synthetic clone failure")
@@ -325,9 +315,7 @@ class TestDownloadLatestReport:
 
 
 class TestRunSubprocess:
-    def test_failed_command_raises_with_redacted_url(
-        self, tmp_path: Path
-    ) -> None:
+    def test_failed_command_raises_with_redacted_url(self, tmp_path: Path) -> None:
         """Exercise the real _run wrapper to cover its error path."""
         from agent.issues_remote_report import _run
 
@@ -336,9 +324,7 @@ class TestRunSubprocess:
                 ["git", "-C", str(tmp_path), "status"],
             )
 
-    def test_url_redacted_in_error(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_url_redacted_in_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """The token in cmd args + stderr must not leak in the raised error.
 
         Mocks ``subprocess.run`` rather than invoking a real ``git clone``
@@ -355,11 +341,7 @@ class TestRunSubprocess:
             # git typically echoes the URL in its error output, so make
             # the fake stderr match that shape so we know redaction
             # actually scrubs both the cmd args AND stderr text.
-            stderr = (
-                "fatal: unable to access "
-                "'https://x-access-token:secret@github.com/o/r/': "
-                "boom"
-            )
+            stderr = "fatal: unable to access 'https://x-access-token:secret@github.com/o/r/': boom"
 
         monkeypatch.setattr(
             "agent.issues_remote_report.subprocess.run",

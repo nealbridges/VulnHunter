@@ -12,14 +12,12 @@ from __future__ import annotations
 import httpx
 import pytest
 import respx
-
 from agent._github_verify import GitHubVerifyError, IssueRef, make_client
 from agent.verify_post import (
     PostResult,
     post_disposition,
     should_reopen,
 )
-
 
 # ---------- should_reopen (pure) --------------------------------------------
 
@@ -103,9 +101,7 @@ async def test_post_disposition_not_fixed_reopens(
     respx_mock.post(_comments_url(42)).mock(
         return_value=httpx.Response(201, json=_comment_response(102))
     )
-    respx_mock.patch(_issue_url(42)).mock(
-        return_value=httpx.Response(200, json={"state": "open"})
-    )
+    respx_mock.patch(_issue_url(42)).mock(return_value=httpx.Response(200, json={"state": "open"}))
     async with make_client("tok") as client:
         result = await post_disposition(
             client,
@@ -134,9 +130,7 @@ async def test_post_disposition_partial_and_inconclusive_reopen(
     respx_mock.post(_comments_url(42)).mock(
         return_value=httpx.Response(201, json=_comment_response())
     )
-    respx_mock.patch(_issue_url(42)).mock(
-        return_value=httpx.Response(200, json={"state": "open"})
-    )
+    respx_mock.patch(_issue_url(42)).mock(return_value=httpx.Response(200, json={"state": "open"}))
     async with make_client("tok") as client:
         result = await post_disposition(
             client,

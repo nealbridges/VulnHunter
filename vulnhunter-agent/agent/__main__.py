@@ -51,19 +51,21 @@ from pathlib import Path
 import httpx
 
 from . import audit as audit_mod
-from . import audit_extract
+from . import audit_extract, issues_extract
 from . import issues as issues_stage
-from . import issues_extract
 from . import repo_properties as repo_props
 from ._github import api_base
+from ._stream_events import SessionTotals
 from .auth import make_token_manager, resolve_verify
 from .clone import shallow_clone
-from .config import AgentConfig, AuditConfig, load_config
+from .config import AgentConfig, load_config
+from .issues import PostSummary
 from .issues_remote_report import (
     DownloadedReport,
     RemoteReportError,
     download_latest_report,
 )
+from .manifest import write_manifest
 from .publish import PublishError, publish_results
 from .runner import (
     _git_context,
@@ -72,10 +74,6 @@ from .runner import (
     run_vulnhunt,
     set_verbosity,
 )
-from ._stream_events import SessionTotals
-from .issues import PostSummary
-from .issues_extract import Finding
-from .manifest import write_manifest
 from .token_client import GitHubRole, get_github_token
 
 
@@ -183,8 +181,7 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="issues",
         action="store_true",
         default=None,
-        help="Post a GitHub issue per confirmed finding (overrides config; "
-        "default: enabled).",
+        help="Post a GitHub issue per confirmed finding (overrides config; default: enabled).",
     )
     issues_group.add_argument(
         "--no-issues",
@@ -348,8 +345,7 @@ def _build_parser() -> argparse.ArgumentParser:
     audit_group.add_argument(
         "--audit-actor",
         default=None,
-        help="Worker/agent identity recorded in audit events "
-        "(overrides [audit] actor).",
+        help="Worker/agent identity recorded in audit events (overrides [audit] actor).",
     )
 
     # ------------------------------------------------------------------ repo properties
@@ -430,9 +426,7 @@ def _short_sha(clone_dir: object) -> str:
     return sha or "unknown"
 
 
-def _resolve_modes(
-    args: argparse.Namespace, config: AgentConfig
-) -> tuple[bool, bool, bool]:
+def _resolve_modes(args: argparse.Namespace, config: AgentConfig) -> tuple[bool, bool, bool]:
     """Resolve the (scan, publish, issues) tristate flags + config defaults.
 
     Each flag defaults to True if not explicitly set; publish additionally
@@ -451,14 +445,11 @@ def _resolve_modes(
     return scan, publish, issues
 
 
-def _validate_modes(
-    *, scan: bool, publish: bool, issues: bool, config: AgentConfig
-) -> None:
+def _validate_modes(*, scan: bool, publish: bool, issues: bool, config: AgentConfig) -> None:
     """Reject incoherent toggle combinations before we do any work."""
     if not scan and not publish and not issues:
         raise ValueError(
-            "Nothing to do: --no-scan + --no-publish + --no-issues. "
-            "Enable at least one stage."
+            "Nothing to do: --no-scan + --no-publish + --no-issues. Enable at least one stage."
         )
     if scan and not publish and issues:
         raise ValueError(
@@ -466,12 +457,11 @@ def _validate_modes(
             "embed a link to the published report, but the report wouldn't "
             "be uploaded. Either flip --publish on, or pass --no-issues."
         )
-    if not scan and issues:
-        if not config.publish.destination_repo:
-            raise ValueError(
-                "--no-scan + --issues requires publish.destination_repo to be "
-                "set (we need somewhere to download the latest report from)."
-            )
+    if not scan and issues and not config.publish.destination_repo:
+        raise ValueError(
+            "--no-scan + --issues requires publish.destination_repo to be "
+            "set (we need somewhere to download the latest report from)."
+        )
     # Token presence is required by stage, not blanket.
     # - issues needs scan_token (post + label + dedup-fetch on target repo)
     # - publish needs reports_token (push to destination_repo)
@@ -514,9 +504,8 @@ def _required_roles(*, scan: bool, publish: bool, issues: bool) -> list[GitHubRo
     roles: list[GitHubRole] = []
     if issues:
         roles.append("scan")
-    if publish or (not scan and issues):
-        if "reports" not in roles:
-            roles.append("reports")
+    if (publish or (not scan and issues)) and "reports" not in roles:
+        roles.append("reports")
     return roles
 
 
@@ -577,8 +566,7 @@ def _preflight_standalone_tokens(
                 resp = client.get(f"{api}/installation/repositories", headers=headers)
         except httpx.HTTPError as exc:
             raise PreflightError(
-                f"preflight check for '{role}' token failed to reach "
-                f"{api}: {exc!s}"
+                f"preflight check for '{role}' token failed to reach {api}: {exc!s}"
             ) from exc
         if resp.status_code in (401, 403) and not _is_pat_on_app_endpoint(resp):
             raise PreflightError(_format_preflight_failure(role, api, token, resp))
@@ -617,9 +605,7 @@ _PREFLIGHT_DIAGNOSTIC_HEADERS = (
 )
 
 
-def _format_preflight_failure(
-    role: str, api: str, token: str, resp: httpx.Response
-) -> str:
+def _format_preflight_failure(role: str, api: str, token: str, resp: httpx.Response) -> str:
     """Assemble a diagnostic error message from GitHub's actual response.
 
     Includes the response body (truncated), key diagnostic headers,
@@ -711,15 +697,11 @@ def _cli_repo_properties(args: argparse.Namespace) -> repo_props.RepoProperties:
     values: dict[str, str] = {}
     for raw in getattr(args, "repo_property", None) or []:
         if "=" not in raw:
-            raise ValueError(
-                f"--repo-property must be NAME=VALUE (got {raw!r})."
-            )
+            raise ValueError(f"--repo-property must be NAME=VALUE (got {raw!r}).")
         name, _, value = raw.partition("=")
         name = name.strip()
         if not name:
-            raise ValueError(
-                f"--repo-property NAME must be non-empty (got {raw!r})."
-            )
+            raise ValueError(f"--repo-property NAME must be non-empty (got {raw!r}).")
         values[name] = value.strip()
     return repo_props.RepoProperties(values=values)
 
@@ -750,7 +732,6 @@ def _resolve_repo_properties(
         return cli
     fetched = repo_props.fetch_from_github(repo_url_for_github, config=config)
     return repo_props.resolve(cli_overrides=cli, github=fetched)
-
 
 
 async def _amain(args: argparse.Namespace) -> int:
@@ -789,7 +770,7 @@ async def _amain(args: argparse.Namespace) -> int:
 async def _run_scan_flow(
     args: argparse.Namespace,
     config: AgentConfig,
-    audit_writer: "audit_mod.AuditWriter | None",
+    audit_writer: audit_mod.AuditWriter | None,
 ) -> int:
     """Original scan → publish → issues workflow, threaded with audit emission."""
     # main() already validates ``len(args.targets) == 1`` for scan mode;
@@ -806,9 +787,7 @@ async def _run_scan_flow(
     # broker's successful initial mint already proves the App
     # credentials, and the agent reads on demand thereafter.
     if not config.github.broker_token_dir:
-        _preflight_standalone_tokens(
-            config=config, scan=scan, publish=publish, issues=issues
-        )
+        _preflight_standalone_tokens(config=config, scan=scan, publish=publish, issues=issues)
 
     # Preflight the optional operator-defined findings-stream metadata
     # tags. CLI overrides win, then GitHub custom properties (per the
@@ -819,9 +798,7 @@ async def _run_scan_flow(
     # will emit these fields anyway) so a --no-audit run doesn't pay
     # the round-trip.
     if audit_writer is not None:
-        repo_properties = _resolve_repo_properties(
-            args, config, repo_url_for_github=repo_url
-        )
+        repo_properties = _resolve_repo_properties(args, config, repo_url_for_github=repo_url)
         logging.info(
             "Resolved repo properties: %s",
             repo_properties.values or "<none>",
@@ -1006,9 +983,7 @@ async def _run_scan_flow(
         # Extraction is done up-front (and shared with the audit stream)
         # so we don't pay for it twice when both --audit and --issues are
         # enabled. Skipped when we have nothing to feed it to.
-        audit_ctx = _audit_context_for_results(
-            results_dir, args, scan, audit_writer
-        )
+        audit_ctx = _audit_context_for_results(results_dir, args, scan, audit_writer)
         # ``repo_properties`` was resolved in preflight (see top of
         # _run_scan_flow) so a broken GitHub properties endpoint fails
         # before the scan starts, not after. The same values are used
@@ -1024,16 +999,11 @@ async def _run_scan_flow(
                 )
             except Exception as exc:  # noqa: BLE001
                 logging.warning(
-                    "Finding extraction failed (audit findings-open events "
-                    "will be skipped): %s",
+                    "Finding extraction failed (audit findings-open events will be skipped): %s",
                     exc,
                 )
                 extracted = None
-            if (
-                audit_writer is not None
-                and audit_ctx is not None
-                and extracted is not None
-            ):
+            if audit_writer is not None and audit_ctx is not None and extracted is not None:
                 events = audit_extract.build_finding_events(
                     extracted,
                     repo_slug=audit_ctx["repo_slug"],
@@ -1049,9 +1019,7 @@ async def _run_scan_flow(
 
         if issues:
             token_manager = make_token_manager(config, name="issues")
-            target_repo_url = (
-                args.issues_target_repo or config.issues.target_repo or repo_url
-            )
+            target_repo_url = args.issues_target_repo or config.issues.target_repo or repo_url
             try:
                 summary = await issues_stage.post_issues(
                     results_dir=results_dir,
@@ -1083,7 +1051,6 @@ async def _run_scan_flow(
     finally:
         if download is not None:
             download.cleanup()
-
 
 
 async def _amain_verify(args: argparse.Namespace) -> int:
@@ -1164,11 +1131,12 @@ def _issue_url_to_repo_url(issue_url: str) -> str:
             return issue_url[:idx].rstrip("/")
     return issue_url.rstrip("/")
 
+
 def _audit_context_for_results(
     results_dir: Path | None,
     args: argparse.Namespace,
     scan: bool,
-    audit_writer: "audit_mod.AuditWriter | None",
+    audit_writer: audit_mod.AuditWriter | None,
 ) -> dict[str, str] | None:
     """Compute report_id + repo_slug for audit emissions post-scan.
 
@@ -1188,9 +1156,7 @@ def _audit_context_for_results(
     return {"report_id": report_id, "repo_slug": repo_slug}
 
 
-def _repo_slug_for_audit(
-    results_dir: Path, args: argparse.Namespace, scan: bool
-) -> str:
+def _repo_slug_for_audit(results_dir: Path, args: argparse.Namespace, scan: bool) -> str:
     """Best-effort org/repo derivation for audit records post-scan.
 
     - When we have a live clone (--scan), read origin via git.
@@ -1213,7 +1179,6 @@ def _repo_slug_for_audit(
         normalized = _normalize_repo_url(source_url) or source_url
         return _repo_slug_from_url(normalized, results_dir.name)
     return f"unknown/{results_dir.name}"
-
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -40,9 +40,7 @@ class DiffApplyError(ValueError):
     """
 
 
-def reconstruct_original(
-    current_body: str, edits: list[dict]
-) -> str:
+def reconstruct_original(current_body: str, edits: list[dict]) -> str:
     """Recover the earliest captured issue body from GitHub's edit
     history.
 
@@ -74,9 +72,7 @@ def reconstruct_original(
     try:
         sorted_edits = sorted(edits, key=lambda e: e["editedAt"])
     except KeyError as exc:
-        raise DiffApplyError(
-            f"Edit missing required field: {exc}"
-        ) from exc
+        raise DiffApplyError(f"Edit missing required field: {exc}") from exc
     oldest = sorted_edits[0]
     snapshot = oldest.get("diff")
     if snapshot is None:
@@ -86,7 +82,6 @@ def reconstruct_original(
         )
     if not isinstance(snapshot, str):
         raise DiffApplyError(
-            f"Oldest edit's diff field is {type(snapshot).__name__}, "
-            "expected string."
+            f"Oldest edit's diff field is {type(snapshot).__name__}, expected string."
         )
     return snapshot

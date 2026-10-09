@@ -66,9 +66,7 @@ def fetch_open_issues_with_label(
     """
     token = get_github_token("scan", config)
     if not token:
-        raise IssuesFetchError(
-            "scan_token is required to list issues for dedup."
-        )
+        raise IssuesFetchError("scan_token is required to list issues for dedup.")
     owner, name = parse_owner_repo(target_repo_url)
     api = api_base(config.github.host)
     headers = {
@@ -96,12 +94,19 @@ def fetch_open_issues_with_label(
                 "per_page": per_page,
                 "page": page,
             }
-            resp = _get_with_retry(client, url, params=params, label=label, owner=owner, name=name, page=page, log_retries=log_retries)
+            resp = _get_with_retry(
+                client,
+                url,
+                params=params,
+                label=label,
+                owner=owner,
+                name=name,
+                page=page,
+                log_retries=log_retries,
+            )
             batch = resp.json()
             if not isinstance(batch, list):
-                raise IssuesFetchError(
-                    f"unexpected non-list response: {batch!r}"
-                )
+                raise IssuesFetchError(f"unexpected non-list response: {batch!r}")
             if not batch:
                 break
             for raw in batch:

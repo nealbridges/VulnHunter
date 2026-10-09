@@ -11,18 +11,15 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
-
-# Module-under-test — doesn't exist until Phase 6 (implementation) lands.
-# All tests in this file fail with ImportError until then. Deliberate.
-from agent.manifest import MANIFEST_VALIDATION_FAILURE_PREFIX, write_manifest
-
 from agent._stream_events import SessionTotals
 from agent.issues import FailedIssue, PostedIssue, PostSummary, SkippedIssue
 from agent.issues_extract import Finding
 
+# Module-under-test — doesn't exist until Phase 6 (implementation) lands.
+# All tests in this file fail with ImportError until then. Deliberate.
+from agent.manifest import MANIFEST_VALIDATION_FAILURE_PREFIX, write_manifest
 
 # ── fixtures / helpers ──────────────────────────────────────────────────────
 
@@ -129,7 +126,9 @@ def test_manifest_not_written_on_exit_2(results_dir: Path):
 # ── AGENT-MANIFEST-003 ──────────────────────────────────────────────────────
 
 
-def test_validation_failure_raises_with_stderr_prefix(results_dir: Path, capsys: pytest.CaptureFixture):
+def test_validation_failure_raises_with_stderr_prefix(
+    results_dir: Path, capsys: pytest.CaptureFixture
+):
     """@spec AGENT-MANIFEST-003: schema-invalid data → raise + stderr prefix + no file."""
     bad = Finding(
         id="VULN-001",

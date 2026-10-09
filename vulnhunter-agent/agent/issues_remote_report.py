@@ -66,9 +66,7 @@ def _run(
     # silently blocks the verify run forever.
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
-    result = subprocess.run(
-        cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env
-    )
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout, env=env)
     if result.returncode != 0:
         rendered = " ".join(redact(arg) for arg in cmd)
         raise RemoteReportError(
@@ -158,9 +156,7 @@ def download_latest_report(
             source_name,
             rel_path_in_dest,
         )
-        return DownloadedReport(
-            path=newest, rel_path_in_dest=rel_path_in_dest, workdir=workdir
-        )
+        return DownloadedReport(path=newest, rel_path_in_dest=rel_path_in_dest, workdir=workdir)
     except Exception:
         shutil.rmtree(workdir, ignore_errors=True)
         raise
@@ -208,9 +204,7 @@ def download_named_report(
 
     source_owner, source_name = parse_owner_repo(source_repo_url)
     sparse_path = f"{source_owner}/{source_name}"
-    authed_url = inject_token(
-        publish.destination_repo, reports_token, config.github.host
-    )
+    authed_url = inject_token(publish.destination_repo, reports_token, config.github.host)
 
     workdir = Path(tempfile.mkdtemp(prefix="vulnhunt-verify-fetch-", dir=cache_base_dir))
     try:
@@ -276,9 +270,7 @@ def download_named_report(
             source_name,
             rel_path_in_dest,
         )
-        return DownloadedReport(
-            path=match, rel_path_in_dest=rel_path_in_dest, workdir=workdir
-        )
+        return DownloadedReport(path=match, rel_path_in_dest=rel_path_in_dest, workdir=workdir)
     except Exception:
         shutil.rmtree(workdir, ignore_errors=True)
         raise
