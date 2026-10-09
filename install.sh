@@ -114,12 +114,25 @@ import jsonschema, graphify  # noqa: F401
 
 # Skills shipped from this repo. Format: <installed-name>:<source-dir>.
 # Order matters only for output readability — both are independent.
+# Roots: skills live either at the repo root (the four original ones) or
+# under skills/ (newer operator-procedure skills). The dynamic sweep below
+# discovers both, so a newly added skill cannot be forgotten here.
 SKILLS=(
     "vulnhunt:$SCRIPT_DIR/vulnhunt"
     "vulnhunt-fix-verify:$SCRIPT_DIR/vulnhunt-fix-verify"
     "vulnhunter-fix:$SCRIPT_DIR/vulnhunter-fix"
     "vulnhunter-run:$SCRIPT_DIR/vulnhunter-run"
 )
+if [ -d "$SCRIPT_DIR/skills" ]; then
+    for dir in "$SCRIPT_DIR"/skills/*/; do
+        [ -f "${dir}SKILL.md" ] || continue
+        name="$(basename "$dir")"
+        # First entry wins; root-level definitions take precedence.
+        if ! printf '%s\n' "${SKILLS[@]}" | grep -q "^${name}:"; then
+            SKILLS+=("${name}:${dir%/}")
+        fi
+    done
+fi
 
 # Create the parent skills directory if missing.
 if [ ! -d "$SKILLS_PARENT" ]; then
