@@ -71,3 +71,5 @@ dev/
 *_VULNHUNT_RESULTS_*/
 *_RESULTS_*/
 
+
+# Probe: verify required-check context names (see issue #3).
