@@ -23,6 +23,8 @@ from pathlib import Path
 
 from vulnhunter_common import gitops, hostcmd, manifest
 
+from . import skill_check
+
 _SCAN_ID = re.compile(r"^.+_VULNHUNT_RESULTS_.+$")
 _EXIT_OK = {0, 1, 2, 3, 4}
 
@@ -153,6 +155,57 @@ def cmd_validate_manifest(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_check_skills(args: argparse.Namespace) -> int:
+    """Verify installed skills against the source checkout they claim.
+
+    This is the mechanical half of the drift check: it is handed a root and
+    compares bytes plus the recorded install commit. It deliberately does not
+    know which harness is running -- resolving that root is operational prose
+    in vulnhunter-run/SKILL.md Step 0 (BUILD_A1 plan §2).
+
+    Enforcement split, stated here because reviewers keep asking who stops the
+    run: this command only *reports*. Nothing in vh invokes it, and nothing in
+    vh can know whether Step 0 ran. The policy that a non-zero exit stops a
+    run lives in the operator skill's prose, because only the skill knows what
+    a run is. A caller who ignores the exit code has skipped the gate -- that
+    is the caller's contract, not a bug in the tool. Tests in
+    vulnhunter-agent/tests/test_skill_structure.py pin that the prose exists,
+    is Step 0, and says STOP.
+    """
+    try:
+        report = skill_check.check_root(args.root, args.source)
+    except skill_check.SkillCheckError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+    if args.json:
+        print(json.dumps(report.as_dict(), indent=2))
+    else:
+        for skill in report.skills:
+            print(skill.line())
+        if report.skipped:
+            print(
+                f"({report.skipped} other skill(s) under the root did not come "
+                "from this source; not checked)"
+            )
+
+    # Warn whenever the source is dirty, pass or fail. The recorded commit
+    # equals HEAD, but the bytes hashed are the working tree, so a match does
+    # NOT prove the install is that commit's content -- only that it matches
+    # whatever uncommitted state the checkout is in. Gating this on "already
+    # failing" hid the case that matters most: a reinstall from a dirty
+    # checkout stamps HEAD onto content that HEAD does not contain.
+    if any(s.source_dirty for s in report.skills):
+        print(
+            "warning: source checkout has uncommitted changes; "
+            "the recorded commit is HEAD and cannot prove the installed bytes",
+            file=sys.stderr,
+        )
+    if args.warn_only and not report.match:
+        print("warning: drift found, exiting 0 because --warn-only was given", file=sys.stderr)
+    return 0 if (report.match or args.warn_only) else 1
+
+
 def cmd_host(args: argparse.Namespace) -> int:
     # hostcmd owns the VULNHUNT_HOST_CMD contract: shlex-split, prompt file
     # appended LAST, transcript on the child's stdout. vh keeps its
@@ -205,6 +258,29 @@ def build_parser() -> argparse.ArgumentParser:
     host = sub.add_parser("host", help="run $VULNHUNT_HOST_CMD with a prompt file")
     host.add_argument("prompt")
     host.set_defaults(func=cmd_host)
+
+    skills = sub.add_parser(
+        "check-skills",
+        help="compare installed skills against the source checkout they came from",
+    )
+    skills.add_argument(
+        "--root",
+        required=True,
+        help="directory holding installed skills (or one skill directory). "
+        "The caller resolves which harness root this is; vh does not guess.",
+    )
+    skills.add_argument(
+        "--source",
+        required=True,
+        help="source checkout the skills were installed from",
+    )
+    skills.add_argument(
+        "--warn-only",
+        action="store_true",
+        help="print drift but exit 0 instead of 1",
+    )
+    skills.add_argument("--json", action="store_true", help="machine-readable summary")
+    skills.set_defaults(func=cmd_check_skills)
     return parser
 
 
