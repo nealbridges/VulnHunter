@@ -41,6 +41,36 @@ The `vh` commands do not talk to a model.
 
 ## Steps
 
+0. **Verify the skill set.** Resolve the skills directory *this harness will
+   actually load*, following its documented root precedence, and the source
+   checkout the skill was installed from. Then run:
+
+   ```bash
+   vh check-skills --root <this harness's skills dir> --source <source checkout>
+   ```
+
+   `vh` does not know which harness is running — you supply the root. It
+   compares the installed bytes against the **source working tree** and the
+   recorded install commit against source `HEAD`. Both must agree for the
+   check to pass, which is why a dirty source checkout cannot produce a clean
+   proof: the bytes are real, but they are not provably `HEAD`'s bytes. On
+   exit 0 the skill set matches source: carry on.
+
+   On a non-zero exit, reinstall with `install.sh` into that root and re-check
+   once. If it still fails, **STOP** and report both commits for every
+   drifted skill — a hunt on a stale skill cannot be compared to any other
+   run, and every procedure fix it was supposed to carry is absent. Exit 2
+   means the invocation is wrong (root not found, a source path with no skill
+   layout, or no skill there came from that source): fix the paths, do not
+   treat it as drift.
+
+   Carry forward, for the report's header (Phase 4): for each skill, the
+   commit its bytes are attributable to (`bytes_from` in `--json`), the source
+   commit it was compared against, whether the whole set matched, and whether
+   the source checkout was dirty. A run whose skills do not match source — or
+   whose source was dirty, leaving `bytes_from` unknown — MUST record
+   `Skills match source: no` and MUST NOT claim cross-run comparability.
+
 1. **Clone.** If the user gave a git URL, run `vh clone <url> --dest <dir>`.
    If they gave a checkout, use that directory and skip the clone.
 2. **Hunt.** Invoke the `vulnhunt` skill on that checkout. Use this harness's

@@ -33,3 +33,6 @@ source = ["vh"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+markers = [
+    "integration: touches the real filesystem or local harness skill roots",
+]

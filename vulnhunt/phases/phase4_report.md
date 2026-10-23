@@ -142,6 +142,8 @@ After all findings are finalized, create `${VULNHUNT_DIR}/README.md` as the entr
 **Audit Date**: <YYYY-MM-DD>
 **Branch**: <branch [short-commit-hash]>
 **Model**: <model identifier>
+**Skills**: <skill-name>@<installed-commit> (source <source-commit>) — one line per skill
+**Skills match source**: <yes | no>
 **Findings Summary**: <N High+, N High, N Medium, N Low, N Informational>
 ```
 
@@ -156,6 +158,21 @@ Field definitions:
   block. Format: `branch-name [abc1234]`, or `unknown` if the source
   isn't a git repo. Do not run git to recompute.
 - **Model** = the model identifier reported by your host harness (e.g. the current model ID).
+- **Skills** = one line per skill the run used, copied from the operator's
+  `vh check-skills` output (Step 0 of `vulnhunter-run`). Record the skill
+  name, the commit its bytes are **attributable** to (the `bytes_from` field
+  in `--json`, or `unknown` when the check could not prove it), and the
+  source commit it was compared against. Do not re-derive these — copy the
+  values the check printed. Record `unknown` as written: it means the bytes
+  matched but no commit could be proven to have produced them.
+- **Skills match source** = `yes` only when the operator's Step 0 drift
+  check exited 0 for every skill. Otherwise `no`, and the run MUST NOT
+  claim cross-run comparability: results produced on a drifted skill set
+  are not comparable to a run on source, and the report must say so.
+  When the check printed a `dirty` marker, record `no (source checkout had
+  uncommitted changes)`: the recorded commit equals `HEAD`, so those bytes
+  are **not proven** to be that commit's bytes — the install may predate or
+  postdate the edits. Do not record `yes` on a dirty checkout.
 
 After the header, include:
 - Summary table of findings (ID, title, severity, CWE, status)

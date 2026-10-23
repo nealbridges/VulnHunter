@@ -251,3 +251,116 @@ class TestSchemaContracts:
             assert schema.get("x-fork-home") == "https://github.com/nealbridges/VulnHunter", (
                 f"{schema_name}: x-fork-home missing or wrong"
             )
+
+
+class TestRunSkillStep0:
+    """vulnhunter-run Step 0 is the enforcement point for skill drift (A1).
+
+    BUILD_A1 plan S5: a run that fails the drift check cannot silently
+    proceed, and the report must record it. These tests pin the prose that
+    makes that true -- without them the Step 0 contract is documentation
+    nobody checks, which is exactly the failure A1 exists to close.
+    """
+
+    def _run_skill(self) -> str:
+        return (REPO_ROOT / "vulnhunter-run" / "SKILL.md").read_text(encoding="utf-8")
+
+    def test_step_0_invokes_check_skills(self) -> None:
+        text = self._run_skill()
+        assert "vh check-skills" in text
+        assert "--root" in text and "--source" in text
+
+    def test_step_0_is_the_first_step(self) -> None:
+        # Ordering matters: a check after the hunt is a check too late.
+        # Assert on the step's HEADING (the numbered line), not its whole
+        # body, and on the body containing the verb.
+        text = self._run_skill()
+        steps = [ln for ln in text.splitlines() if re.match(r"^\d+\. \*\*", ln)]
+        assert steps, "no numbered steps found in vulnhunter-run/SKILL.md"
+        assert steps[0].startswith("0. **"), (
+            "the drift check must be numbered step 0; found: " + steps[0]
+        )
+        assert "skill set" in steps[0].lower(), (
+            "step 0 must be the drift/skill-set check; found: " + steps[0]
+        )
+        # And the command must appear before the first operational step.
+        body = text.split(steps[1])[0]
+        assert "vh check-skills" in body, "step 0 body must invoke vh check-skills"
+
+    def test_step_0_stops_on_failure(self) -> None:
+        text = self._run_skill()
+        assert "STOP" in text, "Step 0 must stop the run on a failed drift check"
+
+    def test_step_0_records_comparability(self) -> None:
+        text = self._run_skill()
+        assert "Skills match source" in text
+        assert "cross-run comparability" in text
+
+    def test_step_0_says_vh_does_not_resolve_the_root(self) -> None:
+        # The plan's §2 design rule: targeting is operational prose, not code.
+        text = self._run_skill()
+        assert "does not know which harness" in text or "you supply the root" in text
+
+    def test_step_0_distinguishes_invocation_error_from_drift(self) -> None:
+        text = self._run_skill()
+        assert "Exit 2" in text, "Step 0 must tell the operator exit 2 is not drift"
+
+
+class TestReportSkillProvenanceFields:
+    """The report header must carry the skill provenance Step 0 produces."""
+
+    def test_phase4_header_has_skills_fields(self) -> None:
+        path = REPO_ROOT / "vulnhunt" / "phases" / "phase4_report.md"
+        text = path.read_text(encoding="utf-8")
+        assert "**Skills**" in text
+        assert "**Skills match source**" in text
+
+    def test_dirty_checkout_cannot_claim_yes(self) -> None:
+        path = REPO_ROOT / "vulnhunt" / "phases" / "phase4_report.md"
+        text = path.read_text(encoding="utf-8")
+        assert "uncommitted changes" in text, (
+            "the report must refuse to claim 'yes' when the source was dirty"
+        )
+
+    def _header(self, name: str) -> dict[str, list[str]]:
+        """Parse a filled-in report header into field -> values."""
+        text = (REPO_ROOT / "vulnhunter-agent" / "tests" / "fixtures" / name).read_text(
+            encoding="utf-8"
+        )
+        fields: dict[str, list[str]] = {}
+        for line in text.splitlines():
+            m = re.match(r"^\*\*(.+?)\*\*:\s*(.+)$", line)
+            if m:
+                fields.setdefault(m.group(1), []).append(m.group(2))
+        return fields
+
+    def test_filled_report_carries_skill_provenance(self) -> None:
+        """Round-3 review: asserting template strings is not enough.
+
+        Plan §5 S6 is verified by a fixture results directory showing Skills:
+        lines. This parses a real filled header and requires the provenance
+        fields to be present and well-formed -- one line per skill, each
+        naming an installed commit and the source commit it was compared to.
+        """
+        fields = self._header("report_header_matched.md")
+        assert "Skills" in fields, "filled report must carry Skills: lines"
+        assert len(fields["Skills"]) == 2, "one Skills line per skill used"
+        for entry in fields["Skills"]:
+            assert re.match(r"^[\w.-]+@[0-9a-f]{40} \(source [0-9a-f]{40}\)$", entry), (
+                f"malformed provenance entry: {entry!r}"
+            )
+        assert fields["Skills match source"] == ["yes"]
+
+    def test_drifted_report_records_no_and_caveat(self) -> None:
+        """A drifted run must not claim comparability."""
+        text = (
+            REPO_ROOT / "vulnhunter-agent" / "tests" / "fixtures" / "report_header_drifted.md"
+        ).read_text(encoding="utf-8")
+        fields = self._header("report_header_drifted.md")
+        assert fields["Skills match source"] == ["no"]
+        # The installed and source commits must differ visibly.
+        entry = fields["Skills"][0]
+        installed = entry.split("@")[1].split(" ")[0]
+        source = entry.split("(source ")[1].rstrip(")")
+        assert installed != source, "a drifted report must show differing commits"
+        assert "NOT comparable" in text, "drifted run must state the comparability caveat"
