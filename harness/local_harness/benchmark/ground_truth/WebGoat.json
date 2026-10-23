@@ -1,0 +1,14 @@
+[
+    {
+        "finding_id": "WEBGOAT-001",
+        "type": "PathTraversal",
+        "source_code": "https://github.com/WebGoat/WebGoat/tree/5142935bf7c279882c3b0fc0ecec42c447de6fd5",
+        "description": "In src/main/java/org/owasp/webgoat/lessons/pathtraversal/ProfileUploadBase.java (execute, line 51) the fullName request parameter is passed to new File(uploadDirectory, fullName) with no canonicalization or separator filtering. FileCopyUtils.copy() then writes the upload (line 53) before attemptWasMade() runs, so a fullName such as '../../../etc/evil' writes outside /PathTraversal/{username}/. Endpoint: POST /PathTraversal/profile-upload, multipart fullName field."
+    },
+    {
+        "finding_id": "WEBGOAT-002",
+        "type": "PathTraversal",
+        "source_code": "https://github.com/WebGoat/WebGoat/tree/5142935bf7c279882c3b0fc0ecec42c447de6fd5",
+        "description": "In src/main/java/org/owasp/webgoat/lessons/pathtraversal/ProfileZipSlip.java (processZipUpload, line 79) each ZipEntry name is joined with new File(tmpZipDirectory.toFile(), e.getName()) and extracted without rejecting '..' segments. A zip uploaded to POST /PathTraversal/zip-slip with an entry named ../../webapps/ROOT/evil.jsp can write outside the temp extraction directory to any path writable by the process."
+    }
+]

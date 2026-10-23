@@ -22,6 +22,7 @@ import argparse
 import glob
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -52,24 +53,95 @@ from .tally import (
     write_tally_markdown,
 )
 
+_REQUIRED_FIELDS = ("finding_id", "type", "source_code", "description")
+# Schema samples use placeholder commits and must not enter a real run.
+_SAMPLE_FILENAMES = frozenset({"EXAMPLE.json"})
+_SOURCE_CODE_RE = re.compile(r"^https://github\.com/[^/]+/[^/]+/tree/[0-9a-fA-F]{7,40}/?$")
+
+
+def _nonempty_str(value):
+    """Return stripped text when `value` is a non-empty string, else None."""
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
+def validate_benchmarks(benchmarks):
+    """Return human-readable errors for a loaded corpus.
+
+    Empty list means the corpus is safe to clone. `finding_id` values must be
+    unique across every file — judgments and history are keyed by that id.
+    """
+    errors = []
+    seen_ids = {}
+    for filename, findings in benchmarks:
+        if not isinstance(findings, list):
+            errors.append(f"{filename}: top-level value must be a JSON array")
+            continue
+        for i, finding in enumerate(findings):
+            loc = f"{filename}[{i}]"
+            if not isinstance(finding, dict):
+                errors.append(
+                    f"{loc}: each entry must be a JSON object, got {type(finding).__name__}"
+                )
+                continue
+            missing = [
+                name for name in _REQUIRED_FIELDS if _nonempty_str(finding.get(name)) is None
+            ]
+            if missing:
+                errors.append(f"{loc}: missing required fields: {', '.join(missing)}")
+                continue
+            fid = finding["finding_id"].strip()
+            if fid in seen_ids:
+                errors.append(f"{loc}: duplicate finding_id '{fid}' (also in {seen_ids[fid]})")
+            else:
+                seen_ids[fid] = loc
+            url = finding["source_code"].strip()
+            if not _SOURCE_CODE_RE.match(url):
+                errors.append(
+                    f"{loc} ({fid}): source_code must be "
+                    f"https://github.com/{{org}}/{{repo}}/tree/{{commit_hash}}, got: {url!r}"
+                )
+    return errors
+
 
 def load_all_benchmarks():
-    """Load all benchmark JSON files.
+    """Load all runnable benchmark JSON files.
 
+    Schema samples (`EXAMPLE.json`, `*.json.template`) are not loaded.
     Returns list of (filename, findings_list) where each finding has parsed
-    _repo_url, _repo_name, _commit_hash fields added.
+    `_repo_url`, `_repo_name`, `_commit_hash` fields added.
+    Exits with a clear error if a file is malformed — before any clone.
     """
     results = []
     pattern = os.path.join(BENCHMARK_DIR, "*.json")
     for json_file in sorted(glob.glob(pattern)):
-        with open(json_file) as f:
-            findings = json.load(f)
+        filename = os.path.basename(json_file)
+        if filename in _SAMPLE_FILENAMES:
+            print(f"  Skipping {filename} (schema sample, not a runnable corpus file)")
+            continue
+        try:
+            with open(json_file) as f:
+                findings = json.load(f)
+        except json.JSONDecodeError as exc:
+            print(f"Error: {filename} is not valid JSON: {exc}")
+            sys.exit(1)
+        results.append((filename, findings))
+
+    errors = validate_benchmarks(results)
+    if errors:
+        print("Error: benchmark corpus validation failed:")
+        for err in errors:
+            print(f"  {err}")
+        sys.exit(1)
+
+    for _, findings in results:
         for finding in findings:
             repo_url, repo_name, commit_hash = parse_source_url(finding["source_code"])
             finding["_repo_url"] = repo_url
             finding["_repo_name"] = repo_name
             finding["_commit_hash"] = commit_hash
-        results.append((os.path.basename(json_file), findings))
     return results
 
 

@@ -1,0 +1,14 @@
+[
+    {
+        "finding_id": "JUICE-001",
+        "type": "SQLInjection",
+        "source_code": "https://github.com/juice-shop/juice-shop/tree/a520e158cb65c43d24e2c55d84f09b05a2511a03",
+        "description": "In routes/login.ts (login handler, line 34) the email field from the POST body is interpolated into a raw Sequelize query: SELECT * FROM Users WHERE email = '${req.body.email || ''}' AND password = '${security.hash(req.body.password || '')}' AND deletedAt IS NULL. models.sequelize.query() is called with no bind parameters. An email value of \"' OR 1=1--\" bypasses authentication and returns the first user row (typically the admin account)."
+    },
+    {
+        "finding_id": "JUICE-002",
+        "type": "DOMXss",
+        "source_code": "https://github.com/juice-shop/juice-shop/tree/a520e158cb65c43d24e2c55d84f09b05a2511a03",
+        "description": "In frontend/src/app/search-result/search-result.component.ts (filterTable, line 143) the URL query parameter q is passed to DomSanitizer.bypassSecurityTrustHtml() and stored in this.searchValue, which the template renders as HTML. Because bypassSecurityTrustHtml turns off Angular's XSS sanitizer, a crafted /#/search?q=<img onerror=...> link executes in the visitor's browser."
+    }
+]

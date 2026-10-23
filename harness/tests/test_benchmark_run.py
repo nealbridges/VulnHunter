@@ -50,6 +50,42 @@ def test_load_all_benchmarks(monkeypatch, tmp_path):
     assert widget_findings[0]["_commit_hash"] == "abcdef1234567890"
 
 
+def test_load_all_benchmarks_skips_example_and_templates(monkeypatch, tmp_path):
+    bdir = _write_bench(monkeypatch, tmp_path)
+    (bdir / "EXAMPLE.json").write_text(json.dumps(BENCH_JSON[:1]))
+    (bdir / "EXAMPLE.json.template").write_text(json.dumps(BENCH_JSON[:1]))
+    names = [n for n, _ in run.load_all_benchmarks()]
+    assert names == ["other.json", "widget.json"]
+
+
+def test_load_all_benchmarks_rejects_invalid_json(monkeypatch, tmp_path):
+    bdir = tmp_path / "gt"
+    bdir.mkdir()
+    (bdir / "broken.json").write_text("{ not json")
+    monkeypatch.setattr(run, "BENCHMARK_DIR", str(bdir))
+    with pytest.raises(SystemExit) as exc:
+        run.load_all_benchmarks()
+    assert exc.value.code == 1
+
+
+def test_load_all_benchmarks_rejects_duplicate_ids(monkeypatch, tmp_path, capsys):
+    bdir = tmp_path / "gt"
+    bdir.mkdir()
+    finding = {
+        "finding_id": "F1",
+        "type": "SQLi",
+        "description": "x",
+        "source_code": "https://github.com/acme/widget/tree/abcdef1234567890",
+    }
+    (bdir / "a.json").write_text(json.dumps([finding]))
+    (bdir / "b.json").write_text(json.dumps([finding]))
+    monkeypatch.setattr(run, "BENCHMARK_DIR", str(bdir))
+    with pytest.raises(SystemExit) as exc:
+        run.load_all_benchmarks()
+    assert exc.value.code == 1
+    assert "duplicate finding_id" in capsys.readouterr().out
+
+
 def test_deduplicate_targets(monkeypatch, tmp_path):
     _write_bench(monkeypatch, tmp_path)
     benches = run.load_all_benchmarks()

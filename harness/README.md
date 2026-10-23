@@ -45,9 +45,11 @@ python -m local_harness.batch.run collect              # gather results into to_
 
 Ground truth lives in `local_harness/benchmark/ground_truth/*.json` — one file
 per repo, each finding pinned to a public GitHub URL at a specific commit. The
-repo ships only a synthetic `EXAMPLE.json` mapped to public targets (OWASP Juice
-Shop / WebGoat / NodeGoat); **bring your own corpus** by adding
-`ground_truth/<repo>.json`.
+repo ships a starter corpus of six findings across OWASP Juice Shop, WebGoat,
+and NodeGoat. Add more with `ground_truth/<repo>.json`. Schema samples live in
+`EXAMPLE.json.template` and are not loaded. `finding_id` values must be unique
+across the whole corpus (prefix with the app name). The runner validates every
+file before cloning.
 
 ```bash
 python -m local_harness.benchmark.run                  # full run: clone + scan + judge + tally

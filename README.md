@@ -254,7 +254,7 @@ python -m local_harness.benchmark.run --repos "name"   # Benchmark a single targ
 python -m local_harness.benchmark.run --tally-only      # Re-generate the analytical report only
 ```
 
-> **Bring Your Own Corpus:** This repository ships with a minimal synthetic example (`harness/local_harness/benchmark/ground_truth/EXAMPLE.json`) mapped to public targets like OWASP NodeGoat, Juice Shop, and WebGoat. Build out your own testing suites inside `ground_truth/<repo>.json`. Define your target scanning/judging engines in `harness/local_harness/config.py`.
+> **Starter corpus:** `harness/local_harness/benchmark/ground_truth/` ships six findings across OWASP Juice Shop, WebGoat, and NodeGoat, each pinned to a public commit. Add more files as `ground_truth/<repo>.json`. `finding_id` values must be unique across the whole corpus. Schema samples live in `EXAMPLE.json.template` and are not loaded. The runner validates every file before cloning.
 
 ### Operator CLI (`vh/`)
 `vh` is a deterministic, model-free companion for a single scan run. It sequences the mechanical steps around a hunt and validates the output shape:

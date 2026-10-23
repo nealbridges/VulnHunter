@@ -18,16 +18,18 @@ The harness operates in four phases:
 
 ## Ground Truth Data
 
-The `ground_truth/` directory contains JSON files (one per repo) with known findings across unique (repo, commit) combinations. This repo ships a small **synthetic** example corpus (`ground_truth/EXAMPLE.json`) pointing at public, deliberately-vulnerable apps; supply your own corpus of real findings locally. See `ground_truth/README.md` for the schema. Each finding records:
+The `ground_truth/` directory contains JSON files (one per repo) with known findings across unique (repo, commit) combinations. This repo ships a starter corpus of six findings in Juice Shop, WebGoat, and NodeGoat, each pinned to a public commit. See `ground_truth/README.md` for the schema and the uniqueness rule for `finding_id`. Schema samples (`EXAMPLE.json.template`) are not loaded. Each finding records:
 
 ```json
 {
-  "finding_id": "VULN-001",
-  "type": "IDOR",
+  "finding_id": "JUICE-001",
+  "type": "SQLInjection",
   "source_code": "https://github.com/your-org/example-vulnerable-app/tree/<commit_hash>",
   "description": "Detailed vulnerability description with file paths and line numbers..."
 }
 ```
+
+A malformed corpus fails at load, before any clone: required fields, globally unique `finding_id` values, and `https://github.com/{org}/{repo}/tree/{commit}` URLs.
 
 ## Usage
 

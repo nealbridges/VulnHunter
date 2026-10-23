@@ -1,0 +1,14 @@
+[
+    {
+        "finding_id": "NODEGOAT-001",
+        "type": "NoSQLInjection",
+        "source_code": "https://github.com/OWASP/NodeGoat/tree/c5cb68a7084e4ae7dcc60e6a98768720a81841e8",
+        "description": "In app/data/allocations-dao.js (getByUserIdAndThreshold, lines 78-79) the user-supplied threshold query parameter is interpolated into a MongoDB $where clause: {$where: `this.userId == ${parsedUserId} && this.stocks > '${threshold}'`}. $where runs server-side JavaScript. Payloads such as \"0';while(true){}//\" (DoS) or \"1'; return 1 == '1\" (drop the threshold filter) are not sanitized. A commented-out block immediately above (lines 70-75) shows the intended fix: parseInt the threshold and reject values outside 0-99."
+    },
+    {
+        "finding_id": "NODEGOAT-002",
+        "type": "InsecureDirectObjectReference",
+        "source_code": "https://github.com/OWASP/NodeGoat/tree/c5cb68a7084e4ae7dcc60e6a98768720a81841e8",
+        "description": "In app/routes/allocations.js (displayAllocations, lines 16-18) userId is taken from req.params rather than the session. A commented-out block at lines 12-14 documents the correct source: req.session.userId. Any authenticated caller can view another user's allocations by substituting the path (GET /allocations/2 vs /allocations/1); nothing checks that the requested userId matches the session."
+    }
+]
