@@ -19,7 +19,11 @@ container) and wires the results into GitHub.
   and push a commit, so reports live outside the scanned repo.
 - **Issues** *(optional)* — post one deduplicated GitHub issue per confirmed finding on
   the target repo, linking back to the published report; emit a "clean scan" receipt when
-  there are no findings.
+  there are no findings. If the hunt ended before Phase 4 wrote `README.md` but Phase 2
+  candidate write-ups are on disk (`results/sg-*_*.md`, `candidates/*.md`), extraction
+  uses those files so `--issues` can still file what was found. The run summary notes
+  that path. Missing both the report and candidate files is still an extraction failure,
+  not a clean scan.
 - **Verify** *(`--mode=verify`)* — orchestrate the `/vulnhunt-fix-verify` skill over a
   checkout and post a per-finding verdict.
 

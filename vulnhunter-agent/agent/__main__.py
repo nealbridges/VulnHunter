@@ -842,6 +842,7 @@ async def _run_scan_flow(
     download: DownloadedReport | None = None
     scan_totals = SessionTotals()
     extracted = None
+    extraction_error: BaseException | None = None
     summary: PostSummary | None = None
     results_dir: Path | None = None
 
@@ -1003,6 +1004,7 @@ async def _run_scan_flow(
                     exc,
                 )
                 extracted = None
+                extraction_error = exc
             if audit_writer is not None and audit_ctx is not None and extracted is not None:
                 events = audit_extract.build_finding_events(
                     extracted,
@@ -1032,6 +1034,7 @@ async def _run_scan_flow(
                     audit_repo_slug=audit_ctx["repo_slug"] if audit_ctx else "",
                     audit_repo_properties=repo_properties,
                     extracted=extracted,
+                    extraction_error=extraction_error,
                     commit_sha=commit_sha if commit_sha != "unknown" else "",
                 )
             except Exception as exc:  # noqa: BLE001
