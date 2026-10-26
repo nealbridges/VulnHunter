@@ -221,11 +221,12 @@ incomplete. For EVERY defense (sanitizer, middleware, framework feature) in the
 data flow, you MUST:
   - **(a)** Read the defense's source code and confirm it actually blocks the
     attack — **sufficient only when the claim is structural**, OR
-  - **(b)** If the source is unavailable, **treat the defense as ineffective** —
-    do NOT assume it works. Proceed to Gate 3 with the finding intact.
+  - **(b)** If the source is unavailable and the claim is structural, **treat
+    the defense as ineffective** — do NOT assume it works. Proceed to Gate 3 with
+    the finding intact.
 
   When the claim is behavioural and you cannot execute against the real
-  consumer, record **HOLD-UNVERIFIED** with the probe named.
+  consumer, record **HOLD-UNVERIFIED** with the probe named instead of (b).
 
 Verify the defense matches the context. A sanitizer for one context does NOT
 protect a different context (e.g., HTML sanitizer on URL sink — does not encode

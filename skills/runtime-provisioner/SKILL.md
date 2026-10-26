@@ -121,10 +121,10 @@ Before handing the finding to `poc-impact`, verify:
 
 ## The blunt sentence
 
-A mechanism-proving assertion is not an impact measurement. "The query string
-contains `OR WorkflowId IS NOT NULL`" is the mechanism. The finding is "a
-victim tenant's row was returned to the attacker's listing." If your test
-asserts the first, it has not proven the second.
+A mechanism-proving assertion is not an impact measurement. "The rendered page
+contains the injected `<script>` tag" is the mechanism. The finding is "another
+user's session token reached the attacker's server." If your test asserts the
+first, it has not proven the second.
 
 ## Env contract
 

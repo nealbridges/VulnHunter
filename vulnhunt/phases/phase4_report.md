@@ -208,8 +208,8 @@ under `## Unverified` — including Low HOLDs that never reached Phase 3a and HO
 whose probe could not run.
 
 **Cross-check before writing:** entries here + Phase 3a promotions + Phase 3a
-disproofs = the Phase 2b HOLD total. A disproved HOLD is a FALSE POSITIVE row in
-the verification table, not an entry here.
+disproofs = Phase 2b HOLDs + the sweep's Held instances. A disproved HOLD is a
+FALSE POSITIVE row in the verification table, not an entry here.
 
 Format — one entry per HOLD:
 
