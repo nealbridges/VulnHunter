@@ -1,11 +1,13 @@
 # Phase 3a: Build the Working PoC
 
 > **Context**: You have completed Phase 2b (Verification) and have CONFIRMED
-> findings only. The orchestrator's Operating Principles and Investigation
-> Discipline are in effect. The runtime to use was decided in Phase 2b and
-> recorded on the finding as its `Runtime:` line (see
-> `skills/runtime-provisioner/SKILL.md`) — execute in that runtime, never
-> outside it.
+> findings, plus any `HOLD-UNVERIFIED` findings at Medium+ potential. CONFIRMED
+> findings get a PoC; HOLDs get the probe named on their HOLD line (see
+> "HOLD-UNVERIFIED intake" below), and the probe's outcome promotes or disproves
+> them. The orchestrator's Operating Principles and Investigation Discipline are
+> in effect. The runtime to use was decided in Phase 2b and recorded on the
+> finding as its `Runtime:` line (see `skills/runtime-provisioner/SKILL.md`) —
+> execute in that runtime, never outside it.
 
 > **Universal Auth Gap (Phase 2b §9)**: for `VULN-PLATFORM-AUTHN` or
 > `VULN-PLATFORM-AUTHZ`, produce ONE PoC against ONE representative
@@ -42,6 +44,37 @@ exploit test by end of phase. A CONFIRMED finding cannot be removed without an
 explicit FAIL verdict from its exploit test. The `Runtime` column copies the
 `Runtime:` line recorded in Phase 2b — a finding with no Runtime line returns
 to Phase 2b (the runtime decision was skipped, not deferred).
+
+### HOLD-UNVERIFIED intake (MANDATORY)
+
+`HOLD-UNVERIFIED` is defined once, in `vulnhunt/SKILL.md`'s verdict vocabulary —
+this phase uses that definition and does not restate it.
+
+A `HOLD-UNVERIFIED` finding at **Medium+ potential** enters Phase 3a as a probe
+task, not as a confirmed finding. Add it to a separate table:
+
+| HOLD-ID | Phase 2b # | Title | Potential severity | Probe required |
+|---|---|---|---|---|
+
+The probe column copies the `probe:` text from the Phase 2b HOLD line verbatim —
+it is the assignment. Executing it is the work of this phase.
+
+The outcome resolves the HOLD, in one of three ways:
+
+- **Probe confirms the attack** → promote to CONFIRMED. Assign a VULN-NNN, give
+  it a PoC, and give it the severity its impact justifies. Update the Phase 2b
+  claim record to `Evidence: executed-probe`.
+- **Probe disproves the attack** → the finding becomes FALSE POSITIVE, but only
+  now: the elimination is closed by `executed-probe`, which is what makes a
+  behavioural FALSE POSITIVE legitimate. Record the probe output as the evidence.
+- **Probe cannot run** (dependency unavailable, no cheap harness) → the finding
+  stays `HOLD-UNVERIFIED` and moves to the report's Unverified section with its
+  probe named and the reason it could not run. Severity is recorded as
+  "potential — unverified" and it does NOT count toward the confirmed total.
+
+Do not promote a HOLD to CONFIRMED on the strength of reading code, and do not
+demote it to FALSE POSITIVE for the same reason. The whole point of the label is
+that this phase runs the experiment.
 
 ## What counts as a Working PoC
 

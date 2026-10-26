@@ -10,6 +10,14 @@ These instructions apply to ALL class-group trace agents (INJ, NAV, LOG). Read y
    every assignment, function call, and transformation until it either:
    - (a) reaches a dangerous sink without effective sanitization → **candidate**
    - (b) is proven sanitized or type-constrained before every sink → **safe**
+     **only if the proof is structural** — a check you can read in this
+     repository on this path. If the mitigation rests on what a parser, template
+     engine, ORM, or library does with the value, it is a **behavioural** claim
+     and it is not yet proven: record **HOLD-UNVERIFIED** with the probe that
+     would settle it. Do not call it safe here — Phase 2b only re-opens
+     candidates, so a SAFE recorded at trace time is never revisited. A
+     sanitizer that *appears* to cover quotes because its source says it doubles
+     them is exactly this case.
    - (c) exits the codebase (returned to caller, logged, discarded) → **safe**
    - (d) reaches a store (DB, cache, queue, in-memory state, session/global
      variable) → grep for ALL readers and trace EACH forward independently
@@ -43,6 +51,14 @@ These instructions apply to ALL class-group trace agents (INJ, NAV, LOG). Read y
 4. **Record the disposition** for this input in the inventory:
    - **CANDIDATE** (input #, sink file:line, vuln class) → proceeds to gates
    - **SAFE** (input #, reason: sanitized / type-constrained / not reaching sink)
+     — a `sanitized` reason is only valid when the sanitization claim is
+     **structural**. If the defense's adequacy depends on what a parser or library
+     does downstream, the input is **HOLD-UNVERIFIED**, not SAFE.
+   - **HOLD-UNVERIFIED** (input #, sink file:line, vuln class, the unsettled
+     behavioural claim, the probe that would settle it) → the only defense found
+     is behavioural and unexecuted. This disposition is terminal for the trace
+     step (it skips Gates 3–4, which are impact questions) and proceeds to Phase
+     2b as a candidate whose verdict is already HOLD.
    - **DESIGN-INTENT** (input #, reason: this is the application's intended function)
    **Severity-context check:** Before recording a candidate's CWE, verify you
    classified under the **highest-severity context** the sink accepts. If the
@@ -57,6 +73,15 @@ These instructions apply to ALL class-group trace agents (INJ, NAV, LOG). Read y
    - URL encoder on SQL/command sink → NO
    - Format validator (regex, schema) on injection sink → NO (validates shape, not content)
    If mismatch → CANDIDATE, not SAFE.
+
+   **A coverage match is not proof when the claim is behavioural.** This check
+   tests whether the sanitizer *transforms* the dangerous characters; it does not
+   test whether the downstream consumer *agrees* that they are neutralized. A
+   quote-doubling sanitizer that covers `'` passes this check, and yet the Gate 6
+   High was exactly that case: the sanitizer's coverage was real, and the parser
+   still disagreed. When the deciding behaviour belongs to a dependency, a match
+   is grounds for **HOLD-UNVERIFIED**, not SAFE — SAFE means no one needs to look
+   again, and here someone does.
 5. Move to the next input.
 
 **Absent-input analysis (MANDATORY after completing the inventory):**
@@ -210,9 +235,18 @@ knowledge.** Your training data about library behavior may be wrong, stale, or
 incomplete. For EVERY defense (sanitizer, middleware, framework feature) in the
 data flow, you MUST:
   - **(a)** Read the defense's source code and confirm it actually blocks the
-    attack, OR
+    attack — **sufficient only when the claim is structural**. Reading the
+    defense's source tells you what the defense emits; it does not tell you what
+    a downstream consumer then does with that output. If the deciding behaviour
+    belongs to a dependency, reading the source is necessary but not sufficient,
+    OR
   - **(b)** If the source is unavailable, **treat the defense as ineffective** —
     do NOT assume it works. Proceed to Gate 3 with the finding intact.
+
+  When (a) is not sufficient and you cannot execute against the real consumer
+  here, record **HOLD-UNVERIFIED** with the probe named rather than eliminating
+  the finding. A HOLD is a disposition this pipeline must carry (see aggregation),
+  not a dropped instance.
 
 Verify the defense matches the context. A sanitizer for one context does NOT
 protect a different context (e.g., HTML sanitizer on URL sink — does not encode
@@ -233,7 +267,23 @@ methodology (options a/b/c with executable test construction). Use that expanded
 procedure for injection sinks.
 
 If effective, context-matched defense exists between source and sink, the finding
-is eliminated. If not, proceed to Gate 3.
+is eliminated — **but only when the defense claim is structural.** Reading the
+defense's source settles what the defense emits; it does not settle what a
+downstream consumer does with that output. When the deciding behaviour belongs
+to a parser, template engine, ORM, or other dependency (auto-escaping,
+parameterisation, encoding), the claim is behavioural: either execute it against
+the real consumer, or record the finding `HOLD-UNVERIFIED` with the probe named
+rather than eliminating it here. Eliminating a behavioural claim on read-source
+evidence is exactly the Gate 6 miss; Phase 2b only re-verifies candidates, so an
+elimination made here is never looked at again.
+
+If not eliminated, proceed to Gate 3 — **unless you recorded HOLD-UNVERIFIED,
+which is terminal here.** A HOLD is not forwarded into Gate 3: Gates 3 and 4 ask
+whether the attacker gains a new capability, which is a question about impact,
+not about whether the defense worked. Letting a HOLD continue through Gate 3
+invites it to be re-dispositioned as a Code Smell or eliminated on impact
+grounds, and nothing downstream reopens it. Record the HOLD with its probe and
+stop iterating that input.
 
 **Gate 3: Does the attacker gain a NEW capability?**
 
@@ -242,7 +292,10 @@ You must AFFIRMATIVELY demonstrate what new outcome the attacker achieves.
 confirmation — you must state concretely what the attacker GETS. If the
 exploit test proves the mechanism works (crypto is reversible, injection
 reaches the sink, redirect fires) but you cannot articulate a concrete
-outcome the attacker could not already achieve, the finding is a Code Smell.
+outcome the attacker could not already achieve, the finding is a Code Smell —
+**but only if you actually ran the exploit test.** A finding that is
+HOLD-UNVERIFIED has not run its probe, so its impact cannot be judged yet: leave
+it as a HOLD and record the impact question as part of the probe.
 
 The exploit test for Gate 3 must prove the OUTCOME, not the MECHANISM.
 

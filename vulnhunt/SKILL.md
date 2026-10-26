@@ -76,9 +76,12 @@ exploitable vulnerabilities.
    with vague "low impact" reasoning. The gates are the precision filter.
 2. **Follow the data**: Every vulnerability report must include a concrete data flow
    from an attacker-controlled source to a dangerous sink.
-3. **Prove it**: Every finding must have a PoC (runnable or static trace). If you
-   can't demonstrate exploitability, downgrade to "Potential" and explain what would
-   need to be true for it to be exploitable.
+3. **Prove it**: Every finding must have a PoC. A **structural** claim may carry a
+   static trace as its PoC; a **behavioural** claim needs an executed PoC (see the
+   claim-typing rule in Phase 2b). If you can't demonstrate exploitability, and the
+   gap is that nothing could be executed, record HOLD-UNVERIFIED rather than
+   downgrading to "Potential" — and say what would need to be true for it to be
+   exploitable.
 4. **Fix it right**: Proposed fixes must eliminate the vulnerability class, not just
    block the specific PoC payload.
 5. **Production code only**: Only audit first-party production source code. Always
@@ -257,15 +260,21 @@ variant. See "Build-Time Code Swapping" in Phase 1 for how to detect this.
    > Your scan directory is `${VULNHUNT_DIR}`. Follow the prompts in
    > `${PHASES_DIR}/phase3a_build_poc.md`, `${PHASES_DIR}/phase3b_measure_impact.md`,
     > and `${PHASES_DIR}/phase3c_fixes.md`.
-   > Read confirmed findings from `${VULNHUNT_DIR}/phase2b_output.md`.
+   > Read confirmed findings and Medium+ HOLD-UNVERIFIED findings from
+   > `${VULNHUNT_DIR}/phase2b_output.md` (HOLDs are probe tasks, not PoC targets).
    > Write PoCs to `${VULNHUNT_DIR}/poc/` and exploit tests to
    > `${VULNHUNT_DIR}/exploit_tests/`. Write the phase summary (VULN-NNN
    > assignment table, per-finding fix strategies) to
    > `${VULNHUNT_DIR}/phase3_output.md` — that exact filename, at the
    > results-dir top level. Do NOT name the file after a prompt
    > (`phase3c_fixes.md`, etc.). IMPORTANT: Return ≤20 words.
-   Verify `${VULNHUNT_DIR}/phase3_output.md` exists alongside the
-   populated `poc/` and `exploit_tests/` directories.
+   Verify `${VULNHUNT_DIR}/phase3_output.md` exists. The `poc/` and
+   `exploit_tests/` directories must be populated **for every CONFIRMED
+   finding**; a run whose Phase 2b results were all HOLDs legitimately writes no
+   PoC files, and `phase3_output.md` then carries the probe records instead.
+   Do not treat an empty `poc/` as a failed phase when there were no confirmed
+   findings — check `phase3_output.md` for the HOLD dispositions before deciding
+   to relaunch.
 
    **E. Phase 3d - Sweep**: Launch a subagent:
    > Your scan directory is `${VULNHUNT_DIR}`. Follow the prompt in
@@ -281,11 +290,21 @@ variant. See "Build-Time Code Swapping" in Phase 1 for how to detect this.
    Read `${PHASES_DIR}/phase4_report.md`. Compile the final report from the
    output files in `${VULNHUNT_DIR}/`.
 
-   **Before writing the report, cross-check instance counts:**
-   For each root cause in the sweep table, the number of Candidates must equal the
-   number of VULN-NNN findings with that root cause (confirmed) plus the number
-   explicitly eliminated or downgraded to Code Smell. If the counts don't match,
-   you dropped instances — validate and add them.
+   **Before writing the report, cross-check instance counts.** For each root
+   cause, the sweep table's `Candidates` count must equal the number of
+   dispositions of that root cause, where every instance is counted once:
+
+   `Candidates = confirmed findings + eliminated/downgraded to Code Smell + Held`
+
+   **`Held` is a column in the table, not part of `Candidates`.** An instance the
+   sweep marked CANDIDATE that then becomes a HOLD moved into the `Held` column;
+   it is not still counted as a Candidate. Counting the same HOLD in both columns
+   makes the equation impossible to satisfy. A HOLD is a disposition like any
+   other: it has been evaluated and is awaiting a probe, so it belongs in the
+   audit count — but in its own column.
+
+   If the counts don't match after that, you dropped instances — validate and add
+   them.
 
    **STOP — count check before writing the summary table.**
    List every confirmed exploit test PASS. Each PASS is one
@@ -293,6 +312,25 @@ variant. See "Build-Time Code Swapping" in Phase 1 for how to detect this.
    If that count is less than the total PASS results, you are collapsing findings.
    Do NOT group multiple sink locations under one VULN-NNN. Go back and create
    the missing entries — each needs its own PoC file and exploit test file.
+
+   **Then count the HOLDs separately.** Every `HOLD-UNVERIFIED` from Phase 2b
+   must appear in exactly one of three places, and the three must sum to the
+   Phase 2b HOLD total:
+   (a) the Unverified section as still open;
+   (b) the rows above, because a Phase 3a probe promoted it to CONFIRMED;
+   (c) the verification table, because a Phase 3a probe DISPROVED it and it is
+       now a FALSE POSITIVE backed by `executed-probe` evidence.
+   A disproved HOLD is accounted for — it is not "dropped", and it is not in the
+   Unverified section either (see Phase 4's reconciliation). A HOLD that
+   appears in none of the three was dropped, and this is the last chance to
+   notice.
+
+   A **Medium+ HOLD whose probe could not run** is reported in the Unverified
+   section, not promoted and not dropped — it is a real open question at
+   plausible severity, and the reader must see it. Its severity is written
+   "High (unverified)" so it cannot be mistaken for a confirmed High, and the
+   probe that would settle it is named. If the probe genuinely cannot run in
+   this environment, say which dependency was unavailable and why.
 
    Save all artifacts to `${VULNHUNT_DIR}/` and generate the README.
 
@@ -305,6 +343,49 @@ The final report contains:
 - Proposed fix strategies (descriptions, not applied edits)
 - The sweep verification table from Phase 3d
 - Code smells in a separate section
+- The **Unverified** section: every `HOLD-UNVERIFIED` candidate with its open
+  question and the probe that would settle it
+
+### Verdict vocabulary — the canonical definitions
+
+This is the single authoritative definition of these terms. Phase files,
+`runtime-provisioner`, and report templates use these words with these meanings
+and do not restate them.
+
+- **CONFIRMED** — a candidate whose vulnerability has been proven. A
+  **behavioural** confirmation (the attack depends on how a parser, library, or
+  sanitizer behaves) requires a PoC that executes at the real boundary. A
+  **structural** confirmation (the attack is visible in this codebase's control
+  flow — e.g. a value interpolated into a query with no check at all) may be
+  confirmed on `static-trace`, and its Phase 3a artifact is the data-flow trace,
+  consistent with the static-trace PoC exception in `phase3a_build_poc.md`.
+  Confirmed findings proceed to Phase 3 and carry a severity.
+
+- **FALSE POSITIVE** — a candidate eliminated by a **structural** claim closed on
+  `static-trace`: the code path is unreachable, a check provably returns first,
+  the only writer is not attacker-reachable. An elimination whose closing claim
+  is **behavioural** (what a sanitizer, parser, or library *does*) is not a FALSE
+  POSITIVE unless an `executed-probe` or `runtime-test` closed it.
+
+- **HOLD-UNVERIFIED** — a candidate whose closing claim is **behavioural** and
+  which no probe has yet settled. Neither confirmed nor refuted: the reviewer
+  does not know, and says so rather than guessing in either direction. Every
+  HOLD-UNVERIFIED carries the probe that would settle it:
+  `HOLD-UNVERIFIED — probe: <what to call, with what payload, fed to what>`.
+  Routing: Medium+ potential goes to Phase 3a as a probe task; Low potential goes
+  to the report's Unverified section. A HOLD is **never** silently dropped and is
+  **never** counted as confirmed.
+
+  `HOLD-UNVERIFIED` is **not** `INCONCLUSIVE`. `INCONCLUSIVE` is
+  `vulnhunter-fix-verify`'s verdict for a *different* situation: a finding whose
+  cited location no longer exists in the checked-out code, so there is nothing
+  left to verify. `HOLD-UNVERIFIED` means the location exists and the question is
+  open pending an experiment. The two vocabularies are deliberately distinct and
+  the words are not interchangeable.
+
+  `HOLD-UNVERIFIED` is **not** a **Code Smell**. A code smell is a pattern that
+  is not (or not yet) a security claim at all — it needs no probe and no verdict,
+  just a note. A HOLD is a live security claim waiting on evidence.
 
 ### Stopping Rules
 
@@ -312,10 +393,32 @@ The final report contains:
 by the gates, verification, or exploit testing, report "no exploitable
 vulnerabilities found", list the code smells (if any), and stop.
 
+**HOLD-UNVERIFIED items are reported, not dropped.** If candidates remain in
+HOLD when the run stops, list them in the Unverified section with their probes.
+Stopping with open questions is a valid outcome; stopping with unexplained
+silence is not.
+
 **Do not soften criteria to maintain output.** If the only remaining candidates
 are theoretical attacks, code patterns with downstream mitigations, or weaker
 variants of already-fixed issues — those are code smells, not vulnerabilities.
 Put them in the Code Quality section and stop.
+
+**"Downstream mitigation" is not a licence to stop, and it is not a Code Smell.**
+Apply the claim-typing rule before filing anything here:
+
+- A mitigation you can see **in this repository** (a check on the path, a type
+  constraint at the call site) is a **structural** claim — eliminated, and it is
+  fine to stop.
+- A mitigation that lives in a **dependency** — "the sanitizer handles it", "the
+  parser rejects it", "the framework escapes it" — is a **behavioural** claim and
+  must not be disposed of as a code smell. It is `HOLD-UNVERIFIED` with a named
+  probe, reported in the Unverified section. That is exactly the
+  `escapeVisibility` High from Gate 6: it was filed as handled, and nothing had
+  run the parser.
+
+A HOLD is never a Code Smell (see the verdict vocabulary). Stop when the
+remaining items are *structurally* resolved, or when they are HOLDs that have
+been recorded — not by relabelling open behavioural questions.
 
 
 ---
@@ -351,5 +454,18 @@ installed correctly. Run install.sh from the vulnhunter repository root."
 - `phase3d_sweep.md` — sweep subagent prompt
 - `phase4_report.md` — report format (you read this for final report)
 
-If the audit ends early (zero findings after Phase 2b), skip to step 3 (Write
-report). You MUST still read and follow `${PHASES_DIR}/phase4_report.md`.
+If the audit ends early — zero CONFIRMED findings **and** zero HOLDs after
+Phase 2b — skip to step 3 (Write report). You MUST still read and follow
+`${PHASES_DIR}/phase4_report.md`.
+
+**Zero CONFIRMED is not zero findings.** If Phase 2b left HOLD-UNVERIFIED
+findings, the run does **not** end early: continue to Phase 3a so each Medium+
+HOLD gets its probe. **Low-severity HOLDs are deferred by severity** and do not
+need a probe — they go straight to the report's Unverified section, recorded as
+open with the probe that *would* settle them. A deferred Low HOLD is a settled
+disposition for the purposes of this rule, not an outstanding obligation.
+
+Phase 4 is written once every HOLD has reached a terminal disposition: promoted,
+disproved, proven unrunnable, or **deferred as Low**. A run that stops at "zero
+confirmed" with Medium+ HOLDs still open has silently discarded the only
+interesting results it had.
