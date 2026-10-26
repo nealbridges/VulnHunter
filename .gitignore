@@ -64,7 +64,8 @@ https:/
 # (tests/test_skill_contracts.py compares it to a fresh extraction).
 product_docs/*
 !product_docs/skill_requirements.md
-query/
+# Local checkouts and scratch dirs. Named generically on purpose: a client's
+# directory name is not ours to publish.
 dev/
 
 # Scan-output result dirs copied locally for benchmarking receipts

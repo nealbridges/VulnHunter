@@ -28,6 +28,14 @@ MUST have exactly this many rows. If it has fewer, you silently dropped findings
 A candidate that was never listed in the table was never evaluated — that is a
 verification failure, not an implicit rejection.
 
+**HOLD-UNVERIFIED entries from Phase 2 are candidates too.** An input that hunt
+aggregation dispositioned `HOLD-UNVERIFIED` (the defense is behavioural and was
+never executed) is an unsettled finding, not a SAFE one. Add it to the manifest
+and give it a row in the verdict table like any other candidate; its verdict is
+already `HOLD-UNVERIFIED` and the verification step confirms the claim type and
+records the probe. Excluding HOLDs from the manifest count is the drop this
+pipeline exists to prevent.
+
 ### Consensus-Skip (before full verification)
 
 Before performing full source-level verification on each candidate, check trace
@@ -41,7 +49,11 @@ agent consensus:
 - **Sink-driven agent candidates**: Always full verification.
 
 Include consensus-skipped entries in the verification table marked
-`"consensus-skipped"` for audit trail.
+`"consensus-skipped"` for audit trail. A consensus-skip is a **structural**
+elimination (it rests on a gate that provably fails at a cited file:line), so it
+still records the four claim fields: `Claim type: structural`, `Evidence:
+static-trace`, the `Path reasoned about`, and `Runtime: static — <file:line>`.
+Skipping full verification does not skip the claim record.
 
 ### For EACH remaining candidate finding, verify:
 
@@ -72,7 +84,10 @@ contains dev-only guards in its own source.
 
 Identify every defense between the attacker-controlled source and the sink.
 For each defense, verify it actually blocks the attack — **read the actual library
-source or docs**, don't assume. Search the **FULL codebase** for shared defenses
+source or docs**, don't assume. Reading the library is necessary but, for a
+**behavioural** claim, not sufficient: it tells you what the sanitizer emits, not
+what the downstream consumer does with that output. Apply the claim-typing rule
+below before treating "I read the source and it looks safe" as a conclusion. Search the **FULL codebase** for shared defenses
 (middleware, auth, sanitizers, ORM base classes) — these may not have been visible
 to the originating trace agent.
 
@@ -114,14 +129,23 @@ For every candidate you are about to CONFIRM, decide and record the runtime NOW 
 follow the runtime-provisioner skill (loaded copy or
 `skills/runtime-provisioner/SKILL.md`). Classify the proof requirements
 (boundary type, attacker-reachable surface, observable outcome — the outcome
-stated in one sentence), choose the cheapest sufficient sandbox in the fixed
-preference order (Docker container → in-process harness → static with written
-justification), and write the finding's `Runtime:` line. Budget rule: **Medium
-and above must execute in a container.** A mock is allowed only when the real
-dependency is genuinely unavailable, and then the finding records
-`Runtime: EXECUTED-MOCK — <what was mocked and why>` and its severity ceiling
-is Low until a real-boundary run is done. Phase 3a will execute in this
-recorded runtime; Phase 3b will measure against it.
+stated in one sentence), then climb the provisioner's cheapest-sufficient-first
+probe ladder (call the real function → feed its output to the real parser →
+only then the container), and write the finding's `Runtime:` line.
+
+Budget rule, reconciled with the claim typing above: **Medium and above must
+execute something at the real boundary.** A rung-1 or rung-2 probe that runs the
+real function and the real parser satisfies that requirement for a behavioural
+claim; the container is then required only for the end-to-end impact claim. A
+mock is allowed only when the real dependency is genuinely unavailable, and then
+the finding records `Runtime: EXECUTED-MOCK — <what was mocked and why>` and its
+severity ceiling is Low until a real-boundary run is done. Phase 3a will execute
+in this recorded runtime; Phase 3b will measure against it.
+
+This decision applies to **eliminations too**, not only to candidates about to be
+CONFIRMED. An elimination whose closing claim is behavioural cannot be signed off
+with `Runtime: static` — either a probe settles it (record the runtime that ran),
+or it is `HOLD-UNVERIFIED` with its probe named.
 
 #### 6. Downgrade discipline
 
@@ -267,21 +291,146 @@ not surfaced as separate findings. Platform PoC + exploit test stand in.
 
 For each candidate finding, record the verification result:
 
-| Finding | Gates complete? | Production-reachable? | Defenses cover attack? | Severity correct? | Runtime decision | All call sites checked? | Verdict |
-|---|---|---|---|---|---|---|---|
-| VULN-001 | Yes | 2 of 5 call sites reachable | No mitigation found | Yes — High | docker:python:3.12-slim@sha256:... | 5/5 verified | CONFIRMED (reduced scope) |
-| VULN-002 | Yes | No — `txnLog` written by coordinator at engine.go:441 | N/A | N/A | N/A (eliminated before runtime choice) | 3/3 verified non-exploitable | FALSE POSITIVE |
-| VULN-003 | Yes | Yes | xss() — scope mismatch, not a defense | Yes — High | docker:nginx:1.27-alpine@sha256:... | 4/4 verified | CONFIRMED |
+| Finding | Gates complete? | Production-reachable? | Defenses cover attack? | Severity correct? | Runtime decision | All call sites checked? | Closing claim | Claim type | Evidence | Path reasoned about | Verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| VULN-001 | Yes | 2 of 5 call sites reachable | No mitigation found | Yes — High | docker:python:3.12-slim@sha256:... | 5/5 verified | attacker-controlled `sort` reaches `ORDER BY` unquoted | structural | static-trace | `handler.go:41` → `repo.List` → `sqldb.go:88` (`sort` interpolated, branch: `if opts.Sort != ""`) | CONFIRMED (reduced scope) |
+| VULN-002 | Yes | No — `txnLog` written by coordinator at engine.go:441 | N/A | N/A | `static — engine.go:441 single writer` | 3/3 verified non-exploitable | no user-reachable write path to `txnLog` | structural | static-trace | `engine.go:441` (single writer) → `txnlog.go:60` (only reader); no handler references | FALSE POSITIVE |
+| VULN-003 | Yes | Yes | `quoteEscape` doubles `'` — but a trailing `\` is not covered; nothing has run the parser to see whether the literal closes early | Yes — High | `HOLD-UNVERIFIED — probe: call quoteEscape("x\\") then parse the result with the real sqlparser` | 4/4 verified | quote-doubling leaves non-quote metacharacters bound inside the literal | behavioural | existing-test | `handlers.go:199` → `quoteEscape` → `Key='<sched>'`; cited `TestListBuilderEscapesKeys` asserts a built string | HOLD-UNVERIFIED |
 
-The `Runtime decision` column carries the sandbox choice recorded on the
-finding (step 5 above). A FALSE POSITIVE or eliminated candidate shows N/A —
-the runtime decision only applies to candidates being CONFIRMED.
+The `Runtime decision` column carries the Runtime line recorded on the finding
+(step 5 above). It is never blank: `runtime-provisioner` Step 4 forbids reporting
+a finding with no Runtime line, and that applies to eliminations too.
+
+For a **structural** FALSE POSITIVE, write `Runtime: static — <the file:line
+reasoning that closes it>` (e.g. `static — engine.go:441 single writer`). Static
+is the honest answer for a control-flow elimination: nothing needs to execute,
+and the column names the reasoning that decided it. Do not write bare `N/A` —
+`N/A` says "no runtime applies", which is true, but it loses *why*. A bare `N/A`
+is acceptable only in the `Severity correct?` column, where the question
+genuinely does not apply to an elimination.
+
+A **behavioural** verdict never records `Runtime: static`. It shows either the
+runtime that executed the probe, or `HOLD-UNVERIFIED` with its required probe
+line. That is the one combination the provisioner bans outright.
 
 **FALSE POSITIVE verdicts require evidence.** Every FALSE POSITIVE must cite the
 specific file:line of the defense, type constraint, or non-attacker origin that
 eliminates it. "No — transaction log" is not sufficient; "No — `txnLog` written
 by coordinator at engine.go:441, no user-reachable write path" is. If you cannot
 cite a specific code location, the finding is not eliminated.
+
+### Claim typing (MANDATORY on every verdict, both directions)
+
+Every verdict — CONFIRMED *and* eliminated — records the claim its reasoning
+rests on and the evidence that closes it. A verdict without these four fields is
+incomplete.
+
+| Field | Values |
+|---|---|
+| `Closing claim` | One sentence: what must be true for the verdict to hold. |
+| `Claim type` | `structural` or `behavioural` |
+| `Evidence` | `executed-probe`, `runtime-test`, `static-trace`, or `existing-test` |
+| `Path reasoned about` | `entry → … → sink`, naming the specific branch that decides the outcome |
+
+**Structural** claims are about control flow and data flow in this codebase:
+"a check exists on this path", "the branch returns before the sink", "the value
+never reaches the sink because the caller type-constrains it", "the only writer
+is the coordinator". These can be closed by `static-trace`: you can read the
+code and see it. Structural claims are legitimate and common — most eliminations
+in a healthy run are structural.
+
+**Behavioural** claims are about what a parser, library, sanitizer, encoder,
+backend, OS, or runtime **does** with a value at run time — behaviour that is
+**not visible in the source you are reading**. You cannot settle these from your
+own code; they are settled only by running the real thing on the real payload.
+
+Clear behavioural cases:
+
+- "quote-doubling neutralizes it" — what the consumer's parser does with the
+  escaped string is not visible in the sanitizer's source.
+- "the template engine escapes it" — the escaping happens inside the engine.
+- "json.Unmarshal rejects it" — the decoder's acceptance rules are the claim.
+
+The line is *whose* source decides it. If the answer lives in **this** codebase —
+you can open the function and read the branch — it is structural:
+
+- "the ORM parameterizes it" is **structural** when the call site passes a bound
+  parameter and you can see it; it is behavioural only when the parameterisation
+  would happen inside library machinery you cannot read locally.
+- "the regex is anchored" is **structural** when the pattern literal is in front
+  of you with `^` visible.
+- "the value is type-constrained before the sink" is structural.
+
+When a claim is genuinely borderline, ask: *if I am wrong, would re-reading the
+source tell me?* If yes, it is structural — read it. If no — the answer depends
+on how the dependency behaves on this input — it is behavioural, and it needs a
+probe. Do not HOLD a claim you can settle by reading code you already have open.
+
+**The classification test, stated once (tooling may parse this).** A claim is
+**behavioural** exactly when the question it turns on is *not decidable by
+re-reading the source in this repository* — i.e. the deciding behaviour lives in
+a dependency (parser, library, sanitizer, encoder, backend, OS, runtime) whose
+source is not in this tree. A claim is **structural** exactly when re-reading
+the code in this repository does decide it. This is the whole boundary; the
+examples above are illustrations of it, not the rule.
+
+#### Execution rule
+
+A **behavioural** claim is closed only by `executed-probe` or `runtime-test`.
+Any other evidence leaves the verdict `HOLD-UNVERIFIED`, with the probe that
+would settle it written down:
+
+> `HOLD-UNVERIFIED — probe: <what to call, on which payload, then what to feed it to>`
+
+This applies in **both directions**. An elimination ("the sanitizer handles it")
+and a promotion ("the payload breaks out") are both behavioural claims about the
+sanitizer, and neither stands on reading its name.
+
+A `structural` claim may close on `static-trace` alone. Do not manufacture a
+probe for a structural finding; that is the over-strictness failure mode.
+
+#### Existing-test rule (R4.3)
+
+A test that asserts a **built string**, a **mock return**, or a function's own
+**output** is `existing-test` evidence of *intent*, never behavioural evidence
+about safety or exploitability. The canonical case is `quoteEscape`:
+`TestListBuilderEscapesKeys` asserts the query string contains
+`Key = 'x'' OR ''1''=''1'`. That proves the author *intended*
+quote-doubling to work. It does not prove the parser treats the backslash the
+way the author believed — and it did not. Feeding that same string to the real
+parser is what settles it.
+
+`existing-test` is acceptable evidence for a **structural** claim (the test
+proves the code path is unreachable). For a **behavioural** claim it is a
+starting point, not a conclusion.
+
+#### HOLD routing
+
+`HOLD-UNVERIFIED` is defined once, in `vulnhunt/SKILL.md`'s verdict vocabulary —
+this phase uses that definition and does not restate it.
+
+A `HOLD-UNVERIFIED` verdict is not a dropped finding. Route it by severity:
+
+- **Medium+ potential** → Phase 3a as a probe/PoC task. The probe named on the
+  HOLD line is the task.
+- **Low potential** → the report's Unverified section (Phase 4). It is still
+  never counted as confirmed and never silently dropped.
+
+Record every **still-unresolved** HOLD item in the Phase 4 Unverified section
+with its open question and the probe that would settle it. A HOLD resolved in
+Phase 3a (promoted or disproved) does not go in that section: a promotion becomes
+a CONFIRMED VULN-NNN, and a disproof becomes a FALSE POSITIVE backed by
+`executed-probe` evidence. Phase 4's reconciliation counts all three buckets, so
+nothing is lost by moving an item out of Unverified once it is settled.
+
+#### Runtime line on eliminations
+
+`runtime-provisioner` requires a Runtime line on every finding; a structural
+elimination needs to execute nothing. Record `Runtime: static — <the file:line
+reasoning that closes it>` for a structural elimination. A behavioural
+elimination must NOT be recorded as `Runtime: static` — either a runtime
+executed the probe, or the finding is `HOLD-UNVERIFIED` with its probe named.
+
 
 **Anti-merge rule:** (exception: §9 Universal Auth Gap rollup) Do NOT merge, subsume, or consolidate findings that differ in
 any of: (a) attacker authentication level, (b) entry point / route, (c) gateway
@@ -297,6 +446,15 @@ assignment (CWE-915) dropped when IDOR (CWE-639) exists at the same endpoint. Th
 have different exploited parameters (body fields vs. resource ID), different impacts,
 and different fixes — they are always separate findings.
 
-**Drop all FALSE POSITIVE findings.** Only CONFIRMED findings proceed to Phase 3.
-If zero findings survive, report that no exploitable vulnerabilities were found
-and list code quality recommendations instead.
+**Drop all FALSE POSITIVE findings.** CONFIRMED findings proceed to Phase 3 as
+PoC targets. **HOLD-UNVERIFIED findings also proceed to Phase 3a**, as probe
+tasks — a HOLD at Medium+ potential is not dropped here; Phase 3a exists to
+settle it. A Low HOLD goes to the report's Unverified section without entering
+Phase 3a.
+
+If zero CONFIRMED findings survive **and** there are no HOLDs, report that no
+exploitable vulnerabilities were found and list code quality recommendations.
+If zero CONFIRMED findings survive but HOLDs remain, report "no confirmed
+vulnerabilities; N unverified findings open" and list them in the Unverified
+section with their probes. Zero confirmed is a valid outcome; zero *dispositions*
+is not.

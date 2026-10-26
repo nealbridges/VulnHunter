@@ -1,7 +1,8 @@
 # Final Report Format
 
 > **Context**: All phases are complete. Compile the final report with all confirmed
-> findings, code smells, and the resolved input inventory.
+> findings, all HOLD-UNVERIFIED findings (the `## Unverified` section), code
+> smells, and the resolved input inventory.
 
 ## Final Report Format
 
@@ -73,7 +74,19 @@ Every finding MUST include a CWE identifier. Use the most specific CWE that appl
 **VALIDATION RULE**: A finding is INVALID if either the **PoC** or **Exploit Test**
 field is empty, says "N/A", or says "see above." Each field MUST contain a file path
 to the saved artifact. If you cannot produce a PoC or exploit test, the finding has
-not been proven and must be downgraded to Potential or eliminated.
+not been proven — but **what happens next depends on why**:
+
+- If a probe was attempted and the claim failed, the finding is **eliminated** as a
+  FALSE POSITIVE (evidence: `executed-probe`).
+- If a probe was attempted and was **unrunnable** in this environment, the finding
+  is **HOLD-UNVERIFIED** and belongs in the `## Unverified` section with the probe
+  that would settle it named — not downgraded to Potential.
+- If nothing was ever attempted and the claim is structural, downgrade to Potential.
+
+Do not downgrade a behavioural HOLD to "Potential" to avoid the PoC requirement:
+"Potential" is a judgement; a HOLD is a recorded fact about what was tried (see
+the verdict vocabulary in `vulnhunt/SKILL.md`). A HOLD that vanishes into
+"Potential" has lost its probe.
 
 **Code smells go in a separate section.** Findings where the exploit test showed
 "code runs but attack is mitigated" are NOT vulnerabilities. List them after the
@@ -177,8 +190,15 @@ Field definitions:
 After the header, include:
 - Summary table of findings (ID, title, severity, CWE, status)
 - For each finding: input #, location, entry point, impact, links to PoC and exploit test files
+- The `## Unverified` section for every open `HOLD-UNVERIFIED` finding (see below).
+  **Always print the section** — when nothing is open, its body is `none`. A
+  reader must be able to tell, from this checklist alone and without reading the
+  rest of the document, whether the run left anything unsettled; an omitted
+  section cannot distinguish "nothing open" from "writer forgot".
 - The resolved input inventory table showing every input's disposition
-  (CANDIDATE / SAFE / DESIGN-INTENT) as a completeness artifact
+  (CANDIDATE / SAFE / DESIGN-INTENT / HOLD-UNVERIFIED) as a completeness artifact.
+  A HOLD input is not SAFE and not CANDIDATE-confirmed: it is unsettled, and it
+  appears here as well as in the `## Unverified` section.
 - "Not Found / Excluded" section listing checked-but-clean vulnerability classes
 - Artifacts table linking all files in `${VULNHUNT_DIR}/`
 
@@ -195,6 +215,68 @@ match. If they don't, you missed findings when generating the README.
 After writing the README, add a footer to each PoC file linking to its exploit test
 and back to the README.
 
+## The Unverified section (MANDATORY when non-empty)
+
+`HOLD-UNVERIFIED` is defined once, in `vulnhunt/SKILL.md`'s verdict vocabulary —
+this section uses that definition and does not restate it.
+
+**Cross-check before writing.** The count of `HOLD-UNVERIFIED` entries in the
+`## Unverified` section plus the HOLDs promoted or disproved in Phase 3a must
+equal the Phase 2b HOLD total. If the Unverified section is absent, that is a
+claim that no HOLD survived — verify it against `phase2b_output.md` rather than
+assuming.
+
+Every `HOLD-UNVERIFIED` finding from Phase 2b goes in its own top-level
+section, headed `## Unverified` — unless Phase 3a promoted it (it is then a
+confirmed row) or disproved it (it is then a FALSE POSITIVE row).
+
+That includes HOLDs that never reached Phase 3a, and HOLDs whose probe could not
+run: a HOLD is settled by evidence, not by the run ending. "It did not survive
+Phase 3a" must not be read as "drop it" — an unrunnable probe is exactly the case
+the Unverified section exists for. It is not a Code Quality section and not a
+confirmed-findings section: it is the honest list of things this run could not
+settle.
+
+Format — one entry per HOLD:
+
+```
+### [UNVERIFIED-NNN] Title
+
+**Potential severity:** High (unverified)
+**Why it is a HOLD:** <the behavioural claim nothing has settled>
+**Closing claim:** <what must be true for this to be a real vulnerability>
+**Probe that would settle it:** <what to call, with what payload, fed to what>
+**Why the probe did not run:** <no harness / dependency unavailable / deferred by severity>
+```
+
+Rules for this section:
+
+- **Never counted as confirmed.** The summary's confirmed count excludes HOLDs.
+  A reader who sees "3 confirmed" is entitled to believe those three were proven.
+- **Never silently dropped.** Every HOLD from Phase 2b must be accounted for in
+  exactly one of three places, and the three must reconcile to the Phase 2b
+  HOLD count:
+  1. rows in this Unverified section (still unresolved),
+  2. Phase 3a promotions (probe confirmed → now a CONFIRMED VULN-NNN),
+  3. Phase 3a disproofs (probe disproved → now a FALSE POSITIVE with
+     `executed-probe` evidence, recorded in the verification table, not here).
+  Count Phase 2b HOLDs; count (1) + (2) + (3). They must be equal. A disproved
+  HOLD belongs to bucket 3, **not** to this section — that is the difference
+  between "we could not settle it" and "we settled it and it was wrong".
+  A promoted HOLD likewise leaves this section for bucket 2.
+- **Never described as a false positive.** "We could not settle it" and "we
+  disproved it" are different statements. Do not collapse them: only a HOLD
+  sitting in this section is unsettled; a disproved one has moved to bucket 3.
+- **Always carry the probe.** A HOLD without a named probe is a dropped finding
+  wearing a label.
+
+**If there are no HOLDs, still print the section, with the body `none`.** Its
+absence must never be ambiguous: a reader cannot tell whether the run had no
+HOLDs or the writer forgot the section. `## Unverified` followed by `none` says
+"we looked, and nothing was left open" — which is a claim worth making out loud.
+(BUILD_B3 §4.3 depends on this; an omitted section is also indistinguishable from
+a lost one when reconciling against the Phase 2b HOLD count.)
+
 ## What NOT to Report
 
 - Anything in test code, build scripts, vendored/third-party code, or generated code
@@ -209,9 +291,23 @@ and back to the README.
   internals.** Instead: if you encounter a dependency CVE during hunting and the
   first-party code clearly invokes the vulnerable API path with attacker-controlled
   input (provable from the first-party call site alone), report it as a finding
-  with the CVE reference. If exploitability would require analyzing the dependency's
-  internal code to confirm, note it as a Code Smell with the CVE number and move on.
+  with the CVE reference.
+
+  If exploitability would require analyzing the dependency's internal code to
+  confirm, that is a **behavioural** claim and it is **`HOLD-UNVERIFIED`, not a
+  Code Smell**: record it with the CVE number, its potential severity, and the
+  probe that would settle it (run the affected dependency version against the
+  payload). A Code Smell is an aesthetic opinion; this is an unsettled question
+  about a real vulnerability, and the two must not share a bucket. Only downgrade
+  to Code Smell if you can show the first-party call site cannot reach the
+  vulnerable path at all — that is structural, so reading the code does settle it.
 - Style issues or best-practice violations without security impact
 - Theoretical vulnerabilities that require unrealistic preconditions
 - Injection claims where the language/framework genuinely auto-sanitizes — but verify
-  by reading the actual library, and check that the sanitizer matches the sink context
+  by reading the actual library, and check that the sanitizer matches the sink context.
+  **Reading the library is not enough on its own when the claim is behavioural.** If
+  the sanitizer's output looks safe but the deciding behaviour is what a *downstream*
+  consumer does with that output, the claim is behavioural and belongs under the
+  claim-typing rule: `executed-probe` or `HOLD-UNVERIFIED`, never "I read the source
+  and it looks fine". Reading the library proves the sanitizer emits what it emits;
+  it does not prove the parser agrees.

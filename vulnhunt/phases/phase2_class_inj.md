@@ -125,17 +125,51 @@ generic Gate 2b in the shared file:
   the project's own code) and list the exact characters/patterns it transforms.
   If the source is minified or unavailable, use option (b).
 
+  **Option (a) is sufficient only when the claim is structural** — when what the
+  sanitizer emits is the whole question and you can read it in front of you.
+  It is **not** sufficient when the claim is behavioural: if the deciding
+  behaviour belongs to something downstream (the parser, the template engine,
+  the query builder), then what the sanitizer emits is an input to a question
+  you have not asked. Reading `quoteEscape` tells you it doubles `'`; it
+  does not tell you whether the downstream parser agrees — the field run miss.
+
+  In that case, **option (b) must feed the sanitizer's OUTPUT to the real
+  consumer**, not merely print what the sanitizer returns. The distinction is the
+  whole point: `node -e 'console.log(xss(x))'` shows what escaped you, which is
+  option (a) in executable form. What settles a behavioural claim is taking that
+  escaped string and handing it to the actual parser/builder, then observing
+  whether the payload still lands inside the literal. If option (b) cannot reach
+  the real consumer in this environment, record the finding as `HOLD-UNVERIFIED`
+  with that probe named.
+
+  **Do not mark a behavioural claim SAFE here on the strength of having read the
+  sanitizer.** Marking it SAFE in Phase 2 removes it from the candidate set, and
+  Phase 2b only re-verifies candidates — so a SAFE marked on read-source-only
+  evidence never gets the second look that would catch it.
+
   **(b) Construct a test expression** that proves the sanitizer's behavior on
   attack-relevant characters for the sink context. For URL sinks, test: `&`, `=`,
   `?`, `/`, `..`, `#`, `%`. For SQL sinks, test: `'`, `"`, `;`, `--`. For command
   sinks, test: `;`, `|`, `&`, `` ` ``, `$()`. For HTML sinks, test: `<`, `>`,
-  `"`, `'`, `&`. Write the test as a runnable one-liner, e.g.:
-  `node -e "const xss = require('xss'); console.log(xss('X&injected=true'))"`
+  `"`, `'`, `&`. Write the test as a runnable one-liner that carries the result
+  **through to the real consumer** — for an SQL sink, hand the escaped string to
+  the actual query builder and print whether the payload still lands inside the
+  literal. `require('xss')` + `console.log(xss(...))` alone shows what escaped
+  you; it does not show what the parser does with it, and for a behavioural claim
+  that is option (a) in executable form, not option (b).
 
   **(c) If you cannot read the source or construct a test** (e.g., the dependency
-  isn't installed, or the language has no REPL), state this explicitly and
-  **treat the sanitizer as ineffective** — do NOT assume it works. Proceed to
-  Gate 3 with the finding intact.
+  isn't installed, or the language has no REPL), state this explicitly and do NOT
+  assume the sanitizer works — but do not pretend you proved it doesn't either:
+
+  - If the sanitizer's claim is **structural** and unreadable, treat it as
+    ineffective and proceed to Gate 3 with the finding intact.
+  - If the claim is **behavioural** and unrunnable, record **HOLD-UNVERIFIED**
+    with the probe that would settle it (rung 2: the real parser at a pinned
+    version; rung 3: a container). An unrunnable dependency is exactly why the
+    HOLD disposition exists — sending it to Gate 3 as a live candidate invites it
+    to be dispositioned on impact grounds without its defense question ever
+    having been answered.
 
 - **Verify the sanitizer matches the sink context.** A sanitizer that encodes `<`
   and `>` (HTML context) does NOT protect a URL sink — it won't encode `&`, `=`,
