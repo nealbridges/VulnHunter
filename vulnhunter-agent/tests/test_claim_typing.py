@@ -38,6 +38,21 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _read_planning_doc(name: str) -> str:
+    """Read a `product_docs/` artifact, skipping when it is absent.
+
+    `product_docs/*` is gitignored (see .gitignore:65) except the requirement
+    register, so planning docs exist in the author's working tree and NOT in CI.
+    A test that hard-fails on one of them is red on the runner for a reason that
+    has nothing to do with the shipped skill set. Skip instead, and keep the
+    assertion strong when the file is there.
+    """
+    path = REPO_ROOT / "product_docs" / name
+    if not path.is_file():
+        pytest.skip(f"{name} is a local-only planning doc (product_docs/* is gitignored)")
+    return path.read_text(encoding="utf-8")
+
+
 def _shipped_markdown() -> list[Path]:
     """Every markdown file the skill set actually ships.
 
@@ -1902,7 +1917,7 @@ class TestPreGateTerminalsCarryHolds:
         )
 
     def test_planning_doc_defers_to_glossary(self) -> None:
-        text = _read(REPO_ROOT / "product_docs" / "EXPERIMENT_judge_replay_prompt.md")
+        text = _read_planning_doc("EXPERIMENT_judge_replay_prompt.md")
         i = text.find("- `HOLD-UNVERIFIED`")
         assert i != -1
         window = text[i : i + 300]
@@ -2042,7 +2057,7 @@ class TestRound14Residues:
         )
 
     def test_experiment_prompt_does_not_restate_the_definition(self) -> None:
-        text = _read(REPO_ROOT / "product_docs" / "EXPERIMENT_judge_replay_prompt.md")
+        text = _read_planning_doc("EXPERIMENT_judge_replay_prompt.md")
         i = text.find("- `HOLD-UNVERIFIED`")
         assert i != -1
         window = text[i : text.find("\n", i)]
