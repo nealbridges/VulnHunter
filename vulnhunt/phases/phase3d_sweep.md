@@ -91,26 +91,16 @@ Present this table before proceeding:
 | Hardcoded secrets | `[pattern]` in [paths] | 5 | 3 | 0 | 0 | 2 | 0 |
 | Weak entropy | `[pattern]` | 4 | 1 | 2 (adequate) | 1 | 0 | 0 |
 
-The **Held** column exists because a mitigation resting on dependency behaviour is
-not a mitigation you can see: those instances are `HOLD-UNVERIFIED`, and the table
-must be able to say so. Every instance must land in exactly one of Candidates,
-Mitigated, Held, Dev-Only — those four plus Remaining must sum to Total Found.
+**Held** = `HOLD-UNVERIFIED` instances (a mitigation resting on dependency
+behaviour). Candidates + Mitigated + Held + Dev-Only + Remaining = Total Found.
 
 Use the **total count from grepping**, not the count of instances you chose to
 highlight. If you found 20 instances and 3 are candidates, the table says
 "20 found, 3 candidates, 15 mitigated, 0 held" — not "3 found, 3 fixed."
 
-**Held instances must reconcile with the report.** Every Held instance appears in
-the report's `## Unverified` section (or among the confirmed rows if Phase 3a
-promoted it), with the probe that would settle it. State the two counts
-separately — **do not add them together**: the report's Unverified section
-already contains both the sweep HOLDs and the Phase 2b HOLDs, so:
-
-- `Unverified entries (still open) + promoted + disproved = Phase 2b HOLDs + sweep Held`
-
-  is the single equality to check. It is a statement about where every HOLD
-  ended up, not a sum of two independent pools. If it does not hold, an instance
-  was lost between the sweep and the report.
+Every Held instance ends up in the report's `## Unverified` section, promoted, or
+disproved. The one equality to check:
+`Unverified (open) + promoted + disproved = Phase 2b HOLDs + sweep Held`.
 
 ### Sweep Instance Validation
 
@@ -123,11 +113,8 @@ For EVERY instance found by the sweep grep, triage it:
 - Triage verdict: **CANDIDATE** / **MITIGATED** (with reason) / **DEV-ONLY** /
   **HOLD-UNVERIFIED** (with the probe required)
 
-  A mitigation is only "MITIGATED" when the claim is structural — you can see
-  the check on the path. If the mitigation argument rests on what a sanitizer,
-  parser, library, or framework DOES, the instance is **HOLD-UNVERIFIED** until
-  something executes against it. Writing "MITIGATED — sanitizer handles it"
-  without running the parser is the field run mistake reproduced inside the sweep.
+  MITIGATED only when the claim is structural; a mitigation resting on what a
+  dependency does is **HOLD-UNVERIFIED** until something executes against it.
 
 Every CANDIDATE instance must go through the full finding pipeline — gates, PoC,
 and exploit test (Phases 2b, 3a, 3b) — the same as any finding discovered during
@@ -138,21 +125,12 @@ different upstream validation, or different sink behavior.
 
 Instances that pass the full pipeline become separate VULN-NNN findings in the
 report. Instances that fail become Code Smells or are eliminated, same as any
-other candidate — **but only after claim typing**. A sweep instance whose
-disposition turns on what a parser, sanitizer, library, or other dependency does
-with the value is a **behavioural** claim, and reading the code cannot settle it.
-Such an instance is NOT "Mitigated" and NOT eliminated; it is recorded
-`HOLD-UNVERIFIED` with the probe named, and it goes into the report's
-`## Unverified` section alongside Phase 2b's HOLDs.
-
-Applying the verdict vocabulary to sweep instances is mandatory, because the
-the field run failure mode reproduces here exactly: "the sanitizer doubles quotes" looks
-like mitigation, and it is only true if something ran the parser.
+other candidate — after claim typing: a behavioural instance is recorded
+`HOLD-UNVERIFIED` and goes to the report's `## Unverified` section.
 
 **If any row has Remaining > 0, those are unaccounted instances — investigate and
-triage them before proceeding to the report.** `Remaining` is *unaccounted*, not
-*held*: a row whose Held column is populated is fully accounted for and does not
-block the report. Only genuinely untriaged instances block.
+triage them before proceeding to the report.** Held instances are accounted
+for and do not block.
 
 ### Pipeline Reference for Sweep Candidates
 
