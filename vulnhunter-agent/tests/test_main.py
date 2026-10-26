@@ -113,6 +113,7 @@ def _patch_main_dependencies(
 
     def fake_post_issues(*a: object, **k: object) -> Any:
         calls["post_issues"] += 1
+        calls["post_issues_kwargs"] = k
         if issues_error is not None:
             raise issues_error
         from agent.issues import PostSummary
@@ -886,6 +887,8 @@ def test_main_full_pipeline_happy_path(
     assert "Publish:  https://github.com/o/dest@main (abcdef12)" in captured
     assert "Issues:" in captured
     assert calls["post_issues"] == 1
+    assert calls["post_issues_kwargs"]["extracted"] is None
+    assert isinstance(calls["post_issues_kwargs"]["extraction_error"], FileNotFoundError)
 
 
 def test_main_issues_summary_failed_returns_3(

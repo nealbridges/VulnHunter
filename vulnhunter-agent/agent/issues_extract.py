@@ -1,4 +1,8 @@
-"""Extract confirmed findings from a VulnHunter results README via Haiku.
+"""Extract findings from a VulnHunter results directory via Haiku.
+
+Prefers ``README.md`` (the Phase 4 report). If that file is missing or empty
+but Phase 2 candidate write-ups are on disk, those files are concatenated and
+extracted instead so ``--issues`` can still file what the hunt produced.
 
 The agent never re-reads finding text in its own context (see CLAUDE.md);
 extraction is delegated to Haiku and the structured JSON it returns is
@@ -56,11 +60,18 @@ class Finding:
         return asdict(self)
 
 
+SOURCE_README = "readme"
+SOURCE_CANDIDATES = "candidates"
+
+
 @dataclass(frozen=True)
 class ExtractedReport:
     findings: list[Finding]
     scan_date: str  # YYYY-MM-DD; used in issue body footer
     results_dir_name: str  # used in <!-- vulnhunt-results-dir: ... --> marker
+    # "readme" when Phase 4 wrote README.md; "candidates" when extraction
+    # assembled Phase 2 write-ups because that report was missing.
+    source: str = SOURCE_README
 
 
 _SCAN_DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})-\d{6}")
@@ -69,21 +80,7 @@ _SCAN_DATE_RE = re.compile(r"(\d{4}-\d{2}-\d{2})-\d{6}")
 _VULN_FILE_RE = re.compile(r"VULN[-_](\d+)", re.IGNORECASE)
 
 
-_EXTRACTOR_SYSTEM = """You extract VulnHunter scan findings from a Markdown report \
-into strict JSON. You return ONLY a JSON object — no prose, no code fences, no commentary.
-
-The report has a summary table near the top with columns including a Status \
-column. ONLY findings whose status is "Confirmed" are in scope; ignore \
-"Code Smells", "Observations", "Defense in Depth", "Informational", or any \
-finding marked anything other than "Confirmed".
-
-For each confirmed finding, locate its detail section (typically `## VULN-NNN: ...` \
-or similar) and read the field table and prose subsections to fill in the schema below.
-
-Schema (always emit every key; use empty string "" if a field cannot be \
-determined from the report — never invent values):
-
-{
+_FINDING_SCHEMA = """{
   "findings": [
     {
       "id": "VULN-001",
@@ -101,7 +98,57 @@ determined from the report — never invent values):
       "severity_rationale": "Why this severity (impact + reachability)."
     }
   ]
-}
+}"""
+
+_EXTRACTOR_SYSTEM = f"""You extract VulnHunter scan findings from a Markdown report \
+into strict JSON. You return ONLY a JSON object — no prose, no code fences, no commentary.
+
+The report has a summary table near the top with columns including a Status \
+column. ONLY findings whose status is "Confirmed" are in scope; ignore \
+"Code Smells", "Observations", "Defense in Depth", "Informational", or any \
+finding marked anything other than "Confirmed".
+
+For each confirmed finding, locate its detail section (typically `## VULN-NNN: ...` \
+or similar) and read the field table and prose subsections to fill in the schema below.
+
+Schema (always emit every key; use empty string "" if a field cannot be \
+determined from the report — never invent values):
+
+{_FINDING_SCHEMA}
+"""
+
+_EXTRACTOR_SYSTEM_CANDIDATES = f"""You extract VulnHunter scan findings from Phase 2 \
+candidate write-ups into strict JSON. You return ONLY a JSON object — no prose, \
+no code fences, no commentary.
+
+The Phase 4 README.md was not written. The material below is assembled from \
+trace-agent result files (typically `results/sg-*_*.md` and `candidates/*.md`). \
+These are candidate write-ups, not a confirmed report.
+
+IN SCOPE: every candidate that uses the Candidate Output Format \
+(`#### [VULN-NNN] Title` with Gate 0–3, Location, Class, Severity, Data Flow, \
+Root Cause) and was not eliminated.
+OUT OF SCOPE: SAFE, NO-MATCH, DESIGN-INTENT, dead-code, and inventory rows \
+that have no write-up.
+
+Map fields as follows:
+- id: the VULN-NNN from the heading
+- title: the heading title
+- cwe / cwe_name: from **Class** (e.g. CWE-89: SQL Injection)
+- severity: from **Severity**
+- location: from **Location**
+- root_cause: from **Root Cause**
+- data_flow: from **Data Flow**
+- entry_point: from **Entry Point**
+- exploit_description: from **Exploitability** and Gate 3 (what the attacker gains)
+- exploit_impact: the outcome Gate 3 / severity implies
+- fix_strategy: empty string unless the write-up proposes a fix
+- severity_rationale: from **Severity** plus Gate 2a/3
+
+Schema (always emit every key; use empty string "" if a field cannot be \
+determined — never invent values):
+
+{_FINDING_SCHEMA}
 """
 
 
@@ -146,6 +193,70 @@ def _discover_finding_files(results_dir: Path) -> dict[str, dict[str, str]]:
     return out
 
 
+def _add_unique_paths(out: list[Path], seen: set[Path], paths: list[Path]) -> None:
+    for path in paths:
+        if not path.is_file() or path.name == "README.md":
+            continue
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        out.append(path)
+
+
+def candidate_writeup_paths(results_dir: Path) -> list[Path]:
+    """Phase 2 write-ups the hunter leaves when Phase 4 never ran.
+
+    Order: ``results/sg-*_*.md``, other ``results/*.md``, ``candidates/*.md``,
+    then top-level ``sg-*_*.md``. README.md is never included.
+    """
+    out: list[Path] = []
+    seen: set[Path] = set()
+    results_sub = results_dir / "results"
+    if results_sub.is_dir():
+        _add_unique_paths(out, seen, sorted(results_sub.glob("sg-*_*.md")))
+        _add_unique_paths(out, seen, sorted(results_sub.glob("*.md")))
+    candidates_sub = results_dir / "candidates"
+    if candidates_sub.is_dir():
+        _add_unique_paths(out, seen, sorted(candidates_sub.glob("*.md")))
+    _add_unique_paths(out, seen, sorted(results_dir.glob("sg-*_*.md")))
+    return out
+
+
+def load_report_material(results_dir: Path) -> tuple[str, str]:
+    """Return ``(markdown, source)`` for extraction.
+
+    Prefers a non-empty ``README.md``. Otherwise concatenates Phase 2
+    candidate write-ups. Raises ``FileNotFoundError`` when neither exists.
+    """
+    readme = results_dir / "README.md"
+    if readme.is_file():
+        text = readme.read_text(encoding="utf-8", errors="replace")
+        if text.strip():
+            return text, SOURCE_README
+
+    paths = candidate_writeup_paths(results_dir)
+    chunks: list[str] = []
+    for path in paths:
+        body = path.read_text(encoding="utf-8", errors="replace")
+        if not body.strip():
+            continue
+        rel = path.relative_to(results_dir).as_posix()
+        chunks.append(f"----- BEGIN {rel} -----\n{body}\n----- END {rel} -----")
+    if chunks:
+        logger.warning(
+            "README.md missing or empty in %s; extracting from %d Phase 2 candidate write-up(s)",
+            results_dir,
+            len(chunks),
+        )
+        return "\n\n".join(chunks), SOURCE_CANDIDATES
+
+    raise FileNotFoundError(
+        f"README.md not found in {results_dir} and no Phase 2 candidate "
+        "write-ups were found under results/, candidates/, or sg-*_*.md"
+    )
+
+
 def _coerce_finding(raw: dict[str, Any], files: dict[str, dict[str, str]]) -> Finding:
     """Build a Finding dataclass, filling in optional fields with ''."""
     fid = str(raw.get("id", "")).strip()
@@ -179,6 +290,20 @@ def _coerce_finding(raw: dict[str, Any], files: dict[str, dict[str, str]]) -> Fi
     )
 
 
+def _user_message(content: str, source: str) -> str:
+    if source == SOURCE_CANDIDATES:
+        instruction = (
+            "Extract every in-scope candidate write-up from the Phase 2 files below. "
+            "Return strict JSON matching the schema in the system prompt."
+        )
+    else:
+        instruction = (
+            "Extract every Confirmed finding from the report below. Return strict JSON "
+            "matching the schema in the system prompt. Report begins after the marker."
+        )
+    return f"{instruction}\n\n----- BEGIN REPORT -----\n{content}\n----- END REPORT -----\n"
+
+
 async def extract_findings(
     results_dir: Path,
     config: AgentConfig,
@@ -187,29 +312,23 @@ async def extract_findings(
     cost_tracker: _llm.CostStats | None = None,
     audit_writer: AuditWriter | None = None,
 ) -> ExtractedReport:
-    """Extract confirmed findings from results_dir/README.md via Haiku.
+    """Extract findings from ``results_dir``.
 
-    Falls back to Sonnet on any LLM transport / parse failure. Raises
-    ``LLMError`` (from ``_llm``) if both models fail.
+    Uses ``README.md`` when present and non-empty; otherwise concatenates
+    Phase 2 candidate write-ups. Falls back to Sonnet on any LLM transport /
+    parse failure. Raises ``LLMError`` (from ``_llm``) if both models fail.
+    Raises ``FileNotFoundError`` when neither a report nor candidate files
+    exist — that is not a clean scan.
     """
-    readme = results_dir / "README.md"
-    if not readme.is_file():
-        raise FileNotFoundError(f"README.md not found in {results_dir}")
-    content = readme.read_text(encoding="utf-8", errors="replace")
-
-    user_msg = (
-        "Extract every Confirmed finding from the report below. Return strict JSON "
-        "matching the schema in the system prompt. Report begins after the marker.\n\n"
-        "----- BEGIN REPORT -----\n"
-        f"{content}\n"
-        "----- END REPORT -----\n"
-    )
+    content, source = load_report_material(results_dir)
+    system = _EXTRACTOR_SYSTEM_CANDIDATES if source == SOURCE_CANDIDATES else _EXTRACTOR_SYSTEM
+    user_msg = _user_message(content, source)
 
     try:
         parsed = await _llm.call_json_with_fallback(
             primary_model=config.issues.haiku_model,
             fallback_model=config.issues.sonnet_model,
-            system=_EXTRACTOR_SYSTEM,
+            system=system,
             user=user_msg,
             config=config,
             token_manager=token_manager,
@@ -245,7 +364,7 @@ async def extract_findings(
         try:
             parsed = await _llm.call_json(
                 model=config.anthropic.model,
-                system=_EXTRACTOR_SYSTEM,
+                system=system,
                 user=user_msg,
                 config=config,
                 token_manager=token_manager,
@@ -288,4 +407,5 @@ async def extract_findings(
         findings=findings,
         scan_date=_scan_date_from_dir(results_dir.name),
         results_dir_name=results_dir.name,
+        source=source,
     )

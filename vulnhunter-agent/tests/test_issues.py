@@ -652,6 +652,91 @@ class TestPostIssues:
         assert not out.failed
         assert out.clean_scan is None
 
+    async def test_extraction_error_does_not_reextract(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        populated_agent_config: Any,
+        tmp_path: Path,
+    ) -> None:
+        calls = {"n": 0}
+
+        async def _fake_extract(*a: Any, **k: Any) -> ExtractedReport:
+            calls["n"] += 1
+            raise AssertionError("extract_findings must not run after extraction_error")
+
+        monkeypatch.setattr(extract_mod, "extract_findings", _fake_extract)
+        out = await post_issues(
+            results_dir=tmp_path,
+            report_url="u",
+            target_repo_url="https://github.com/o/r",
+            config=self._cfg_with_token(populated_agent_config),
+            token_manager=_TM(),
+            extracted=None,
+            extraction_error=RuntimeError("llm transport failed"),
+        )
+        assert calls["n"] == 0
+        assert out.note == "finding extraction failed, no issues posted: llm transport failed"
+        assert not out.posted
+        assert not out.failed
+        assert out.clean_scan is None
+
+    async def test_extraction_failure_in_stage_degrades(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        populated_agent_config: Any,
+        tmp_path: Path,
+    ) -> None:
+        async def _fake_extract(*a: Any, **k: Any) -> ExtractedReport:
+            raise FileNotFoundError("README.md not found")
+
+        monkeypatch.setattr(extract_mod, "extract_findings", _fake_extract)
+        out = await post_issues(
+            results_dir=tmp_path,
+            report_url="u",
+            target_repo_url="https://github.com/o/r",
+            config=self._cfg_with_token(populated_agent_config),
+            token_manager=_TM(),
+        )
+        assert out.note == "finding extraction failed, no issues posted: README.md not found"
+        assert not out.posted
+        assert not out.failed
+        assert out.clean_scan is None
+
+    @respx.mock
+    async def test_candidate_source_sets_summary_note(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        populated_agent_config: Any,
+        tmp_path: Path,
+    ) -> None:
+        self._stub_labels_existing()
+        respx.post("https://api.github.com/repos/o/r/issues").mock(
+            return_value=httpx.Response(201, json={"html_url": "https://github.com/o/r/issues/9"})
+        )
+        f = _finding("VULN-001")
+        self._stub_pipeline(
+            monkeypatch,
+            findings=[f],
+            open_issues=[],
+            decisions=[DedupDecision(finding_id="VULN-001", matched_issues=[], via="")],
+        )
+        extracted = ExtractedReport(
+            findings=[f],
+            scan_date="2026-06-23",
+            results_dir_name="myrepo_VULNHUNT_RESULTS_opus47_2026-06-23-141824",
+            source="candidates",
+        )
+        out = await post_issues(
+            results_dir=tmp_path,
+            report_url="https://example.com/blob/main/o/n/2026-06-23-141824/abc/d/README.md",
+            target_repo_url="https://github.com/o/r",
+            config=self._cfg_with_token(populated_agent_config),
+            token_manager=_TM(),
+            extracted=extracted,
+        )
+        assert "Phase 2 candidate write-ups" in out.note
+        assert len(out.posted) == 1
+
     def _stub_labels_existing(self) -> None:
         respx.get("https://api.github.com/repos/o/r/labels/security").mock(
             return_value=httpx.Response(200, json={"name": "security"})

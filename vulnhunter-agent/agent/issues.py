@@ -831,15 +831,22 @@ async def post_issues(
     audit_repo_slug: str = "",
     audit_repo_properties: RepoProperties | None = None,
     extracted: ExtractedReport | None = None,
+    extraction_error: BaseException | None = None,
     commit_sha: str = "",
 ) -> PostSummary:
     """Run the full issues stage. Errors below are caught per-finding.
 
     ``extracted`` may be supplied by the caller when it has already
     parsed the report (e.g. for the audit path) — the LLM extractor
-    isn't re-invoked in that case. When ``audit_writer`` is non-None,
-    each successful POST also emits a ``finding_opened`` audit event
-    plus a findings-event transition record.
+    isn't re-invoked in that case. Passing neither ``extracted`` nor
+    ``extraction_error`` means extraction has not run yet, so
+    ``extract_findings`` is called here. When ``extraction_error`` is
+    set, extraction already failed upstream: the stage returns a
+    summary noting that no issues were posted and does not call
+    ``extract_findings`` again. A failure of the extraction run here
+    degrades the same way instead of crashing the stage. When ``audit_writer`` is
+    non-None, each successful POST also emits a ``finding_opened``
+    audit event plus a findings-event transition record.
 
     On a zero-findings scan the flow diverges into the clean-scan
     receipt path (see docs/clean-scan-notifications-design.md) —
@@ -848,16 +855,38 @@ async def post_issues(
     summary = PostSummary()
     verify = resolve_verify(config.tls)
 
+    if extraction_error is not None:
+        summary.note = f"finding extraction failed, no issues posted: {extraction_error}"
+        logger.error(
+            "Skipping issues stage: finding extraction already failed (%s)",
+            extraction_error,
+        )
+        return summary
+
     if extracted is None:
-        extracted = await issues_extract.extract_findings(
+        try:
+            extracted = await issues_extract.extract_findings(
+                results_dir,
+                config,
+                token_manager,
+                cost_tracker=summary.cost,
+                audit_writer=audit_writer,
+            )
+        except Exception as exc:  # noqa: BLE001
+            summary.note = f"finding extraction failed, no issues posted: {exc}"
+            logger.error("Issues stage: finding extraction failed: %s", exc)
+            return summary
+    if extracted.source == issues_extract.SOURCE_CANDIDATES:
+        logger.warning(
+            "Issues extraction used Phase 2 candidate write-ups in %s "
+            "because README.md was missing or empty (%d finding(s))",
             results_dir,
-            config,
-            token_manager,
-            cost_tracker=summary.cost,
-            audit_writer=audit_writer,
+            len(extracted.findings),
         )
     if not extracted.findings:
         summary.note = "no confirmed findings in report"
+        if extracted.source == issues_extract.SOURCE_CANDIDATES:
+            summary.note += " (Phase 2 candidate write-ups; README.md missing)"
         if config.issues.notify_clean_scan:
             summary.clean_scan = await _post_clean_scan_notice(
                 results_dir=results_dir,
@@ -875,6 +904,8 @@ async def post_issues(
                 "skipping receipt POST."
             )
         return summary
+    if extracted.source == issues_extract.SOURCE_CANDIDATES:
+        summary.note = "extracted from Phase 2 candidate write-ups because README.md was missing"
 
     await _ensure_all_labels(target_repo_url=target_repo_url, config=config, verify=verify)
 
