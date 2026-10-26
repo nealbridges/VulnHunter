@@ -106,16 +106,11 @@ Follow the iteration rules in the shared file. For each input, return:
 - NO-MATCH (input #) → input does not reach sinks in your class group
 - CROSS-CLASS (input #, sink file:line, suspected class group)
 - DESIGN-INTENT (input #, reason)
-- **HOLD-UNVERIFIED** (input #, sink file:line, vuln class, the behavioural claim
-  nothing has settled, the probe that would settle it) → the only defense found
-  is behavioural and was never executed. Use this instead of SAFE: SAFE means
-  *proven*, and a behavioural defense you did not run is *not yet proven*.
-  Medium+ HOLDs go to Phase 3a for their probe; Low HOLDs are reported in the
-  Unverified section.
+- **HOLD-UNVERIFIED** (input #, sink file:line, vuln class, the unsettled
+  behavioural claim, the probe that would settle it) → the only defense found is
+  behavioural and was never executed. Use this instead of SAFE.
 
-This list is the trace agent's complete return vocabulary. If you find yourself
-wanting to write HOLD-UNVERIFIED and it is not on this list, the pipeline will
-silently coerce it to SAFE — which is the field run miss.
+This list is the trace agent's complete return vocabulary.
 
 Write results to: ${VULNHUNT_DIR}/results/sg-{SG_ID}_{class}_results.md
 
@@ -229,15 +224,9 @@ the orchestrator merges them:
      that partition. If the target agent evaluated the flagged sink (returned
      CANDIDATE or SAFE for it), use that disposition. Only re-dispatch if the
      target class agent did not evaluate that specific sink.
-   - **HOLD-UNVERIFIED**: an agent recorded that the only defense is behavioural
-     and unsettled. This survives aggregation as its own disposition — it is not
-     folded into SAFE, because "SAFE" means *proven*, and a HOLD means *not yet
-     proven*. It enters Phase 2b as a candidate whose verdict is already known to
-     be HOLD; Phase 2b then routes it by severity (Medium+ -> Phase 3a probe,
-     Low -> report Unverified).
-     Precedence: **HOLD beats SAFE** when one agent holds and another says SAFE —
-     the safe verdict is the one that was never executed. HOLD does **not** beat
-     CANDIDATE: a candidate is confirmed to reach a sink, which subsumes it.
+   - **HOLD-UNVERIFIED**: survives aggregation as its own disposition, never
+     folded into SAFE, and enters Phase 2b as a candidate. Precedence: **HOLD
+     beats SAFE**; **CANDIDATE beats HOLD**.
    If an input has no disposition from any agent, re-dispatch it.
 
 2. **Assign VULN-NNN IDs** to all candidates across all subgraphs. Number
