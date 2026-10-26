@@ -240,7 +240,58 @@ after with an independent count, not with the normaliser's own report.
 
 ---
 
-## 5. The one-sentence version
+## 5. History is published too, permanently
+
+The failures above were about the *current* tree. An independent verifier then found a class the tree-level
+guard cannot address, and it was correct:
+
+* A commit that appears on no branch is **still served** at `raw.githubusercontent.com/<owner>/<repo>/<sha>/<path>`.
+  Measured: a commit that was neither an ancestor of main nor a tip of any ref returned HTTP 200 with the
+  client strings intact.
+* A commit **message** is as public as the tree it describes.
+* `refs/pull/*` is read-only, so a merged pull request's head is permanent — `DELETE /git/refs/pull/N/head`
+  returns 422. Rewriting main does not touch it.
+* Deleting a branch does not delete the commits it pointed at; GitHub collects unreachable objects on its
+  own schedule, and nothing forces that schedule.
+
+**Eleven** commits in this repo's history carry the client strings. Every one is still served by SHA.
+
+### R9. Rewriting history fixes the shipped state, never the served state
+
+Do not report a privacy fix as complete because the current tree is clean. The current tree is one of two
+public surfaces; the other is every commit, message and blob the repository has ever received, and that
+surface is immutable.
+
+State the distinction explicitly:
+
+```
+SHIPPED STATE (current tree, default branch):  clean / not clean -- verified by <command>
+SERVED STATE (history, by SHA and PR):
+  PR refs still serving: <n>, permanent (refs/pull/* is read-only)
+  commits still reachable by SHA: <n>
+  can these be retracted in place? yes / no, and why
+```
+
+### R10. Never make a claim the platform cannot keep
+
+A verifier who asks "does this URL 404?" is asking a question about the *platform*, not about effort. Check
+what the platform actually does before promising it.
+
+If retraction is impossible, say so plainly — "the default branch is clean; the history is immutable and
+permanently visible to anyone who follows a link into it" — rather than describing a partial fix as if it
+were complete. An overstated fix is the same failure as an unstated residual.
+
+### R11. The cheapest leak is the one never committed
+
+The strongest defence is procedural: do not put client-shaped strings into a commit in the first place, in
+the tree or the message. Once committed, they are permanent. Every later remediation is damage control.
+
+Practically: scrub before the first commit, not after the first review. A pre-commit hook that greps the
+staged diff AND the proposed message is worth more than any amount of force-pushing.
+
+---
+
+## 6. The one-sentence version
 
 **Green means the tests I wrote pass. That is a different claim from "it works," and only someone who did
 not write them can tell you whether you have mistaken one for the other.**
