@@ -64,12 +64,7 @@ https:/
 # (tests/test_skill_contracts.py compares it to a fresh extraction).
 product_docs/*
 !product_docs/skill_requirements.md
-# The verification policy is published on purpose: a contributor or reviewer needs to know
-# what standard a build is held to. It names no scan identifier (verified by the leak guard),
-# so it is safe in public. Everything else in product_docs/ stays private.
-!product_docs/VERIFICATION_POLICY.md
-# Local checkouts and scratch dirs. Named generically on purpose: a client's
-# directory name is not ours to publish.
+# Local checkouts and scratch dirs.
 dev/
 
 # Scan-output result dirs copied locally for benchmarking receipts
