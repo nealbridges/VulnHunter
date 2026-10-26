@@ -2088,3 +2088,38 @@ class TestEmptyUnverifiedSectionIsExplicit:
         )
         assert "`none`" in window, "the text does not say what to print"
         assert "omit" not in window.split(".")[0].lower() or "still print" in window.lower()
+
+
+class TestUnverifiedSectionRulesAreConsistent:
+    """Merge round 2: the checklist said omit-when-empty while the section rule said print-none.
+
+    Both sentences described the same section and disagreed. Whichever the report
+    writer read second won, so the outcome was down to reading order.
+    """
+
+    def test_checklist_and_section_rule_agree(self) -> None:
+        text = _read(PHASE4)
+        flat = " ".join(text.split())
+
+        # The checklist line, bounded to its own bullet: the next bullet starts at
+        # "- The resolved input inventory", and a fixed window would bleed into it.
+        i = flat.find("- The `## Unverified` section for every open")
+        assert i != -1, "the entry-point checklist line for Unverified is missing"
+        end = flat.find("- The resolved input inventory", i)
+        assert end != -1, "the bullet after the Unverified checklist line is missing"
+        checklist = flat[i:end]
+
+        # The dedicated section rule
+        j = flat.find("If there are no HOLDs")
+        assert j != -1, "the no-HOLDs rule is missing"
+        section = flat[j : j + 600]
+
+        # "omit" may appear in the justification ("an omitted section is
+        # ambiguous"); what must not appear is an instruction to omit.
+        assert not re.search(r"omit it|omit the section", checklist, re.IGNORECASE), (
+            "the checklist still instructs the writer to omit the section when empty, "
+            "contradicting the section rule that says to print it with `none`"
+        )
+        assert "always print" in checklist.lower(), "the checklist does not say to always print it"
+        assert "`none`" in checklist
+        assert "`none`" in section

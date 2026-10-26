@@ -190,10 +190,11 @@ Field definitions:
 After the header, include:
 - Summary table of findings (ID, title, severity, CWE, status)
 - For each finding: input #, location, entry point, impact, links to PoC and exploit test files
-- The `## Unverified` section for every open `HOLD-UNVERIFIED` finding (see below) —
-  **omit it only when there are none.** A reader must be able to tell, from this
-  checklist alone and without reading the rest of the document, whether the run
-  left anything unsettled.
+- The `## Unverified` section for every open `HOLD-UNVERIFIED` finding (see below).
+  **Always print the section** — when nothing is open, its body is `none`. A
+  reader must be able to tell, from this checklist alone and without reading the
+  rest of the document, whether the run left anything unsettled; an omitted
+  section cannot distinguish "nothing open" from "writer forgot".
 - The resolved input inventory table showing every input's disposition
   (CANDIDATE / SAFE / DESIGN-INTENT / HOLD-UNVERIFIED) as a completeness artifact.
   A HOLD input is not SAFE and not CANDIDATE-confirmed: it is unsettled, and it
