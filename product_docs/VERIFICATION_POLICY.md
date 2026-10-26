@@ -1,6 +1,8 @@
 # Verification policy
 
-**PRIVATE. `product_docs/*` is gitignored, so this file is never published.**
+**PUBLISHED.** `product_docs/*` is gitignored, but this file is explicitly un-ignored because a
+contributor or reviewer needs to know what standard a build is held to. It names no scan identifier — the
+repo's leak guard scans it — so it is safe in public. The other `product_docs/` files stay private.
 
 This policy exists because of a specific, expensive failure. Read that case first; the rules are only
 convincing in light of it.
@@ -56,11 +58,12 @@ A verifier should be able to reproduce every figure without trusting this docume
 | Figure | Command that produces it |
 |---|---|
 | 17 rebuild commits | `git reflog \| grep -c "commit: feat(skills)"` (distinct SHAs: 17) |
-| 14 review rounds, 13 REJECT | `ls product_docs/A2_REVIEW*.json \| wc -l`, then read each `structuredOutput.verdict` |
+| 14 review rounds, 13 REJECT | `ls product_docs/A2_REVIEW*.json \| wc -l`, then read each `structuredOutput.verdict` (the review JSONs are PRIVATE, kept in the maintainer's checkout; the count is a fact about the process, not an artifact the public needs) |
 | 22 words in the plaintext seed | `git show 9f99f39:vulnhunter-agent/agent/_banned_words.py \| sed -n '/^_SEED = (/,/^)/p' \| grep -c '"'` |
 | 153 of 322 files covered | `git worktree add --detach /tmp/x b588690`, then expand `PUBLISHED_GLOBS` in that tree and compare against `git ls-files` |
 | 7 identifiers in a commit message | `git log -1 --format=%B 9f99f39 \| grep -o -iE "<identifier pattern>" \| sort -u \| wc -l` |
-| empty set passes without private docs | clone with `product_docs/` absent, set `_BANNED_SPAN_SHA1 = frozenset({})`, run the suite |
+| empty set passes without private docs | clone this repo (which lacks the private docs), set `_BANNED_SPAN_SHA1 = frozenset({})` in `vulnhunter-agent/agent/_banned_words.py`, run `pytest vulnhunter-agent/tests/test_skill_contracts.py` |
+| the 22-word seed | `git show 9f99f39:vulnhunter-agent/agent/_banned_words.py` — a historical commit, reproducible from a clone |
 
 Two figures in an earlier draft were wrong and were corrected by measurement before commit: "eight
 rebuilds" (actually seventeen) and "154 of 322" (actually 153). This is rule R7 applied to this document
