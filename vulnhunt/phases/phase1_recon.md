@@ -152,13 +152,25 @@ inputs at the lowest trust level (unauthenticated first, then authenticated, the
 internal, then privileged). Inputs reachable without authentication have the
 highest attacker accessibility and should be traced first.
 
+**Scaffold floor (mandatory)**: If `${VULNHUNT_DIR}/inputs_scaffold.md` exists,
+start the inventory from it. Every scaffold row must appear in the inventory —
+including rows outside this scan's scope, which get a disposition rather than
+being deleted. Then add the rows the scaffold missed. The `Variable` cell holds
+exactly one backticked name, never a list; use `N/A` when there is no variable.
+A co-parameter group is enumerated member by member, with the group noted in
+Entry Point. These rows still follow the Sibling input rule, and the
+completeness check below still applies — the scaffold does not replace either.
+
+Counter-example: a row whose Variable cell reads `name`, `email`, `role`
+becomes three rows.
+
 **Completeness check**: After building the inventory, compare it against the entry
 points found in Step 1. Every entry point (HTTP route, CLI command, queue consumer,
 gRPC method, cron job, etc.) should have at least one input. If an entry point
 appears in the scan but has zero inputs in the inventory, either you missed inputs
 — go back and read that entry point's code — OR the endpoint genuinely accepts no
 user input. In the latter case, add a synthetic inventory entry with source type
-'no-input endpoint', variable 'N/A', and trust level based on what authentication
+'no-input endpoint', variable `N/A`, and trust level based on what authentication
 the endpoint requires. Zero-input endpoints are critical for the NAV agent: an
 endpoint that performs a sensitive operation without requiring authentication is an
 auth bypass candidate (CWE-306) regardless of whether it processes user data.
@@ -490,7 +502,10 @@ Produce a compact Attack Surface Report (not the raw tool output):
 
 **Languages**: [detected languages]
 **Frameworks**: [detected frameworks and versions if visible]
-**Input Inventory**: [total count] inputs across [count] entry points
+
+#### Input Inventory
+
+[total count] inputs across [count] entry points
   (include the full inventory table from Step 1b)
 
 #### Threat Model

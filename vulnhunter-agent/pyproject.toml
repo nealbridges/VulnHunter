@@ -35,6 +35,7 @@ version = { attr = "vulnhunter.__version__" }
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning:claude_agent_sdk.*",

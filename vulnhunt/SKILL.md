@@ -229,7 +229,13 @@ variant. See "Build-Time Code Swapping" in Phase 1 for how to detect this.
 2. **Hunt→Report**: This is the core of the audit. Execute steps A-E once.
    **After each phase completes, check token usage and report the result to the user.**
 
-   **A. Phase 1 - Recon (subagent)**: Launch a subagent:
+   **A. Phase 1 - Recon (subagent)**: Before launching recon, run
+   `vh scaffold-inputs "<target>" --out "${VULNHUNT_DIR}/inputs_scaffold.md"`.
+   If that exits non-zero, or `vh` is not on PATH, the breadth gate is NOT RUN:
+   skip check-phase and record the reason. The orchestrator owns
+   `inputs_scaffold.md`; recon must not rewrite it — it is the floor the gate reads.
+
+   Launch a subagent:
    > Your scan directory (absolute path) is `${VULNHUNT_DIR}`. Follow the prompt
    > in `${PHASES_DIR}/phase1_recon.md`. Write output to
    > `${VULNHUNT_DIR}/phase1_output.md`. IMPORTANT: Your return message must
@@ -237,6 +243,20 @@ variant. See "Build-Time Code Swapping" in Phase 1 for how to detect this.
    After it completes, verify `${VULNHUNT_DIR}/phase1_output.md` exists.
    **Do NOT read this file in full.** Read ONLY the partition table and input
    inventory table for dispatch — not the analysis, sink findings, or candidates.
+
+   Then run the gate:
+   `vh check-phase 1 "${VULNHUNT_DIR}" > "${VULNHUNT_DIR}/phase1_gate.txt" 2>&1`.
+   You write that file, not the tool; `2>&1` keeps the exit-2 reason.
+   - exit 0: continue.
+   - exit 1: hand the file's contents verbatim to recon, re-dispatch it once,
+     then re-check. A second exit 1 stops the scan: write
+     `${VULNHUNT_DIR}/README.md` whose first line is exactly
+     `# VulnHunter scan STOPPED: breadth gate failed`, then the violations.
+     Do not run Phase 2.
+   - exit 2: NOT RUN.
+   Finally append one status line to `phase1_gate.txt`: `PASS`, `FAIL (<rules>)`,
+   `NOT RUN (<reason>)`, or `NOT ENFORCED (<reason>)` when a warning fired.
+   When the gate stops the scan, steps 2.B–2.E and step 3 do not run.
 
    **B. Phase 2 - Hunt (dispatch)**: Read `${PHASES_DIR}/phase2_hunt.md`.
    Create partition data files by extracting each partition's inputs, file scope,
