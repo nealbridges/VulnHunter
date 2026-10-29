@@ -23,7 +23,7 @@ from pathlib import Path
 
 from vulnhunter_common import gitops, hostcmd, manifest
 
-from . import scaffold, skill_check
+from . import check_phase, scaffold, skill_check
 
 _SCAN_ID = re.compile(r"^.+_VULNHUNT_RESULTS_.+$")
 _EXIT_OK = {0, 1, 2, 3, 4}
@@ -241,6 +241,11 @@ def cmd_scaffold_inputs(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_check_phase(args: argparse.Namespace) -> int:
+    scaffold_path = Path(args.scaffold) if args.scaffold else None
+    return check_phase.run(args.phase, Path(args.results), scaffold_path, args.json)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="vh")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -278,6 +283,17 @@ def build_parser() -> argparse.ArgumentParser:
     scaffold_inputs.add_argument("repo")
     scaffold_inputs.add_argument("--out", required=True)
     scaffold_inputs.set_defaults(func=cmd_scaffold_inputs)
+
+    gate = sub.add_parser("check-phase", help="check a phase output against its gate")
+    gate.add_argument("phase")
+    gate.add_argument("results")
+    gate.add_argument(
+        "--scaffold",
+        default=None,
+        help="scaffold file (default: <results>/inputs_scaffold.md)",
+    )
+    gate.add_argument("--json", action="store_true", help="machine-readable summary")
+    gate.set_defaults(func=cmd_check_phase)
 
     host = sub.add_parser("host", help="run $VULNHUNT_HOST_CMD with a prompt file")
     host.add_argument("prompt")

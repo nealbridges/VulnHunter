@@ -148,6 +148,8 @@ After all findings are finalized, create `${VULNHUNT_DIR}/README.md` as the entr
 **Model**: <model identifier>
 **Skills**: <skill-name>@<installed-commit> (source <source-commit>) — one line per skill
 **Skills match source**: <yes | no>
+**Inputs**: scaffold <N> / inventoried <M>
+**Breadth gate**: <status>
 **Findings Summary**: <N High+, N High, N Medium, N Low, N Informational>
 ```
 
@@ -177,6 +179,12 @@ Field definitions:
   uncommitted changes)`: the recorded commit equals `HEAD`, so those bytes
   are **not proven** to be that commit's bytes — the install may predate or
   postdate the edits. Do not record `yes` on a dirty checkout.
+- **Inputs** = the last `inputs:` line of `${VULNHUNT_DIR}/phase1_gate.txt`.
+  If there is no such line (the gate was NOT RUN), write
+  `scaffold - / inventoried -`.
+- **Breadth gate** = the status line at the end of `phase1_gate.txt`
+  (`PASS`, `FAIL (<rules>)`, `NOT RUN (<reason>)`, `NOT ENFORCED (<reason>)`).
+  If the file is absent, write `NOT RUN (no gate output)`.
 
 After the header, include:
 - Summary table of findings (ID, title, severity, CWE, status)

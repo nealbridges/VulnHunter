@@ -79,7 +79,11 @@ The `vh` commands do not talk to a model.
 3. **Results.** Run `vh find-results <checkout>`. One directory must be
    printed. If none is printed, stop and say the hunt produced no results.
    Do not invent a results directory.
-4. **Manifest.** Run `vh write-manifest <results-dir>`, then
+4. **Manifest.** If the README's first line starts with
+   `# VulnHunter scan STOPPED`, pass `--exit-code 1`
+   (`vh write-manifest <results-dir> --exit-code 1`), because
+   `vh write-manifest` treats any non-empty README as exit 0. Otherwise run
+   `vh write-manifest <results-dir>`, then
    `vh validate-manifest <results-dir>`. If validation fails, stop and report
    the error. Do not hand-edit the manifest to force a pass.
 5. **Stop.** Tell the user the results path and whether the manifest
