@@ -20,13 +20,18 @@ _TYPE_DECL = re.compile(
 _STRUCT = re.compile(r"\btype\s+(?P<t>" + NAME + r")\s+struct\s*\{")
 _ENTRY = re.compile(r"\bfunc\s+(?:\([^)]*\)\s*)?(?P<n>" + NAME + r")\s*\(")
 _DECODE = re.compile(
-    r"(?:json\s*\.\s*NewDecoder\s*\([^)]*\)\s*\.\s*Decode|\.\s*"
+    r"(?:json\s*\.\s*NewDecoder\s*\((?P<src>[^)]*)\)\s*\.\s*Decode|\.\s*"
     r"(?:ShouldBindJSON|BindJSON|ShouldBind|Bind))\s*\(\s*&\s*(?P<v>" + NAME + r")\s*\)"
 )
 _QUERY = re.compile(
     r"(?:(?:\.\s*URL\s*\.\s*Query\s*\(\s*\)\s*\.\s*Get)"
     r"|\.\s*(?:Query|DefaultQuery|QueryParam))\s*\(\s*" + _STRING
 )
+_RESPONSE = re.compile(r"\b(?:resp|res|response)\s*\.\s*Body\b")
+_ALIAS = re.compile(
+    r"^\s*(?:type\s+)?(?P<a>" + NAME + r")\s*=\s*\*?(?P<b>[A-Za-z_][\w.]*)\s*$", re.M
+)
+_BIND_QUERY = re.compile(r"BindQueryParameter\w*\s*\(\s*\"[^\"]*\"\s*,[^,]+,[^,]+,\s*" + _STRING)
 _PATH = re.compile(r"\.\s*(?:PathValue|Param)\s*\(\s*" + _STRING)
 _CHI = re.compile(r"chi\s*\.\s*URLParam\s*\(\s*[^,]+,\s*" + _STRING)
 _MUX_VARS = re.compile(r"mux\s*\.\s*Vars\s*\(\s*[^)]*\)\s*\[\s*" + _STRING)
@@ -156,9 +161,10 @@ class _Pack:
 
     def __init__(self) -> None:
         self.structs: dict[tuple[str, str], tuple[str, list[tuple[int, str, str]]]] = {}
+        self.aliases: dict[tuple[str, str], str] = {}
 
     def prepare(self, repo: Path) -> None:
-        self.structs = {}
+        self.structs, self.aliases = {}, {}
         for root, dirs, files in os.walk(repo):
             dirs[:] = [d for d in dirs if not _skippable_dir(d)]
             root_path = Path(root)
@@ -171,6 +177,16 @@ class _Pack:
                     text = (root_path / name).read_text(encoding="utf-8", errors="replace")
                 except OSError:
                     continue
+                # `type A = B` (oapi-codegen request bodies); also bare members of `type (...)`.
+                for alias in _ALIAS.finditer(text):
+                    line = text[alias.start() : alias.end()].lstrip()
+                    in_group = text.rfind("type (", 0, alias.start()) > text.rfind(
+                        "\n)", 0, alias.start()
+                    )
+                    if line.startswith("type ") or in_group:
+                        self.aliases[(rel_dir, alias.group("a"))] = alias.group("b").rsplit(".", 1)[
+                            -1
+                        ]
                 for struct in _STRUCT.finditer(text):
                     open_pos = text.find("{", struct.start())
                     end = _close_brace(text, open_pos)
@@ -201,6 +217,7 @@ class _Pack:
 
     def _body_rows(self, relpath: str, entry: str, line: int, type_name: str) -> list[Row]:
         dirname = relpath.rsplit("/", 1)[0] if "/" in relpath else ""
+        type_name = self.aliases.get((dirname, type_name), type_name)
         found = self.structs.get((dirname, type_name))
         if found is None:
             return [Row("body field", relpath, line, "<body:unresolved>", entry, "http")]
@@ -229,6 +246,7 @@ class _Pack:
 
         for pattern, kind in (
             (_QUERY, "query param"),
+            (_BIND_QUERY, "query param"),
             (_PATH, "path param"),
             (_CHI, "path param"),
             (_MUX_VARS, "path param"),
@@ -258,6 +276,8 @@ class _Pack:
                 1 for _ in re.finditer(r"\b" + re.escape(var) + r"\s*\[\s*(?!\s*\")", chunk)
             )
         for match in _DECODE.finditer(clean):
+            if _RESPONSE.search(match.group("src") or ""):
+                continue  # decoding an outbound call's response, not request input
             var = match.group("v")
             decl = None
             func_start = clean.rfind("\nfunc ", 0, match.start())

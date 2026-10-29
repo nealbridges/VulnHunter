@@ -36,6 +36,11 @@ GO_CASES = [
     ('cmd.Flags().StringP("out", "o", "", "")', "cli flag", "--out"),
     ('cmd.PersistentFlags().BoolVarP(&b, "debug", "d", false, "")', "cli flag", "--debug"),
     ('v := mux.Vars(r)\n_ = v["tenant"]', "path param", "tenant"),
+    (
+        'runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &p.Limit, o)',
+        "query param",
+        "limit",
+    ),
 ]
 
 
@@ -127,6 +132,26 @@ def test_one_line_struct(tmp_path: Path) -> None:
     )
     rows = [row for row in scan_repo(tmp_path, PACKS).rows if row.source_type == "body field"]
     assert {row.variable for row in rows} == {"a", "b"}
+
+
+def test_alias_body_resolved_and_response_skipped(tmp_path: Path) -> None:
+    (tmp_path / "types.go").write_text(
+        "package p\n\ntype AddItemJSONRequestBody = AddItemRequest\n\ntype (\n\tRenameBody = RenameRequest\n)\n\n"
+        'type AddItemRequest struct { Title string `json:"title"` }\n\n'
+        'type RenameRequest struct { Label string `json:"label"` }\n'
+    )
+    (tmp_path / "handler.go").write_text(
+        "package p\n\nfunc add(r *http.Request) {\n\tvar body AddItemJSONRequestBody\n"
+        "\tjson.NewDecoder(r.Body).Decode(&body)\n}\n\nfunc rename(r *http.Request) {\n"
+        "\tvar body RenameBody\n\tjson.NewDecoder(r.Body).Decode(&body)\n}\n\n"
+        "func fetch(resp *http.Response) {\n\tvar out AddItemRequest\n"
+        "\tjson.NewDecoder(resp.Body).Decode(&out)\n}\n"
+    )
+    rows = [row for row in scan_repo(tmp_path, PACKS).rows if row.source_type == "body field"]
+    assert sorted((row.variable, row.entry_point) for row in rows) == [
+        ("label", "rename"),
+        ("title", "add"),
+    ]
 
 
 def test_literal_query_not_counted() -> None:
