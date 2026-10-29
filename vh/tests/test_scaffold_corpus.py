@@ -19,8 +19,9 @@ pytestmark = pytest.mark.integration
 PINS = {
     "NodeGoat": "c5cb68a7084e4ae7dcc60e6a98768720a81841e8",
     "juice-shop": "a520e158cb65c43d24e2c55d84f09b05a2511a03",
+    "WebGoat": "5142935bf7c279882c3b0fc0ecec42c447de6fd5",
 }
-FLOORS = {"NodeGoat": 25, "juice-shop": 182}
+FLOORS = {"NodeGoat": 25, "juice-shop": 182, "WebGoat": 228}
 ANCHORS = [
     ("NodeGoat", "path param", "app/routes/allocations.js", 17, "userId"),
     ("NodeGoat", "query param", "app/routes/allocations.js", 20, "threshold"),
@@ -31,6 +32,13 @@ ANCHORS = [
         "frontend/src/app/search-result/search-result.component.ts",
         136,
         "q",
+    ),
+    (
+        "WebGoat",
+        "query param",
+        "src/main/java/org/owasp/webgoat/lessons/pathtraversal/ProfileUpload.java",
+        41,
+        "fullName",
     ),
 ]
 
