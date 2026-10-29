@@ -246,17 +246,19 @@ variant. See "Build-Time Code Swapping" in Phase 1 for how to detect this.
 
    Then run the gate:
    `vh check-phase 1 "${VULNHUNT_DIR}" > "${VULNHUNT_DIR}/phase1_gate.txt" 2>&1`.
-   You write that file, not the tool; `2>&1` keeps the exit-2 reason.
+   **Gate outcome rule (all phases).** You write the gate file, not the tool;
+   `2>&1` keeps the exit-2 reason.
    - exit 0: continue.
-   - exit 1: hand the file's contents verbatim to recon, re-dispatch it once,
-     then re-check. A second exit 1 stops the scan: write
+   - exit 1: hand the file's contents verbatim to that phase's agent, re-dispatch
+     it once, then re-check. A second exit 1 stops the scan: write
      `${VULNHUNT_DIR}/README.md` whose first line is exactly
-     `# VulnHunter scan STOPPED: breadth gate failed`, then the violations.
-     Do not run Phase 2.
+     `# VulnHunter scan STOPPED: phase <n> gate failed`, then the violations.
+     Do not run later phases. For phase 4 the report already exists: do not
+     replace it; set its `**Report gate**: FAIL (<rules>)` field instead.
    - exit 2: NOT RUN.
-   Finally append one status line to `phase1_gate.txt`: `PASS`, `FAIL (<rules>)`,
+   Append one status line to the gate file: `PASS`, `FAIL (<rules>)`,
    `NOT RUN (<reason>)`, or `NOT ENFORCED (<reason>)` when a warning fired.
-   When the gate stops the scan, steps 2.B–2.E and step 3 do not run.
+   Steps 2.B–2.E and step 3 point here; do not restate this rule.
 
    **B. Phase 2 - Hunt (dispatch)**: Read `${PHASES_DIR}/phase2_hunt.md`.
    Create partition data files by extracting each partition's inputs, file scope,
@@ -264,15 +266,17 @@ variant. See "Build-Time Code Swapping" in Phase 1 for how to detect this.
    `${VULNHUNT_DIR}/partitions/sg-{N}_data.md` (one per partition).
    Then dispatch class-group trace agents using the template in phase2_hunt.md.
    **Minimum agent count = (3 × partition_count) + 1 sink-driven.**
-   Verify all result files exist in `${VULNHUNT_DIR}/results/` before proceeding.
    Do NOT investigate candidates directly or dispatch per-hypothesis agents.
+   Then run `vh check-phase 2 "${VULNHUNT_DIR}" > "${VULNHUNT_DIR}/phase2_gate.txt" 2>&1`
+   and apply the gate outcome rule from step 2.A.
 
    **C. Phase 2b - Verify (subagent)**: Launch a subagent:
    > Your scan directory is `${VULNHUNT_DIR}`. Follow the prompt in
    > `${PHASES_DIR}/phase2b_verify.md`. Read all result files from
    > `${VULNHUNT_DIR}/results/`. Write output to
    > `${VULNHUNT_DIR}/phase2b_output.md`. IMPORTANT: Return ≤20 words.
-   Verify output file exists.
+   Then run `vh check-phase 2b "${VULNHUNT_DIR}" > "${VULNHUNT_DIR}/phase2b_gate.txt" 2>&1`
+   and apply the gate outcome rule from step 2.A.
 
    **D. Phase 3a+3b+3c - Build PoC, Measure Impact, Fix**: Launch a subagent:
    > Your scan directory is `${VULNHUNT_DIR}`. Follow the prompts in
@@ -286,10 +290,10 @@ variant. See "Build-Time Code Swapping" in Phase 1 for how to detect this.
    > `${VULNHUNT_DIR}/phase3_output.md` — that exact filename, at the
    > results-dir top level. Do NOT name the file after a prompt
    > (`phase3c_fixes.md`, etc.). IMPORTANT: Return ≤20 words.
-   Verify `${VULNHUNT_DIR}/phase3_output.md` exists, and that `poc/` and
-   `exploit_tests/` are populated for every CONFIRMED finding. If Phase 2b
-   produced only HOLDs, an empty `poc/` is correct: `phase3_output.md` carries the
-   probe records instead.
+   If Phase 2b produced only HOLDs, an empty `poc/` is correct:
+   `phase3_output.md` carries the probe records instead. Then run
+   `vh check-phase 3 "${VULNHUNT_DIR}" > "${VULNHUNT_DIR}/phase3_gate.txt" 2>&1`
+   and apply the gate outcome rule from step 2.A.
 
    **E. Phase 3d - Sweep**: Launch a subagent:
    > Your scan directory is `${VULNHUNT_DIR}`. Follow the prompt in
@@ -298,7 +302,8 @@ variant. See "Build-Time Code Swapping" in Phase 1 for how to detect this.
    > triage to `${VULNHUNT_DIR}/phase3d_output.md` — that exact filename,
    > at the results-dir top level. Do NOT name the file after the prompt
    > (`phase3d_sweep.md`). IMPORTANT: Return ≤20 words.
-   Verify `${VULNHUNT_DIR}/phase3d_output.md` exists.
+   Then re-run `vh check-phase 3 "${VULNHUNT_DIR}" > "${VULNHUNT_DIR}/phase3_gate.txt" 2>&1`
+   and apply the gate outcome rule from step 2.A; `phase3d_output.md` is read by the report.
 
 3. **Write report** (after Phase 3d is complete):
 
@@ -331,7 +336,11 @@ variant. See "Build-Time Code Swapping" in Phase 1 for how to detect this.
    its severity written "High (unverified)", the probe named, and the missing
    dependency stated.
 
-   Save all artifacts to `${VULNHUNT_DIR}/` and generate the README.
+   Save all artifacts to `${VULNHUNT_DIR}/` and generate the README. After the
+   README is written, run
+   `vh check-phase 4 "${VULNHUNT_DIR}" > "${VULNHUNT_DIR}/phase4_gate.txt" 2>&1`
+   and apply the gate outcome rule from step 2.A; a second failure leaves the
+   README with `**Report gate**: FAIL (<rules>)`.
 
 ### What the report contains
 

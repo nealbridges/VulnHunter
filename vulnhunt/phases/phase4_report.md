@@ -150,6 +150,7 @@ After all findings are finalized, create `${VULNHUNT_DIR}/README.md` as the entr
 **Skills match source**: <yes | no>
 **Inputs**: scaffold <N> / inventoried <M>
 **Breadth gate**: <status>
+**Report gate**: <status>
 **Findings Summary**: <N High+, N High, N Medium, N Low, N Informational>
 ```
 
@@ -185,6 +186,9 @@ Field definitions:
 - **Breadth gate** = the status line at the end of `phase1_gate.txt`
   (`PASS`, `FAIL (<rules>)`, `NOT RUN (<reason>)`, `NOT ENFORCED (<reason>)`).
   If the file is absent, write `NOT RUN (no gate output)`.
+- **Report gate** = the status line at the end of `phase4_gate.txt`
+  (`PASS` or `FAIL (<rules>)`). If the file is absent, write
+  `NOT RUN (no gate output)`.
 
 After the header, include:
 - Summary table of findings (ID, title, severity, CWE, status)

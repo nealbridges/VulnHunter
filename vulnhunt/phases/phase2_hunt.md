@@ -92,7 +92,7 @@ You are a {CLASS} trace agent for partition {SG_ID}. Your class group focus:
 
 You are responsible ONLY for vulnerability classes in your class file. If an
 input reaches a sink for a DIFFERENT class group, flag as:
-  CROSS-CLASS (input #, sink file:line, suspected class: INJ/NAV/LOG)
+  CROSS-CLASS (input #N, sink file:line, suspected class: INJ/NAV/LOG)
 
 Read these files IN ORDER before starting work:
 1. ${PHASES_DIR}/phase2_shared.md — iteration rules, generic gates, severity, output format
@@ -100,17 +100,19 @@ Read these files IN ORDER before starting work:
 3. ${VULNHUNT_DIR}/partitions/sg-{SG_ID}_data.md — your assigned inputs and file scope
 
 Follow the iteration rules in the shared file. For each input, return:
-- CANDIDATE (input #, sink file:line, vuln class)
-- SAFE (input #, reason — only for YOUR class group's sinks, and only when the
+- CANDIDATE (input #N, sink file:line, vuln class)
+- SAFE (input #N, reason — only for YOUR class group's sinks, and only when the
   defense is **structural**: a check you can read on this path)
-- NO-MATCH (input #) → input does not reach sinks in your class group
-- CROSS-CLASS (input #, sink file:line, suspected class group)
-- DESIGN-INTENT (input #, reason)
-- **HOLD-UNVERIFIED** (input #, sink file:line, vuln class, the unsettled
+- NO-MATCH (input #N) → input does not reach sinks in your class group
+- CROSS-CLASS (input #N, sink file:line, suspected class group)
+- DESIGN-INTENT (input #N, reason)
+- **HOLD-UNVERIFIED** (input #N, sink file:line, vuln class, the unsettled
   behavioural claim, the probe that would settle it) → the only defense found is
   behavioural and was never executed. Use this instead of SAFE.
 
-This list is the trace agent's complete return vocabulary.
+This list is the trace agent's complete return vocabulary. Write each
+disposition as its own line starting with the verdict word and `(input #N`, e.g.
+`CANDIDATE (input #12, src/a.go:40, injection)`; the gate counts these lines.
 
 Write results to: ${VULNHUNT_DIR}/results/sg-{SG_ID}_{class}_results.md
 
@@ -206,6 +208,7 @@ Perform these audits:
 
 For each finding, return the candidate format used by trace agents (but do
 NOT assign VULN-NNN IDs). Include gate results where applicable.
+Write these results to `${VULNHUNT_DIR}/results/sink_results.md`.
 ```
 
 Merge the sink-driven agent's candidates into the main results alongside
