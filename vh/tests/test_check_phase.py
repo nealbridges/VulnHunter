@@ -473,3 +473,46 @@ def test_json_shape_phase2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
     payload = json.loads(capsys.readouterr().out)
     assert payload["phase"] == "2"
     assert set(payload) == {"phase", "passed", "scaffold_rows", "inventory_rows", "violations"}
+
+
+def test_decoy_verdict_table_does_not_hide_rows(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    output = results / "phase2b_output.md"
+    output.write_text(
+        "| Finding | Verdict |\n|---|---|\n| VULN-009 | CONFIRMED |\n\n"
+        + output.read_text()
+        + "| VULN-007 | Yes | static | claim | behavioural | static-trace | a -> b | FALSE POSITIVE |\n"
+    )
+    assert _rules(results, "2b") == {"P2B-UNPROBED"}
+
+
+def test_lenient_cell_formatting(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    output = results / "phase2b_output.md"
+    output.write_text(
+        output.read_text()
+        + "| VULN-008 | Yes | probe | claim | behavioural | `executed-probe` (ran it) | a -> b"
+        " | **FALSE POSITIVE** |\n"
+    )
+    assert _rules(results, "2b") == set()
+    for path in (results / "results").glob("*_results.md"):
+        path.write_text("| 1. | **SAFE** (input #1) |\n3. CANDIDATE (input #2, a.go:1, x)\n")
+    assert _rules(results, "2") == set()
+    (results / "poc" / "VULN-001_sort.md").write_text("# PoC\n\n- **Runtime**: docker:app@1\n")
+    assert _rules(results, "3") == set()
+
+
+def test_hold_id_matches_on_boundary(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    output = results / "phase2b_output.md"
+    output.write_text(
+        output.read_text()
+        + "| **VULN-003** quoting | Yes | none | claim | behavioural | none | a -> b"
+        " | HOLD-UNVERIFIED |\n"
+    )
+    readme = results / "README.md"
+    base = readme.read_text()
+    readme.write_text(base + "\nSee VULN-0030.\n")
+    assert _rules(results, "4") == {"P4-HOLD-DROPPED"}
+    readme.write_text(base + "\n- VULN-003 (unverified): probe named\n")
+    assert _rules(results, "4") == set()

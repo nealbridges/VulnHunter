@@ -187,8 +187,8 @@ Field definitions:
   (`PASS`, `FAIL (<rules>)`, `NOT RUN (<reason>)`, `NOT ENFORCED (<reason>)`).
   If the file is absent, write `NOT RUN (no gate output)`.
 - **Report gate** = the status line at the end of `phase4_gate.txt`
-  (`PASS` or `FAIL (<rules>)`). If the file is absent, write
-  `NOT RUN (no gate output)`.
+  (`PASS` or `FAIL (<rules>)`). The gate runs after the README exists, so
+  write `pending` here; the orchestrator replaces it with the status.
 
 After the header, include:
 - Summary table of findings (ID, title, severity, CWE, status)

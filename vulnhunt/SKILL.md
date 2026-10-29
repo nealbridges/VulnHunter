@@ -255,7 +255,7 @@ variant. See "Build-Time Code Swapping" in Phase 1 for how to detect this.
      `# VulnHunter scan STOPPED: phase <n> gate failed`, then the violations.
      Do not run later phases. For phase 4 the report already exists: do not
      replace it; set its `**Report gate**: FAIL (<rules>)` field instead.
-   - exit 2: NOT RUN.
+   - exit 2: NOT RUN; the scan continues.
    Append one status line to the gate file: `PASS`, `FAIL (<rules>)`,
    `NOT RUN (<reason>)`, or `NOT ENFORCED (<reason>)` when a warning fired.
    Steps 2.B–2.E and step 3 point here; do not restate this rule.
@@ -339,8 +339,8 @@ variant. See "Build-Time Code Swapping" in Phase 1 for how to detect this.
    Save all artifacts to `${VULNHUNT_DIR}/` and generate the README. After the
    README is written, run
    `vh check-phase 4 "${VULNHUNT_DIR}" > "${VULNHUNT_DIR}/phase4_gate.txt" 2>&1`
-   and apply the gate outcome rule from step 2.A; a second failure leaves the
-   README with `**Report gate**: FAIL (<rules>)`.
+   and apply the gate outcome rule from step 2.A. Then set the README's
+   `**Report gate**:` field to the gate file's status line.
 
 ### What the report contains
 

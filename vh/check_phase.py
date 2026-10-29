@@ -296,13 +296,15 @@ _VERDICTS = (
     "NO-MATCH",
     "CROSS-CLASS",
 )
+# Matched anywhere in a line, so bullets, numbering, bold and table cells all count.
 _DISPOSITION = re.compile(
-    r"^\s*(?:[-*]\s*)?(?:\*\*)?(CANDIDATE|SAFE|DESIGN-INTENT|HOLD-UNVERIFIED|NO-MATCH|CROSS-CLASS)"
-    r"(?:\*\*)?\s*\(\s*input\s*#(\d+)",
+    r"\b(CANDIDATE|SAFE|DESIGN-INTENT|HOLD-UNVERIFIED|NO-MATCH|CROSS-CLASS)\b"
+    r"[*_`\s]*\(\s*input\s*#\s*(\d+)",
     re.I,
 )
 _CLOSING = ("FALSE POSITIVE", "SAFE", "ELIMINATED")
-_RUNTIME = re.compile(r"^\s*#?\s*Runtime:", re.I)
+_RUNTIME = re.compile(r"^\s*(?:[-*>#]+\s*)?(?:\*\*)?Runtime(?:\*\*)?\s*:", re.I)
+_CANDIDATE_ID = re.compile(r"\b[A-Z][A-Z0-9]*-\d+\b")
 _REQUIRED_2B = ("Closing claim", "Claim type", "Evidence", "Path reasoned about", "Verdict")
 
 
@@ -353,7 +355,7 @@ def check2(results: Path) -> tuple[list[Finding], dict]:
     seen: set[int] = set()
     for path in files:
         for line in _read(path).splitlines():
-            match = _DISPOSITION.match(line)
+            match = _DISPOSITION.search(line)
             if match:
                 seen.add(int(match.group(2)))
     if files and not seen:
@@ -364,12 +366,24 @@ def check2(results: Path) -> tuple[list[Finding], dict]:
     return findings, _summary("2", findings)
 
 
-def _verdict_table(lines: list[str]) -> tuple[list[str], list[tuple[int, list[str]]]] | None:
-    for _, header, rows in _tables(lines, 0, len(lines)):
-        lower = [cell.lower() for cell in header]
-        if "verdict" in lower:
-            return header, rows
-    return None
+def _verdict_tables(lines: list[str]) -> list[tuple[list[str], list[tuple[int, list[str]]]]]:
+    return [
+        (header, rows)
+        for _, header, rows in _tables(lines, 0, len(lines))
+        if "verdict" in [cell.lower() for cell in header]
+    ]
+
+
+def _plain(cell: str) -> str:
+    return cell.replace("*", "").replace("`", "").strip()
+
+
+def _mentions(text: str, candidate: str) -> bool:
+    # Match the candidate's id (VULN-001, C-3) on a numeric boundary; else the whole cell.
+    found = _CANDIDATE_ID.search(candidate)
+    if found:
+        return re.search(rf"(?<![\w-]){re.escape(found.group(0))}(?!\d)", text) is not None
+    return candidate in text
 
 
 def check2b(results: Path) -> tuple[list[Finding], dict]:
@@ -378,28 +392,39 @@ def check2b(results: Path) -> tuple[list[Finding], dict]:
     if not output.is_file():
         _emit(findings, "P2B-NO-OUTPUT")
         return findings, _summary("2b", findings)
-    lines = _read(output).splitlines()
-    table = _verdict_table(lines)
-    if table is None:
-        _emit(findings, "P2B-COLUMNS", file="phase2b_output.md", columns=", ".join(_REQUIRED_2B))
-        return findings, _summary("2b", findings)
-    header, rows = table
-    lower = [cell.lower() for cell in header]
-    missing = [name for name in _REQUIRED_2B if name.lower() not in lower]
-    if missing:
+    # Every verdict table counts, so a decoy table cannot hide the real one; at least one
+    # must carry the full column set.
+    tables = _verdict_tables(_read(output).splitlines())
+    complete = [
+        (header, rows)
+        for header, rows in tables
+        if all(name.lower() in [cell.lower() for cell in header] for name in _REQUIRED_2B)
+    ]
+    if not complete:
+        lower = [cell.lower() for cell in tables[0][0]] if tables else []
+        missing = [name for name in _REQUIRED_2B if name.lower() not in lower]
         _emit(findings, "P2B-COLUMNS", file="phase2b_output.md", columns=", ".join(missing))
         return findings, _summary("2b", findings)
+    for header, rows in complete:
+        _check_2b_rows(findings, header, rows)
+    return findings, _summary("2b", findings)
+
+
+def _check_2b_rows(
+    findings: list[Finding], header: list[str], rows: list[tuple[int, list[str]]]
+) -> None:
+    lower = [cell.lower() for cell in header]
     claim_cell, evidence_cell = lower.index("claim type"), lower.index("evidence")
     verdict_cell = lower.index("verdict")
     for line_number, cells in rows:
         if len(cells) <= max(claim_cell, evidence_cell, verdict_cell):
             continue
-        claim, evidence = cells[claim_cell].lower(), cells[evidence_cell].strip()
-        verdict = cells[verdict_cell].upper()
+        claim, evidence = _plain(cells[claim_cell]).lower(), _plain(cells[evidence_cell])
+        verdict = _plain(cells[verdict_cell]).upper().rstrip(".")
         if (
             claim.startswith(("behavioural", "behavioral"))
             and any(verdict == word or verdict.startswith(word + " ") for word in _CLOSING)
-            and evidence.lower() not in ("executed-probe", "runtime-test")
+            and not evidence.lower().startswith(("executed-probe", "runtime-test"))
         ):
             _emit(
                 findings,
@@ -411,7 +436,6 @@ def check2b(results: Path) -> tuple[list[Finding], dict]:
             )
         if "HOLD-UNVERIFIED" in verdict and not evidence:
             _emit(findings, "P2B-HOLD-NO-PROBE", line_number, file="phase2b_output.md")
-    return findings, _summary("2b", findings)
 
 
 def _assignment_rows(lines: list[str]) -> list[tuple[int, str]]:
@@ -487,21 +511,18 @@ def check4(results: Path) -> tuple[list[Finding], dict]:
     missing = [field for field in ("**Inputs**:", "**Breadth gate**:") if field not in text]
     if missing:
         _emit(findings, "P4-NO-HEADER", file="README.md", columns=", ".join(missing))
-    table = _verdict_table(_read(results / "phase2b_output.md").splitlines())
-    if table is not None:
-        header, rows = table
+    for header, rows in _verdict_tables(_read(results / "phase2b_output.md").splitlines()):
         lower = [cell.lower() for cell in header]
-        if "verdict" in lower:
-            finding_cell = lower.index("finding") if "finding" in lower else 0
-            verdict_cell = lower.index("verdict")
-            for _, cells in rows:
-                if len(cells) <= max(finding_cell, verdict_cell):
-                    continue
-                candidate = cells[finding_cell].strip()
-                if "HOLD-UNVERIFIED" in cells[verdict_cell].upper() and (
-                    not candidate or candidate not in text
-                ):
-                    _emit(findings, "P4-HOLD-DROPPED", file="README.md", candidate=candidate)
+        finding_cell = lower.index("finding") if "finding" in lower else 0
+        verdict_cell = lower.index("verdict")
+        for _, cells in rows:
+            if len(cells) <= max(finding_cell, verdict_cell):
+                continue
+            candidate = _plain(cells[finding_cell])
+            if "HOLD-UNVERIFIED" in cells[verdict_cell].upper() and (
+                not candidate or not _mentions(text, candidate)
+            ):
+                _emit(findings, "P4-HOLD-DROPPED", file="README.md", candidate=candidate)
     return findings, _summary("4", findings)
 
 
