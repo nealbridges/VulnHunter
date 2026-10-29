@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -206,7 +207,7 @@ def test_exit_codes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert cli.main(["check-phase", "1", str(good)]) == 0
     thin = _gate(tmp_path / "thin", _inventory(["`a`"]), _scaffold(2))
     assert cli.main(["check-phase", "1", str(thin)]) == 1
-    assert cli.main(["check-phase", "2", str(good)]) == 2
+    assert cli.main(["check-phase", "5", str(good)]) == 2
     assert "not implemented" in capsys.readouterr().err
     assert cli.main(["check-phase", "1", str(tmp_path / "missing")]) == 2
 
@@ -219,3 +220,299 @@ def test_json_shape(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert payload["phase"] == "1"
     assert payload["passed"] is False
     assert set(payload["violations"][0]) == {"rule", "severity", "file", "line", "message", "fix"}
+
+
+# --- phases 2, 2b, 3, 4 ------------------------------------------------------
+
+REPLAY = Path(__file__).parent / "fixtures" / "check_phase" / "replay"
+CHECKERS = {
+    "2": check_phase.check2,
+    "2b": check_phase.check2b,
+    "3": check_phase.check3,
+    "4": check_phase.check4,
+}
+
+
+def _replay(tmp_path: Path) -> Path:
+    dest = tmp_path / "results"
+    shutil.copytree(REPLAY, dest)
+    return dest
+
+
+def _rules(results: Path, phase: str) -> set[str]:
+    findings, _ = CHECKERS[phase](results)
+    return {finding.rule for finding in findings}
+
+
+def test_replay_passes_every_phase(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    results = _replay(tmp_path)
+    for phase in ("1", "2", "2b", "3", "4"):
+        assert cli.main(["check-phase", phase, str(results)]) == 0, phase
+    capsys.readouterr()
+
+
+@pytest.mark.parametrize(
+    ("case", "rule"),
+    [
+        ("empty", "P2-NO-RESULTS"),
+        ("too-few", "P2-TOO-FEW"),
+        ("undispositioned", "P2-UNDISPOSITIONED"),
+    ],
+)
+def test_phase2_rules(tmp_path: Path, case: str, rule: str) -> None:
+    results = _replay(tmp_path)
+    files = sorted((results / "results").glob("*_results.md"))
+    if case == "empty":
+        for path in files:
+            path.unlink()
+        (results / "phase1_output.md").unlink()
+    elif case == "too-few":
+        for path in files[2:]:
+            path.unlink()
+    else:
+        for path in files:
+            path.write_text("CANDIDATE (input #1, app/a.go:10, injection)\n")
+    assert _rules(results, "2") == {rule}
+
+
+@pytest.mark.parametrize(
+    ("case", "rule"),
+    [
+        ("no-output", "P2B-NO-OUTPUT"),
+        ("columns", "P2B-COLUMNS"),
+        ("unprobed", "P2B-UNPROBED"),
+        ("hold-no-probe", "P2B-HOLD-NO-PROBE"),
+        ("behavioral-spelling", "P2B-UNPROBED"),
+    ],
+)
+def test_phase2b_rules(tmp_path: Path, case: str, rule: str) -> None:
+    results = _replay(tmp_path)
+    output = results / "phase2b_output.md"
+    if case == "no-output":
+        output.unlink()
+    elif case == "columns":
+        output.write_text(
+            "| Finding | Claim type | Path reasoned about | Verdict |\n"
+            "|---|---|---|---|\n| VULN-001 | structural | a -> b | CONFIRMED |\n"
+        )
+    elif case == "unprobed":
+        output.write_text(
+            output.read_text()
+            + "| VULN-003 | Yes | static | claim | behavioural | static-trace | a -> b | FALSE POSITIVE |\n"
+        )
+    elif case == "behavioral-spelling":
+        output.write_text(
+            output.read_text()
+            + "| VULN-005 | Yes | static | claim | behavioral | static-trace | a -> b | FALSE POSITIVE |\n"
+        )
+    else:
+        output.write_text(
+            output.read_text()
+            + "| VULN-004 | Yes | runtime | claim | structural |  | a -> b | HOLD-UNVERIFIED |\n"
+        )
+    assert _rules(results, "2b") == {rule}
+
+
+@pytest.mark.parametrize(
+    ("case", "rule"),
+    [
+        ("no-output", "P3-NO-OUTPUT"),
+        ("no-poc", "P3-NO-POC"),
+        ("no-runtime", "P3-NO-RUNTIME"),
+    ],
+)
+def test_phase3_rules(tmp_path: Path, case: str, rule: str) -> None:
+    results = _replay(tmp_path)
+    if case == "no-output":
+        (results / "phase3_output.md").unlink()
+    elif case == "no-poc":
+        (results / "poc" / "VULN-001_sort.md").unlink()
+        (results / "exploit_tests" / "test_vuln_001_sort.py").unlink()
+    else:
+        poc = results / "poc" / "VULN-001_sort.md"
+        poc.write_text(
+            "\n".join(
+                line for line in poc.read_text().splitlines() if not line.startswith("# Runtime:")
+            )
+        )
+    assert _rules(results, "3") == {rule}
+
+
+@pytest.mark.parametrize(
+    ("case", "rule"),
+    [
+        ("no-readme", "P4-NO-README"),
+        ("no-unverified", "P4-NO-UNVERIFIED"),
+        ("hold-dropped", "P4-HOLD-DROPPED"),
+        ("no-header", "P4-NO-HEADER"),
+    ],
+)
+def test_phase4_rules(tmp_path: Path, case: str, rule: str) -> None:
+    results = _replay(tmp_path)
+    readme = results / "README.md"
+    if case == "no-readme":
+        readme.unlink()
+    elif case == "no-unverified":
+        readme.write_text(readme.read_text().replace("## Unverified\n\nnone\n", ""))
+    elif case == "hold-dropped":
+        output = results / "phase2b_output.md"
+        output.write_text(
+            output.read_text()
+            + "| VULN-999 | Yes | pending | claim | structural | probe | a -> b | HOLD-UNVERIFIED |\n"
+        )
+    elif case == "no-sweep":
+        (results / "phase3d_output.md").unlink()
+    else:
+        readme.write_text(readme.read_text().replace("**Breadth gate**: PASS\n", ""))
+    assert _rules(results, "4") == {rule}
+
+
+def test_no_match_dispositions_pass(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    for path in (results / "results").glob("*_results.md"):
+        path.write_text("NO-MATCH (input #1)\nNO-MATCH (input #2)\n")
+    assert _rules(results, "2") == set()
+
+
+def test_hold_without_candidate_fails(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    output = results / "phase2b_output.md"
+    output.write_text(
+        output.read_text()
+        + "|  | Yes | pending | claim | structural | probe | a -> b | HOLD-UNVERIFIED |\n"
+    )
+    assert "P4-HOLD-DROPPED" in _rules(results, "4")
+
+
+def test_exploit_test_satisfies_poc_rule(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    (results / "poc" / "VULN-001_sort.md").unlink()
+    assert _rules(results, "3") == set()
+
+
+def test_artifact_id_boundary(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    (results / "poc" / "VULN-001_sort.md").unlink()
+    (results / "exploit_tests" / "test_vuln_001_sort.py").unlink()
+    (results / "poc" / "VULN-0010_other.md").write_text("# Runtime: static\n")
+    assert _rules(results, "3") == {"P3-NO-POC"}
+
+
+def test_holds_only_phase3_passes(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    (results / "phase3_output.md").write_text(
+        "| HOLD-ID | Phase 2b # | Title | Potential severity | Probe required |\n"
+        "|---|---|---|---|---|\n| HOLD-1 | 1 | sort | High | probe it |\n"
+    )
+    (results / "poc" / "VULN-001_sort.md").unlink()
+    (results / "exploit_tests" / "test_vuln_001_sort.py").unlink()
+    assert _rules(results, "3") == set()
+
+
+def test_static_poc_without_runtime_passes(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    poc = results / "poc" / "VULN-001_sort.md"
+    poc.write_text("VULN-001 Static PoC: SQL injection\n\n1. ENTRY -> sink\n")
+    assert _rules(results, "3") == set()
+
+
+def test_empty_results_fail(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    for path in (results / "results").glob("*_results.md"):
+        path.write_text("")
+    (results / "phase1_output.md").unlink()
+    assert _rules(results, "2") == {"P2-NO-RESULTS"}
+
+
+def test_hold_bullet_counts(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    for path in (results / "results").glob("*_results.md"):
+        path.write_text(
+            "- **HOLD-UNVERIFIED** (input #1, app/a.go:10, injection)\n- SAFE (input #2)\n"
+        )
+    assert _rules(results, "2") == set()
+
+
+def test_safe_substring_not_closing(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    output = results / "phase2b_output.md"
+    output.write_text(
+        output.read_text()
+        + "| VULN-006 | Yes | static | claim | behavioural | static-trace | a -> b | NOT SAFE |\n"
+    )
+    assert _rules(results, "2b") == set()
+
+
+def test_empty_phase3_output_fails(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    (results / "phase3_output.md").write_text("")
+    assert _rules(results, "3") == {"P3-NO-OUTPUT"}
+
+
+def test_readonly_all_phases(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    results = _replay(tmp_path)
+    before = {
+        path.relative_to(results): hash(path.read_bytes())
+        for path in results.rglob("*")
+        if path.is_file()
+    }
+    for phase in ("1", "2", "2b", "3", "4"):
+        cli.main(["check-phase", phase, str(results)])
+    capsys.readouterr()
+    after = {
+        path.relative_to(results): hash(path.read_bytes())
+        for path in results.rglob("*")
+        if path.is_file()
+    }
+    assert after == before
+
+
+def test_json_shape_phase2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    results = _replay(tmp_path)
+    assert cli.main(["check-phase", "2", str(results), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["phase"] == "2"
+    assert set(payload) == {"phase", "passed", "scaffold_rows", "inventory_rows", "violations"}
+
+
+def test_decoy_verdict_table_does_not_hide_rows(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    output = results / "phase2b_output.md"
+    output.write_text(
+        "| Finding | Verdict |\n|---|---|\n| VULN-009 | CONFIRMED |\n\n"
+        + output.read_text()
+        + "| VULN-007 | Yes | static | claim | behavioural | static-trace | a -> b | FALSE POSITIVE |\n"
+    )
+    assert _rules(results, "2b") == {"P2B-UNPROBED"}
+
+
+def test_lenient_cell_formatting(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    output = results / "phase2b_output.md"
+    output.write_text(
+        output.read_text()
+        + "| VULN-008 | Yes | probe | claim | behavioural | `executed-probe` (ran it) | a -> b"
+        " | **FALSE POSITIVE** |\n"
+    )
+    assert _rules(results, "2b") == set()
+    for path in (results / "results").glob("*_results.md"):
+        path.write_text("| 1. | **SAFE** (input #1) |\n3. CANDIDATE (input #2, a.go:1, x)\n")
+    assert _rules(results, "2") == set()
+    (results / "poc" / "VULN-001_sort.md").write_text("# PoC\n\n- **Runtime**: docker:app@1\n")
+    assert _rules(results, "3") == set()
+
+
+def test_hold_id_matches_on_boundary(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    output = results / "phase2b_output.md"
+    output.write_text(
+        output.read_text()
+        + "| **VULN-003** quoting | Yes | none | claim | behavioural | none | a -> b"
+        " | HOLD-UNVERIFIED |\n"
+    )
+    readme = results / "README.md"
+    base = readme.read_text()
+    readme.write_text(base + "\nSee VULN-0030.\n")
+    assert _rules(results, "4") == {"P4-HOLD-DROPPED"}
+    readme.write_text(base + "\n- VULN-003 (unverified): probe named\n")
+    assert _rules(results, "4") == set()
