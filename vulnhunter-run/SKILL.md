@@ -83,7 +83,7 @@ The `vh` commands do not talk to a model.
    `# VulnHunter scan STOPPED`, pass `--exit-code 1`
    (`vh write-manifest <results-dir> --exit-code 1`), because
    `vh write-manifest` treats any non-empty README as exit 0. Otherwise run
-   `vh write-manifest <results-dir>`, then
+   `vh write-manifest <results-dir>`. Then run
    `vh validate-manifest <results-dir>`. If validation fails, stop and report
    the error. Do not hand-edit the manifest to force a pass.
 5. **Stop.** Tell the user the results path and whether the manifest

@@ -256,7 +256,7 @@ variant. See "Build-Time Code Swapping" in Phase 1 for how to detect this.
    - exit 2: NOT RUN.
    Finally append one status line to `phase1_gate.txt`: `PASS`, `FAIL (<rules>)`,
    `NOT RUN (<reason>)`, or `NOT ENFORCED (<reason>)` when a warning fired.
-   When the gate stops the scan, steps 3–E do not run.
+   When the gate stops the scan, steps 2.B–2.E and step 3 do not run.
 
    **B. Phase 2 - Hunt (dispatch)**: Read `${PHASES_DIR}/phase2_hunt.md`.
    Create partition data files by extracting each partition's inputs, file scope,
