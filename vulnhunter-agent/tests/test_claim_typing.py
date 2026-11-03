@@ -96,6 +96,12 @@ def test_reimplementation_is_not_a_probe() -> None:
     assert _has(_read(PROVISIONER), r"reimplementation.{0,40}not a probe")
 
 
+def test_elimination_payloads_cover_defence_gaps() -> None:
+    text = _read(PROVISIONER)
+    assert "elimination is only as strong as its payloads" in text
+    assert "comment syntax" in text
+
+
 # --- Invariant 3: one definition, distinct from INCONCLUSIVE and Code Smell -----
 
 

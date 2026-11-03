@@ -30,8 +30,11 @@ NOT get their own summary-table rows.
 
 | ID | Title | CWE | Severity | Runtime | Exploit Test | Measured Impact | Status |
 |---|---|---|---|---|---|---|---|
-| VULN-001 | [title] | CWE-XXX | High+/High/Medium/Low/Informational | docker:image@tag / in-process:desc / static | PASS/FAIL | [the number in the class's impact unit] | Confirmed/Fixed/Verified |
+| VULN-001 | [title] | CWE-XXX | High+/High/Medium/Low/Informational | docker:image@tag / in-process:desc / static | PASS/PASS (static)/FAIL | [the number in the class's impact unit] | Confirmed/Fixed/Verified |
 | ... | ... | ... | ... | ... | ... | ... | ... |
+
+A finding whose Runtime is `static` reports its test as `PASS (static)`: the test asserted source text, it
+did not execute an attack. Never write a bare `PASS` for it.
 
 The `Runtime` column copies the finding's Phase 2b `Runtime:` line. The
 `Measured Impact` column carries the Phase 3b measurement — the number in the
@@ -57,8 +60,9 @@ Then for each finding, provide the full detail:
 | **Entry Point** | ... |
 | **Data Flow** | source -> ... -> sink |
 | **Runtime** | the finding's recorded `Runtime:` line (Phase 2b) |
+| **Attacker controls** | the PoC wrapper's `Attacker controls:` line |
 | **PoC** | `${VULNHUNT_DIR}/poc/VULN-NNN_description.md` |
-| **Exploit Test** | `${VULNHUNT_DIR}/exploit_tests/test_vuln_NNN.py` — PASS/FAIL + reason |
+| **Exploit Test** | `${VULNHUNT_DIR}/exploit_tests/test_vuln_NNN.py` — PASS / PASS (static) / FAIL + reason |
 | **Measured Impact** | the Phase 3b block: unit, result, basis, denominator, negative space |
 | **Fix** | [inline diff or link] |
 | **Root Cause** | [shared root cause name, if this instance is part of a sweep group] |
@@ -146,6 +150,7 @@ After all findings are finalized, create `${VULNHUNT_DIR}/README.md` as the entr
 **Audit Date**: <YYYY-MM-DD>
 **Branch**: <branch [short-commit-hash]>
 **Model**: <model identifier>
+**Models**: orchestrator=<id>; phase1=<id>; phase2=<id>; phase2b=<id>; phase3=<id>; advisor=<id or none>
 **Skills**: <skill-name>@<installed-commit> (source <source-commit>) — one line per skill
 **Skills match source**: <yes | no>
 **Inputs**: scaffold <N> / inventoried <M>
@@ -165,6 +170,10 @@ Field definitions:
   block. Format: `branch-name [abc1234]`, or `unknown` if the source
   isn't a git repo. Do not run git to recompute.
 - **Model** = the model identifier reported by your host harness (e.g. the current model ID).
+- **Models** = the model that actually ran each phase's subagents, taken from the subagent tool's
+  reported model where the harness exposes it, else from the harness's role configuration. Write
+  `unknown` for any phase you cannot determine; never copy the orchestrator's model into a phase you
+  did not observe.
 - **Skills** = one line per skill the run used, copied from the operator's
   `vh check-skills` output (Step 0 of `vulnhunter-run`). Record the skill
   name, the commit its bytes are **attributable** to (the `bytes_from` field

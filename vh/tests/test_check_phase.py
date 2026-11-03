@@ -394,7 +394,9 @@ def test_artifact_id_boundary(tmp_path: Path) -> None:
     results = _replay(tmp_path)
     (results / "poc" / "VULN-001_sort.md").unlink()
     (results / "exploit_tests" / "test_vuln_001_sort.py").unlink()
-    (results / "poc" / "VULN-0010_other.md").write_text("# Runtime: static\n")
+    (results / "poc" / "VULN-0010_other.md").write_text(
+        "# Runtime: static\nAttacker controls: query parameter across HTTP -> sink\n"
+    )
     assert _rules(results, "3") == {"P3-NO-POC"}
 
 
@@ -498,7 +500,10 @@ def test_lenient_cell_formatting(tmp_path: Path) -> None:
     for path in (results / "results").glob("*_results.md"):
         path.write_text("| 1. | **SAFE** (input #1) |\n3. CANDIDATE (input #2, a.go:1, x)\n")
     assert _rules(results, "2") == set()
-    (results / "poc" / "VULN-001_sort.md").write_text("# PoC\n\n- **Runtime**: docker:app@1\n")
+    (results / "poc" / "VULN-001_sort.md").write_text(
+        "# PoC\n\n- **Runtime**: docker:app@1\n"
+        "- Attacker controls: query parameter across HTTP -> sink\n"
+    )
     assert _rules(results, "3") == set()
 
 
@@ -515,4 +520,198 @@ def test_hold_id_matches_on_boundary(tmp_path: Path) -> None:
     readme.write_text(base + "\nSee VULN-0030.\n")
     assert _rules(results, "4") == {"P4-HOLD-DROPPED"}
     readme.write_text(base + "\n- VULN-003 (unverified): probe named\n")
+    assert _rules(results, "4") == set()
+
+
+# --- phase 3: HOLD reasons must be earned -------------------------------------
+
+HOLD_TABLE_HEADER = "| HOLD-ID | Title | Outcome | Why probe could not run |\n|---|---|---|---|\n"
+
+
+def _hold_results(tmp_path: Path, why_cell: str, outcome: str = "HOLD-UNVERIFIED") -> Path:
+    results = _replay(tmp_path)
+    (results / "phase3_output.md").write_text(
+        HOLD_TABLE_HEADER + f"| HOLD-1 | sort | {outcome} | {why_cell} |\n"
+    )
+    return results
+
+
+def _hold_messages(results: Path) -> list[str]:
+    findings, _ = check_phase.check3(results)
+    return [finding.message for finding in findings if finding.rule == "P3-HOLD-UNATTEMPTED"]
+
+
+def _hold_log(results: Path, name: str, body: str = "exit 1\n") -> None:
+    probes = results / "probes"
+    probes.mkdir(exist_ok=True)
+    (probes / name).write_text(body)
+
+
+@pytest.mark.parametrize(
+    ("why_cell", "detail"),
+    [
+        ("requires a live server", "reason not in the allowed forms"),
+        ("", "no reason"),
+        ("attempted: docker run svc-a → exit 1", "attempted without a log"),
+        (
+            "attempted: docker run svc-a → exit 1; log: probes/missing.log",
+            "log probes/missing.log missing, empty or outside the results directory",
+        ),
+        (
+            "attempted: docker run svc-a → exit 1; log: probes/empty.log",
+            "log probes/empty.log missing, empty or outside the results directory",
+        ),
+    ],
+)
+def test_hold_unattempted_fires(tmp_path: Path, why_cell: str, detail: str) -> None:
+    results = _hold_results(tmp_path, why_cell)
+    _hold_log(results, "empty.log", "")
+    messages = _hold_messages(results)
+    assert len(messages) == 1
+    assert "HOLD-1" in messages[0] and detail in messages[0]
+
+
+@pytest.mark.parametrize(
+    "why_cell",
+    [
+        "attempted: docker run svc-a → exit 1; log: probes/a.log",
+        "attempted: docker run svc-a → exit 1; log: `probes/a.log`.",
+        "external-service: svc-a",
+        "model-behaviour",
+        "model-behavior",
+        "needs-credentials: prod key",
+        "**attempted**: docker run svc-a → exit 1; log: probes/a.log",
+        "- attempted: docker run svc-a → exit 1; log: probes/a.log",
+        "`external-service: svc-a`",
+    ],
+)
+def test_hold_unattempted_passes(tmp_path: Path, why_cell: str) -> None:
+    results = _hold_results(tmp_path, why_cell)
+    _hold_log(results, "a.log")
+    assert _hold_messages(results) == []
+
+
+def test_hold_unattempted_rejects_log_outside_results(tmp_path: Path) -> None:
+    outside = tmp_path / "outside.log"
+    outside.write_text("exit 1\n")
+    for index, path in enumerate((f"../../{outside.name}", str(outside))):
+        run = tmp_path / str(index)
+        run.mkdir()
+        results = _hold_results(run, f"attempted: docker run svc-a → exit 1; log: {path}")
+        messages = _hold_messages(results)
+        assert len(messages) == 1 and "outside the results directory" in messages[0]
+
+
+def test_hold_unattempted_without_outcome_column_checks_every_row(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    (results / "phase3_output.md").write_text(
+        "| HOLD-ID | Phase 2b # | Title | Potential severity | Probe required "
+        "| Why probe could not run |\n|---|---|---|---|---|---|\n"
+        "| HOLD-1 | 4 | sort | High | run it | requires a live server |\n"
+    )
+    messages = _hold_messages(results)
+    assert len(messages) == 1 and "reason not in the allowed forms" in messages[0]
+
+
+def test_hold_unattempted_ignores_other_rows_and_tables(tmp_path: Path) -> None:
+    results = _hold_results(tmp_path, "", outcome="CONFIRMED")
+    assert _hold_messages(results) == []
+    (results / "phase3_output.md").write_text(
+        "| HOLD-ID | Title | Probe required |\n|---|---|---|\n| HOLD-2 | sort | probe it |\n"
+    )
+    findings, _ = check_phase.check3(results)
+    assert "P3-HOLD-UNATTEMPTED" not in {finding.rule for finding in findings}
+
+
+# --- phase 3: a confirmed PoC names the attacker-controlled input ---------------
+
+
+def _attacker_poc(tmp_path: Path, body: str) -> Path:
+    results = _replay(tmp_path)
+    (results / "poc" / "VULN-001_sort.md").write_text(body)
+    return results
+
+
+def test_p3_no_attacker_fires(tmp_path: Path) -> None:
+    results = _attacker_poc(tmp_path, "# Working PoC for VULN-001\n\n# Runtime: docker:app@1\n")
+    assert _rules(results, "3") == {"P3-NO-ATTACKER"}
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Attacker controls: request body field across unauthenticated HTTP -> tenant data",
+        "**Attacker controls**: request body field across unauthenticated HTTP -> tenant data",
+        "- Attacker controls: request body field across unauthenticated HTTP -> tenant data",
+    ],
+)
+def test_p3_no_attacker_passes(tmp_path: Path, line: str) -> None:
+    results = _attacker_poc(
+        tmp_path, f"# Working PoC for VULN-001\n\n# Runtime: docker:app@1\n\n{line}\n"
+    )
+    assert _rules(results, "3") == set()
+
+
+def test_p3_no_attacker_skips_static_poc(tmp_path: Path) -> None:
+    results = _attacker_poc(tmp_path, "# VULN-001 Static PoC: SQL injection\n\n1. ENTRY -> sink\n")
+    assert _rules(results, "3") == set()
+
+
+# --- phase 4: static evidence is labelled static; per-phase models recorded -----
+
+
+SUMMARY_HEADER = (
+    "| ID | Title | CWE | Severity | Runtime | Exploit Test | Measured Impact | Status |\n"
+)
+
+
+def _readme(tmp_path: Path, row: str) -> Path:
+    results = _replay(tmp_path)
+    readme = results / "README.md"
+    readme.write_text(
+        readme.read_text() + f"\n\n{SUMMARY_HEADER}|---|---|---|---|---|---|---|---|\n{row}\n"
+    )
+    return results
+
+
+def _static_rule(results: Path) -> list[str]:
+    findings, _ = check_phase.check4(results)
+    return [finding.message for finding in findings if finding.rule == "P4-STATIC-PASS"]
+
+
+def test_p4_static_pass_fires(tmp_path: Path) -> None:
+    results = _readme(
+        tmp_path, "| VULN-001 | sort | CWE-89 | High | static — trace | PASS | 3 rows | Confirmed |"
+    )
+    messages = _static_rule(results)
+    assert len(messages) == 1
+    assert "VULN-001" in messages[0]
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        "| VULN-001 | sort | CWE-89 | High | static — trace | PASS (static) | 3 rows | Confirmed |",
+        "| VULN-001 | sort | CWE-89 | High | static — trace | `PASS (static)` | 3 rows | Confirmed |",
+        "| VULN-001 | sort | CWE-89 | High | in-process: harness | PASS | 3 rows | Confirmed |",
+        "| VULN-001 | sort | CWE-89 | High | Runtime: static — x | PASS (static) | 3 rows | Confirmed |",
+    ],
+)
+def test_p4_static_pass_passes(tmp_path: Path, row: str) -> None:
+    results = _readme(tmp_path, row)
+    assert _static_rule(results) == []
+
+
+def test_p4_no_header_lists_models(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    readme = results / "README.md"
+    base = readme.read_text()
+    readme.write_text(
+        "\n".join(line for line in base.splitlines() if not line.startswith("**Models**:")) + "\n"
+    )
+    findings, _ = check_phase.check4(results)
+    no_header = [finding for finding in findings if finding.rule == "P4-NO-HEADER"]
+    assert len(no_header) == 1
+    assert "**Models**:" in no_header[0].message
+    readme.write_text(base + "\n**Models**: orchestrator=x\n")
     assert _rules(results, "4") == set()

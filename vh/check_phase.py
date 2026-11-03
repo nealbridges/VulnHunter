@@ -273,6 +273,16 @@ _RULES.update(
             "PoC has no Runtime: line",
             "record the Runtime: line from phase 2b",
         ),
+        "P3-HOLD-UNATTEMPTED": (
+            "fail",
+            "HOLD {hold} has no allowed reason ({detail})",
+            "attempt the probe and record `attempted: <cmd> → <result>; log: <path>`, or give an allowed reason",
+        ),
+        "P3-NO-ATTACKER": (
+            "fail",
+            "PoC has no Attacker controls: line",
+            "name the attacker-controlled input and the trust boundary it crosses",
+        ),
         "P4-NO-README": ("fail", "README.md is missing", "write the report"),
         "P4-NO-UNVERIFIED": (
             "fail",
@@ -285,6 +295,11 @@ _RULES.update(
             "place the HOLD in Unverified, a confirmed row, or a FALSE POSITIVE row",
         ),
         "P4-NO-HEADER": ("fail", "README header lacks: {columns}", "add the missing header fields"),
+        "P4-STATIC-PASS": (
+            "fail",
+            "{vuln} has a static Runtime but reports a bare PASS",
+            "report the test as `PASS (static)`",
+        ),
     }
 )
 
@@ -304,8 +319,18 @@ _DISPOSITION = re.compile(
 )
 _CLOSING = ("FALSE POSITIVE", "SAFE", "ELIMINATED")
 _RUNTIME = re.compile(r"^\s*(?:[-*>#]+\s*)?(?:\*\*)?Runtime(?:\*\*)?\s*:", re.I)
+_ATTACKER = re.compile(r"^\s*(?:[-*>#]+\s*)?(?:\*\*)?Attacker controls(?:\*\*)?\s*:", re.I)
 _CANDIDATE_ID = re.compile(r"\b[A-Z][A-Z0-9]*-\d+\b")
 _REQUIRED_2B = ("Closing claim", "Claim type", "Evidence", "Path reasoned about", "Verdict")
+_HOLD_REASONS = (
+    "attempted",
+    "external-service",
+    "model-behaviour",
+    "model-behavior",
+    "needs-credentials",
+)
+_LOG = re.compile(r"log:\s*(\S.*)", re.I)
+_BULLET = re.compile(r"^(?:[-*>]+\s*)+")
 
 
 def _read(path: Path) -> str:
@@ -458,6 +483,62 @@ def _named(results: Path, directory: str, pattern: str) -> bool:
     )
 
 
+def _hold_reason_text(cell: str) -> str:
+    return _BULLET.sub("", _plain(cell).lower()).strip()
+
+
+def _check_hold_reasons(
+    findings: list[Finding], results: Path, header: list[str], rows: list[tuple[int, list[str]]]
+) -> None:
+    lower = [cell.lower() for cell in header]
+    why_cells = [index for index, cell in enumerate(lower) if cell.startswith("why")]
+    outcome_cells = [
+        index for index, cell in enumerate(lower) if cell in ("verdict", "outcome", "status")
+    ]
+    if not why_cells:
+        return
+    # Without an outcome column every row is still an open HOLD.
+    why_cell = why_cells[0]
+    outcome_cell = outcome_cells[0] if outcome_cells else None
+    for line_number, cells in rows:
+        if len(cells) <= max(why_cell, outcome_cell or 0):
+            continue
+        if outcome_cell is not None and "HOLD" not in cells[outcome_cell].upper():
+            continue
+        hold = cells[0].strip()
+        reason = _hold_reason_text(cells[why_cell])
+        if not reason:
+            detail = "no reason"
+        elif not reason.startswith(_HOLD_REASONS):
+            detail = "reason not in the allowed forms"
+        elif reason.startswith("attempted"):
+            match = _LOG.search(_plain(cells[why_cell]))
+            if match is None:
+                detail = "attempted without a log"
+            else:
+                path = match.group(1).strip().rstrip(".,;:!?)]}\"'")
+                target = (results / path).resolve() if path else None
+                if (
+                    target is None
+                    or not target.is_relative_to(results.resolve())
+                    or not target.is_file()
+                    or target.stat().st_size == 0
+                ):
+                    detail = f"log {path} missing, empty or outside the results directory"
+                else:
+                    continue
+        else:
+            continue
+        _emit(
+            findings,
+            "P3-HOLD-UNATTEMPTED",
+            line_number,
+            file="phase3_output.md",
+            hold=hold,
+            detail=detail,
+        )
+
+
 def check3(results: Path) -> tuple[list[Finding], dict]:
     findings: list[Finding] = []
     output = results / "phase3_output.md"
@@ -466,7 +547,7 @@ def check3(results: Path) -> tuple[list[Finding], dict]:
         return findings, _summary("3", findings)
     lines = _read(output).splitlines()
     assignments = _assignment_rows(lines)
-    tables = [rows for _, _, rows in _tables(lines, 0, len(lines)) if rows]
+    tables = [(header, rows) for _, header, rows in _tables(lines, 0, len(lines)) if rows]
     if not assignments and not tables:
         _emit(findings, "P3-NO-OUTPUT")
     for line_number, vuln in assignments:
@@ -477,6 +558,8 @@ def check3(results: Path) -> tuple[list[Finding], dict]:
         test = _named(results, "exploit_tests", rf"^{re.escape(test_id)}(?!\d).*\.(py|sh)$")
         if not poc and not test:
             _emit(findings, "P3-NO-POC", line_number, file="phase3_output.md", vuln=vuln)
+    for header, rows in tables:
+        _check_hold_reasons(findings, results, header, rows)
     folder = results / "poc"
     if folder.is_dir():
         for path in sorted(folder.glob("VULN-*.md")):
@@ -486,6 +569,10 @@ def check3(results: Path) -> tuple[list[Finding], dict]:
                 and "Static PoC" not in text
             ):
                 _emit(findings, "P3-NO-RUNTIME", file=f"poc/{path.name}")
+            if "Static PoC" not in text and not any(
+                _ATTACKER.match(line) for line in text.splitlines()
+            ):
+                _emit(findings, "P3-NO-ATTACKER", file=f"poc/{path.name}")
     return findings, _summary("3", findings)
 
 
@@ -508,9 +595,34 @@ def check4(results: Path) -> tuple[list[Finding], dict]:
     lines = text.splitlines()
     if not _heading_present(lines, "unverified"):
         _emit(findings, "P4-NO-UNVERIFIED", file="README.md")
-    missing = [field for field in ("**Inputs**:", "**Breadth gate**:") if field not in text]
+    missing = [
+        field for field in ("**Inputs**:", "**Breadth gate**:", "**Models**:") if field not in text
+    ]
     if missing:
         _emit(findings, "P4-NO-HEADER", file="README.md", columns=", ".join(missing))
+    for _, header, rows in _tables(lines, 0, len(lines)):
+        lower = [cell.lower() for cell in header]
+        if "runtime" not in lower or "exploit test" not in lower:
+            continue
+        runtime_cell, test_cell = lower.index("runtime"), lower.index("exploit test")
+        for line_number, cells in rows:
+            if len(cells) <= max(runtime_cell, test_cell):
+                continue
+            runtime = _plain(cells[runtime_cell]).lower()
+            runtime = runtime.removeprefix("runtime:").strip()
+            test = _plain(cells[test_cell])
+            if (
+                runtime.startswith("static")
+                and "PASS" in test.upper()
+                and "static" not in test.lower()
+            ):
+                _emit(
+                    findings,
+                    "P4-STATIC-PASS",
+                    line_number,
+                    file="README.md",
+                    vuln=cells[0].strip(),
+                )
     for header, rows in _verdict_tables(_read(results / "phase2b_output.md").splitlines()):
         lower = [cell.lower() for cell in header]
         finding_cell = lower.index("finding") if "finding" in lower else 0

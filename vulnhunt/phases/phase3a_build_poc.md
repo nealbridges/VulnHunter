@@ -47,16 +47,29 @@ to Phase 2b (the runtime decision was skipped, not deferred).
 
 Each Medium+ HOLD is a probe task, not a confirmed finding. List them separately:
 
-| HOLD-ID | Phase 2b # | Title | Potential severity | Probe required |
-|---|---|---|---|---|
+| HOLD-ID | Phase 2b # | Title | Potential severity | Probe required | Outcome | Why probe could not run |
+|---|---|---|---|---|---|---|
 
-The probe column copies the Phase 2b `probe:` text verbatim. Run it. Outcomes:
+The probe column copies the Phase 2b `probe:` text verbatim. Run it, then fill
+**Outcome** with `CONFIRMED (VULN-NNN)`, `FALSE POSITIVE` or `HOLD-UNVERIFIED`.
+Outcomes:
 
 1. **Probe confirms the attack** → CONFIRMED: assign a VULN-NNN, build the PoC,
-   set `Evidence: executed-probe`.
+   set `Evidence: executed-probe`. "The attack" means the probe drives an
+   **attacker-controlled input across a trust boundary**. A probe that sets a
+   dependency's *output* directly (a forged or mocked service response, a stubbed
+   return value, a redirect or header from a server the attacker does not
+   control) proves a **precondition** only. This is the existing-test rule in
+   `phase2b_verify.md` applied at promotion. A precondition-only result stays
+   `HOLD-UNVERIFIED`, with the attacker step as its probe. If no attacker path
+   reaches the precondition, it becomes a Code Quality note.
 2. **Probe disproves it** → FALSE POSITIVE, with the probe output as evidence.
 3. **Probe cannot run** → stays `HOLD-UNVERIFIED`; goes to the Unverified section
-   with the probe and the reason it could not run. Not counted as confirmed.
+   with the probe and a reason in one of the forms in
+   `skills/runtime-provisioner/SKILL.md` (`attempted:` with its log,
+   `external-service:`, `model-behaviour`, `needs-credentials:`). Record that
+   reason in the intake table's **Why probe could not run** column. Not counted
+   as confirmed.
 
 Never promote or demote a HOLD by reading code — this phase runs the experiment.
 
@@ -140,6 +153,10 @@ Requirements for static PoCs:
 4. The impact statement in the class's impact unit (Phase 3b defines it) — the
    mechanism sentence and the impact sentence are different sentences, and the
    wrapper must contain both, labeled as such
+5. One line: `Attacker controls: <input> across <boundary>`, for example
+   `Attacker controls: request body field across unauthenticated HTTP → tenant data`.
+   If you cannot fill it without naming a component the attacker does not
+   control, the finding is precondition-only (see outcome 1).
 
 ## Phase 3a Validation
 

@@ -5,6 +5,7 @@
 **Audit Date**: 2026-10-28
 **Branch**: main [abc1234]
 **Model**: test
+**Models**: orchestrator=test; phase1=test; phase2=test; phase2b=test; phase3=test; advisor=none
 **Skills**: vulnhunt@abc (source abc)
 **Skills match source**: yes
 **Inputs**: scaffold 2 / inventoried 2
