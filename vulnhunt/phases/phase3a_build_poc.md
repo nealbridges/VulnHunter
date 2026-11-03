@@ -47,8 +47,8 @@ to Phase 2b (the runtime decision was skipped, not deferred).
 
 Each Medium+ HOLD is a probe task, not a confirmed finding. List them separately:
 
-| HOLD-ID | Phase 2b # | Title | Potential severity | Probe required |
-|---|---|---|---|---|
+| HOLD-ID | Phase 2b # | Title | Potential severity | Probe required | Why probe could not run |
+|---|---|---|---|---|---|
 
 The probe column copies the Phase 2b `probe:` text verbatim. Run it. Outcomes:
 
@@ -56,7 +56,11 @@ The probe column copies the Phase 2b `probe:` text verbatim. Run it. Outcomes:
    set `Evidence: executed-probe`.
 2. **Probe disproves it** → FALSE POSITIVE, with the probe output as evidence.
 3. **Probe cannot run** → stays `HOLD-UNVERIFIED`; goes to the Unverified section
-   with the probe and the reason it could not run. Not counted as confirmed.
+   with the probe and a reason in one of the forms in
+   `skills/runtime-provisioner/SKILL.md` (`attempted:` with its log,
+   `external-service:`, `model-behaviour`, `needs-credentials:`). Record that
+   reason in the intake table's **Why probe could not run** column. Not counted
+   as confirmed.
 
 Never promote or demote a HOLD by reading code — this phase runs the experiment.
 

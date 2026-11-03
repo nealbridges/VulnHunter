@@ -69,6 +69,19 @@ skip a cheaper option without written cause:
    type.** Structural → static is legitimate. Behavioural and runnable → execute
    it. Behavioural and not runnable → `HOLD-UNVERIFIED`, never `static`.
 
+   **"Not runnable" is earned, not declared.** A behavioural HOLD records why the
+   probe could not run, as exactly one of:
+   - `attempted: <command> → <result>; log: <path>`: you ran a container or
+     in-process probe and it failed. `<path>` is a file under the results
+     directory holding the command's output.
+   - `external-service: <name>`: a service outside the repo with no runnable
+     image (a vendor API, the target org's own hosted backend).
+   - `model-behaviour`: the outcome depends on a third-party model's behaviour.
+   - `needs-credentials: <what>`: needs real secrets or accounts you must not mint.
+
+   A dependency that ships a public container image is never `external-service`:
+   start it, and record `attempted:` if it fails.
+
 ### Payload discipline
 
 - **Cover each interpolation position**, not just the most obvious one.

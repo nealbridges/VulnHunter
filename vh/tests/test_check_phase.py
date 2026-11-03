@@ -516,3 +516,81 @@ def test_hold_id_matches_on_boundary(tmp_path: Path) -> None:
     assert _rules(results, "4") == {"P4-HOLD-DROPPED"}
     readme.write_text(base + "\n- VULN-003 (unverified): probe named\n")
     assert _rules(results, "4") == set()
+
+
+# --- phase 3: HOLD reasons must be earned -------------------------------------
+
+HOLD_TABLE_HEADER = "| HOLD-ID | Title | Outcome | Why probe could not run |\n|---|---|---|---|\n"
+
+
+def _hold_results(tmp_path: Path, why_cell: str, outcome: str = "HOLD-UNVERIFIED") -> Path:
+    results = _replay(tmp_path)
+    (results / "phase3_output.md").write_text(
+        HOLD_TABLE_HEADER + f"| HOLD-1 | sort | {outcome} | {why_cell} |\n"
+    )
+    return results
+
+
+def _hold_messages(results: Path) -> list[str]:
+    findings, _ = check_phase.check3(results)
+    return [finding.message for finding in findings if finding.rule == "P3-HOLD-UNATTEMPTED"]
+
+
+def _hold_log(results: Path, name: str, body: str = "exit 1\n") -> None:
+    probes = results / "probes"
+    probes.mkdir(exist_ok=True)
+    (probes / name).write_text(body)
+
+
+@pytest.mark.parametrize(
+    ("why_cell", "detail"),
+    [
+        ("requires a live server", "reason not in the allowed forms"),
+        ("", "no reason"),
+        ("attempted: docker run svc-a → exit 1", "attempted without a log"),
+        (
+            "attempted: docker run svc-a → exit 1; log: probes/missing.log",
+            "log probes/missing.log missing or empty",
+        ),
+        (
+            "attempted: docker run svc-a → exit 1; log: probes/empty.log",
+            "log probes/empty.log missing or empty",
+        ),
+    ],
+)
+def test_hold_unattempted_fires(tmp_path: Path, why_cell: str, detail: str) -> None:
+    results = _hold_results(tmp_path, why_cell)
+    _hold_log(results, "empty.log", "")
+    messages = _hold_messages(results)
+    assert len(messages) == 1
+    assert "HOLD-1" in messages[0] and detail in messages[0]
+
+
+@pytest.mark.parametrize(
+    "why_cell",
+    [
+        "attempted: docker run svc-a → exit 1; log: probes/a.log",
+        "attempted: docker run svc-a → exit 1; log: `probes/a.log`.",
+        "external-service: svc-a",
+        "model-behaviour",
+        "model-behavior",
+        "needs-credentials: prod key",
+        "**attempted**: docker run svc-a → exit 1; log: probes/a.log",
+        "- attempted: docker run svc-a → exit 1; log: probes/a.log",
+        "`external-service: svc-a`",
+    ],
+)
+def test_hold_unattempted_passes(tmp_path: Path, why_cell: str) -> None:
+    results = _hold_results(tmp_path, why_cell)
+    _hold_log(results, "a.log")
+    assert _hold_messages(results) == []
+
+
+def test_hold_unattempted_ignores_other_rows_and_tables(tmp_path: Path) -> None:
+    results = _hold_results(tmp_path, "", outcome="CONFIRMED")
+    assert _hold_messages(results) == []
+    (results / "phase3_output.md").write_text(
+        "| HOLD-ID | Title | Probe required |\n|---|---|---|\n| HOLD-2 | sort | probe it |\n"
+    )
+    findings, _ = check_phase.check3(results)
+    assert "P3-HOLD-UNATTEMPTED" not in {finding.rule for finding in findings}
