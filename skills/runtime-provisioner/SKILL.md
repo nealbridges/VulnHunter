@@ -89,6 +89,12 @@ skip a cheaper option without written cause:
 - **Use payloads valid in the target grammar.**
 - **Rejection is not safety** unless it happened before the value was
   interpreted.
+- **An elimination is only as strong as its payloads.** Before recording FALSE
+  POSITIVE or SAFE against an escaping, encoding or validation function, the
+  probe must include at least one payload per class that function does not
+  handle in the target grammar: escape characters (e.g. `\`), comment syntax
+  (e.g. `--`, `#`, `/*`), alternate quoting, and encodings. Name the classes
+  you tried in the Evidence cell.
 
 ## Step 3 — Execute at the chosen depth
 

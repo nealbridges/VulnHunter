@@ -295,6 +295,11 @@ _RULES.update(
             "place the HOLD in Unverified, a confirmed row, or a FALSE POSITIVE row",
         ),
         "P4-NO-HEADER": ("fail", "README header lacks: {columns}", "add the missing header fields"),
+        "P4-STATIC-PASS": (
+            "fail",
+            "{vuln} has a static Runtime but reports a bare PASS",
+            "report the test as `PASS (static)`",
+        ),
     }
 )
 
@@ -583,9 +588,34 @@ def check4(results: Path) -> tuple[list[Finding], dict]:
     lines = text.splitlines()
     if not _heading_present(lines, "unverified"):
         _emit(findings, "P4-NO-UNVERIFIED", file="README.md")
-    missing = [field for field in ("**Inputs**:", "**Breadth gate**:") if field not in text]
+    missing = [
+        field for field in ("**Inputs**:", "**Breadth gate**:", "**Models**:") if field not in text
+    ]
     if missing:
         _emit(findings, "P4-NO-HEADER", file="README.md", columns=", ".join(missing))
+    for _, header, rows in _tables(lines, 0, len(lines)):
+        lower = [cell.lower() for cell in header]
+        if "runtime" not in lower or "exploit test" not in lower:
+            continue
+        runtime_cell, test_cell = lower.index("runtime"), lower.index("exploit test")
+        for line_number, cells in rows:
+            if len(cells) <= max(runtime_cell, test_cell):
+                continue
+            runtime = _plain(cells[runtime_cell]).lower()
+            runtime = runtime.removeprefix("runtime:").strip()
+            test = _plain(cells[test_cell])
+            if (
+                runtime.startswith("static")
+                and "PASS" in test.upper()
+                and "static" not in test.lower()
+            ):
+                _emit(
+                    findings,
+                    "P4-STATIC-PASS",
+                    line_number,
+                    file="README.md",
+                    vuln=cells[0].strip(),
+                )
     for header, rows in _verdict_tables(_read(results / "phase2b_output.md").splitlines()):
         lower = [cell.lower() for cell in header]
         finding_cell = lower.index("finding") if "finding" in lower else 0

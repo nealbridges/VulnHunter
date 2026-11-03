@@ -633,3 +633,63 @@ def test_p3_no_attacker_passes(tmp_path: Path, line: str) -> None:
 def test_p3_no_attacker_skips_static_poc(tmp_path: Path) -> None:
     results = _attacker_poc(tmp_path, "# VULN-001 Static PoC: SQL injection\n\n1. ENTRY -> sink\n")
     assert _rules(results, "3") == set()
+
+
+# --- phase 4: static evidence is labelled static; per-phase models recorded -----
+
+
+SUMMARY_HEADER = (
+    "| ID | Title | CWE | Severity | Runtime | Exploit Test | Measured Impact | Status |\n"
+)
+
+
+def _readme(tmp_path: Path, row: str) -> Path:
+    results = _replay(tmp_path)
+    readme = results / "README.md"
+    readme.write_text(
+        readme.read_text() + f"\n\n{SUMMARY_HEADER}|---|---|---|---|---|---|---|---|\n{row}\n"
+    )
+    return results
+
+
+def _static_rule(results: Path) -> list[str]:
+    findings, _ = check_phase.check4(results)
+    return [finding.message for finding in findings if finding.rule == "P4-STATIC-PASS"]
+
+
+def test_p4_static_pass_fires(tmp_path: Path) -> None:
+    results = _readme(
+        tmp_path, "| VULN-001 | sort | CWE-89 | High | static — trace | PASS | 3 rows | Confirmed |"
+    )
+    messages = _static_rule(results)
+    assert len(messages) == 1
+    assert "VULN-001" in messages[0]
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        "| VULN-001 | sort | CWE-89 | High | static — trace | PASS (static) | 3 rows | Confirmed |",
+        "| VULN-001 | sort | CWE-89 | High | static — trace | `PASS (static)` | 3 rows | Confirmed |",
+        "| VULN-001 | sort | CWE-89 | High | in-process: harness | PASS | 3 rows | Confirmed |",
+        "| VULN-001 | sort | CWE-89 | High | Runtime: static — x | PASS (static) | 3 rows | Confirmed |",
+    ],
+)
+def test_p4_static_pass_passes(tmp_path: Path, row: str) -> None:
+    results = _readme(tmp_path, row)
+    assert _static_rule(results) == []
+
+
+def test_p4_no_header_lists_models(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    readme = results / "README.md"
+    base = readme.read_text()
+    readme.write_text(
+        "\n".join(line for line in base.splitlines() if not line.startswith("**Models**:")) + "\n"
+    )
+    findings, _ = check_phase.check4(results)
+    no_header = [finding for finding in findings if finding.rule == "P4-NO-HEADER"]
+    assert len(no_header) == 1
+    assert "**Models**:" in no_header[0].message
+    readme.write_text(base + "\n**Models**: orchestrator=x\n")
+    assert _rules(results, "4") == set()
