@@ -68,9 +68,9 @@ the register in the same commit (enforced by test_skill_contracts.py).
 | VH-HUNT-058 | `vulnhunt/phases/phase2b_verify.md:357` | must | Each must have its own verdict row. |
 | VH-HUNT-059 | `vulnhunt/phases/phase3a_build_poc.md:39` | MUST | Row count MUST equal the total High + Medium CONFIRMED findings in Phase 2b. |
 | VH-HUNT-060 | `vulnhunt/phases/phase3a_build_poc.md:40` | MUST | Every row MUST receive a PoC and exploit test by end of phase. |
-| VH-HUNT-061 | `vulnhunt/phases/phase3a_build_poc.md:112` | MUST | The script MUST print the observed outcome in a form Phase 3b can measure (rows returned, bytes amplified, keys stranded, payloads leaked — the unit is chosen in Phase 3b's impact-unit table). |
-| VH-HUNT-062 | `vulnhunt/phases/phase3a_build_poc.md:146` | must | ### What the PoC wrapper (.md) must contain |
-| VH-HUNT-063 | `vulnhunt/phases/phase3a_build_poc.md:151` | must | The impact statement in the class's impact unit (Phase 3b defines it) — the mechanism sentence and the impact sentence are different sentences, and the wrapper must contain both, labeled as such 5. |
+| VH-HUNT-061 | `vulnhunt/phases/phase3a_build_poc.md:114` | MUST | The script MUST print the observed outcome in a form Phase 3b can measure (rows returned, bytes amplified, keys stranded, payloads leaked — the unit is chosen in Phase 3b's impact-unit table). |
+| VH-HUNT-062 | `vulnhunt/phases/phase3a_build_poc.md:148` | must | ### What the PoC wrapper (.md) must contain |
+| VH-HUNT-063 | `vulnhunt/phases/phase3a_build_poc.md:153` | must | The impact statement in the class's impact unit (Phase 3b defines it) — the mechanism sentence and the impact sentence are different sentences, and the wrapper must contain both, labeled as such 5. |
 | VH-HUNT-064 | `vulnhunt/phases/phase3b_measure_impact.md:14` | MUST | Every Confirmed finding MUST carry its measurement before Phase 4. |
 | VH-HUNT-065 | `vulnhunt/phases/phase3d_sweep.md:119` | must | Every CANDIDATE instance must go through the full finding pipeline — gates, PoC, and exploit test (Phases 2b, 3a, 3b) — the same as any finding discovered during hunting. |
 | VH-HUNT-066 | `vulnhunt/phases/phase4_report.md:19` | MUST | **This table MUST have one row per exploit test PASS — not one row per root cause.** If you have 2 root causes but 8 confirmed sink locations, the table has 8 rows. |

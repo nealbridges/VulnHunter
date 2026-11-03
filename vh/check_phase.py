@@ -495,13 +495,15 @@ def _check_hold_reasons(
     outcome_cells = [
         index for index, cell in enumerate(lower) if cell in ("verdict", "outcome", "status")
     ]
-    if not why_cells or not outcome_cells:
+    if not why_cells:
         return
-    why_cell, outcome_cell = why_cells[0], outcome_cells[0]
+    # Without an outcome column every row is still an open HOLD.
+    why_cell = why_cells[0]
+    outcome_cell = outcome_cells[0] if outcome_cells else None
     for line_number, cells in rows:
-        if len(cells) <= max(why_cell, outcome_cell):
+        if len(cells) <= max(why_cell, outcome_cell or 0):
             continue
-        if "HOLD" not in cells[outcome_cell].upper():
+        if outcome_cell is not None and "HOLD" not in cells[outcome_cell].upper():
             continue
         hold = cells[0].strip()
         reason = _hold_reason_text(cells[why_cell])
@@ -515,9 +517,14 @@ def _check_hold_reasons(
                 detail = "attempted without a log"
             else:
                 path = match.group(1).strip().rstrip(".,;:!?)]}\"'")
-                target = results / path if path else None
-                if target is None or not target.is_file() or target.stat().st_size == 0:
-                    detail = f"log {path} missing or empty"
+                target = (results / path).resolve() if path else None
+                if (
+                    target is None
+                    or not target.is_relative_to(results.resolve())
+                    or not target.is_file()
+                    or target.stat().st_size == 0
+                ):
+                    detail = f"log {path} missing, empty or outside the results directory"
                 else:
                     continue
         else:

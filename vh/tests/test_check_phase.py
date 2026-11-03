@@ -555,11 +555,11 @@ def _hold_log(results: Path, name: str, body: str = "exit 1\n") -> None:
         ("attempted: docker run svc-a → exit 1", "attempted without a log"),
         (
             "attempted: docker run svc-a → exit 1; log: probes/missing.log",
-            "log probes/missing.log missing or empty",
+            "log probes/missing.log missing, empty or outside the results directory",
         ),
         (
             "attempted: docker run svc-a → exit 1; log: probes/empty.log",
-            "log probes/empty.log missing or empty",
+            "log probes/empty.log missing, empty or outside the results directory",
         ),
     ],
 )
@@ -589,6 +589,28 @@ def test_hold_unattempted_passes(tmp_path: Path, why_cell: str) -> None:
     results = _hold_results(tmp_path, why_cell)
     _hold_log(results, "a.log")
     assert _hold_messages(results) == []
+
+
+def test_hold_unattempted_rejects_log_outside_results(tmp_path: Path) -> None:
+    outside = tmp_path / "outside.log"
+    outside.write_text("exit 1\n")
+    for index, path in enumerate((f"../../{outside.name}", str(outside))):
+        run = tmp_path / str(index)
+        run.mkdir()
+        results = _hold_results(run, f"attempted: docker run svc-a → exit 1; log: {path}")
+        messages = _hold_messages(results)
+        assert len(messages) == 1 and "outside the results directory" in messages[0]
+
+
+def test_hold_unattempted_without_outcome_column_checks_every_row(tmp_path: Path) -> None:
+    results = _replay(tmp_path)
+    (results / "phase3_output.md").write_text(
+        "| HOLD-ID | Phase 2b # | Title | Potential severity | Probe required "
+        "| Why probe could not run |\n|---|---|---|---|---|---|\n"
+        "| HOLD-1 | 4 | sort | High | run it | requires a live server |\n"
+    )
+    messages = _hold_messages(results)
+    assert len(messages) == 1 and "reason not in the allowed forms" in messages[0]
 
 
 def test_hold_unattempted_ignores_other_rows_and_tables(tmp_path: Path) -> None:

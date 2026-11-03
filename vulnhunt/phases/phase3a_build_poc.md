@@ -47,10 +47,12 @@ to Phase 2b (the runtime decision was skipped, not deferred).
 
 Each Medium+ HOLD is a probe task, not a confirmed finding. List them separately:
 
-| HOLD-ID | Phase 2b # | Title | Potential severity | Probe required | Why probe could not run |
-|---|---|---|---|---|---|
+| HOLD-ID | Phase 2b # | Title | Potential severity | Probe required | Outcome | Why probe could not run |
+|---|---|---|---|---|---|---|
 
-The probe column copies the Phase 2b `probe:` text verbatim. Run it. Outcomes:
+The probe column copies the Phase 2b `probe:` text verbatim. Run it, then fill
+**Outcome** with `CONFIRMED (VULN-NNN)`, `FALSE POSITIVE` or `HOLD-UNVERIFIED`.
+Outcomes:
 
 1. **Probe confirms the attack** → CONFIRMED: assign a VULN-NNN, build the PoC,
    set `Evidence: executed-probe`. "The attack" means the probe drives an

@@ -72,8 +72,8 @@ skip a cheaper option without written cause:
    **"Not runnable" is earned, not declared.** A behavioural HOLD records why the
    probe could not run, as exactly one of:
    - `attempted: <command> → <result>; log: <path>`: you ran a container or
-     in-process probe and it failed. `<path>` is a file under the results
-     directory holding the command's output.
+     in-process probe and it failed. `<path>` is relative to the results
+     directory and names a file there holding the command's output.
    - `external-service: <name>`: a service outside the repo with no runnable
      image (a vendor API, the target org's own hosted backend).
    - `model-behaviour`: the outcome depends on a third-party model's behaviour.
