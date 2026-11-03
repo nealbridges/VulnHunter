@@ -394,7 +394,9 @@ def test_artifact_id_boundary(tmp_path: Path) -> None:
     results = _replay(tmp_path)
     (results / "poc" / "VULN-001_sort.md").unlink()
     (results / "exploit_tests" / "test_vuln_001_sort.py").unlink()
-    (results / "poc" / "VULN-0010_other.md").write_text("# Runtime: static\n")
+    (results / "poc" / "VULN-0010_other.md").write_text(
+        "# Runtime: static\nAttacker controls: query parameter across HTTP -> sink\n"
+    )
     assert _rules(results, "3") == {"P3-NO-POC"}
 
 
@@ -498,7 +500,10 @@ def test_lenient_cell_formatting(tmp_path: Path) -> None:
     for path in (results / "results").glob("*_results.md"):
         path.write_text("| 1. | **SAFE** (input #1) |\n3. CANDIDATE (input #2, a.go:1, x)\n")
     assert _rules(results, "2") == set()
-    (results / "poc" / "VULN-001_sort.md").write_text("# PoC\n\n- **Runtime**: docker:app@1\n")
+    (results / "poc" / "VULN-001_sort.md").write_text(
+        "# PoC\n\n- **Runtime**: docker:app@1\n"
+        "- Attacker controls: query parameter across HTTP -> sink\n"
+    )
     assert _rules(results, "3") == set()
 
 
@@ -594,3 +599,37 @@ def test_hold_unattempted_ignores_other_rows_and_tables(tmp_path: Path) -> None:
     )
     findings, _ = check_phase.check3(results)
     assert "P3-HOLD-UNATTEMPTED" not in {finding.rule for finding in findings}
+
+
+# --- phase 3: a confirmed PoC names the attacker-controlled input ---------------
+
+
+def _attacker_poc(tmp_path: Path, body: str) -> Path:
+    results = _replay(tmp_path)
+    (results / "poc" / "VULN-001_sort.md").write_text(body)
+    return results
+
+
+def test_p3_no_attacker_fires(tmp_path: Path) -> None:
+    results = _attacker_poc(tmp_path, "# Working PoC for VULN-001\n\n# Runtime: docker:app@1\n")
+    assert _rules(results, "3") == {"P3-NO-ATTACKER"}
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Attacker controls: request body field across unauthenticated HTTP -> tenant data",
+        "**Attacker controls**: request body field across unauthenticated HTTP -> tenant data",
+        "- Attacker controls: request body field across unauthenticated HTTP -> tenant data",
+    ],
+)
+def test_p3_no_attacker_passes(tmp_path: Path, line: str) -> None:
+    results = _attacker_poc(
+        tmp_path, f"# Working PoC for VULN-001\n\n# Runtime: docker:app@1\n\n{line}\n"
+    )
+    assert _rules(results, "3") == set()
+
+
+def test_p3_no_attacker_skips_static_poc(tmp_path: Path) -> None:
+    results = _attacker_poc(tmp_path, "# VULN-001 Static PoC: SQL injection\n\n1. ENTRY -> sink\n")
+    assert _rules(results, "3") == set()

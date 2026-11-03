@@ -57,6 +57,7 @@ Then for each finding, provide the full detail:
 | **Entry Point** | ... |
 | **Data Flow** | source -> ... -> sink |
 | **Runtime** | the finding's recorded `Runtime:` line (Phase 2b) |
+| **Attacker controls** | the PoC wrapper's `Attacker controls:` line |
 | **PoC** | `${VULNHUNT_DIR}/poc/VULN-NNN_description.md` |
 | **Exploit Test** | `${VULNHUNT_DIR}/exploit_tests/test_vuln_NNN.py` — PASS/FAIL + reason |
 | **Measured Impact** | the Phase 3b block: unit, result, basis, denominator, negative space |

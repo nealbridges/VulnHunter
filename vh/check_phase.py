@@ -278,6 +278,11 @@ _RULES.update(
             "HOLD {hold} has no allowed reason ({detail})",
             "attempt the probe and record `attempted: <cmd> → <result>; log: <path>`, or give an allowed reason",
         ),
+        "P3-NO-ATTACKER": (
+            "fail",
+            "PoC has no Attacker controls: line",
+            "name the attacker-controlled input and the trust boundary it crosses",
+        ),
         "P4-NO-README": ("fail", "README.md is missing", "write the report"),
         "P4-NO-UNVERIFIED": (
             "fail",
@@ -309,6 +314,7 @@ _DISPOSITION = re.compile(
 )
 _CLOSING = ("FALSE POSITIVE", "SAFE", "ELIMINATED")
 _RUNTIME = re.compile(r"^\s*(?:[-*>#]+\s*)?(?:\*\*)?Runtime(?:\*\*)?\s*:", re.I)
+_ATTACKER = re.compile(r"^\s*(?:[-*>#]+\s*)?(?:\*\*)?Attacker controls(?:\*\*)?\s*:", re.I)
 _CANDIDATE_ID = re.compile(r"\b[A-Z][A-Z0-9]*-\d+\b")
 _REQUIRED_2B = ("Closing claim", "Claim type", "Evidence", "Path reasoned about", "Verdict")
 _HOLD_REASONS = (
@@ -551,6 +557,10 @@ def check3(results: Path) -> tuple[list[Finding], dict]:
                 and "Static PoC" not in text
             ):
                 _emit(findings, "P3-NO-RUNTIME", file=f"poc/{path.name}")
+            if "Static PoC" not in text and not any(
+                _ATTACKER.match(line) for line in text.splitlines()
+            ):
+                _emit(findings, "P3-NO-ATTACKER", file=f"poc/{path.name}")
     return findings, _summary("3", findings)
 
 

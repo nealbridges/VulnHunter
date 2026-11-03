@@ -87,7 +87,7 @@ Negative space: 17 rejected fail-closed at the tenant filter (src/filters.go:88)
 
 | Measurement outcome | Action |
 |---|---|
-| Impact measured, non-zero | Finding keeps its Phase 2b severity; the number joins the report row. |
+| Impact measured, non-zero | Finding keeps its Phase 2b severity **when the number supports that tier**; otherwise lower it to the tier the number argues, with the number as the argument. The number joins the report row. |
 | Impact measured, zero | The exploit executes but the attacker gains nothing. Downgrade to Code Smell — the mechanism is real, the impact is absent. |
 | Impact larger than severity implied | Escalate the severity tier with the number as the argument — the measurement argues the tier. |
 | Unit undefined for the class | Define it in the wrapper first (one sentence), then measure. Never report an implicit unit. |
