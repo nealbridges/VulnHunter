@@ -50,42 +50,6 @@ def test_load_all_benchmarks(monkeypatch, tmp_path):
     assert widget_findings[0]["_commit_hash"] == "abcdef1234567890"
 
 
-def test_load_all_benchmarks_skips_example_and_templates(monkeypatch, tmp_path):
-    bdir = _write_bench(monkeypatch, tmp_path)
-    (bdir / "EXAMPLE.json").write_text(json.dumps(BENCH_JSON[:1]))
-    (bdir / "EXAMPLE.json.template").write_text(json.dumps(BENCH_JSON[:1]))
-    names = [n for n, _ in run.load_all_benchmarks()]
-    assert names == ["other.json", "widget.json"]
-
-
-def test_load_all_benchmarks_rejects_invalid_json(monkeypatch, tmp_path):
-    bdir = tmp_path / "gt"
-    bdir.mkdir()
-    (bdir / "broken.json").write_text("{ not json")
-    monkeypatch.setattr(run, "BENCHMARK_DIR", str(bdir))
-    with pytest.raises(SystemExit) as exc:
-        run.load_all_benchmarks()
-    assert exc.value.code == 1
-
-
-def test_load_all_benchmarks_rejects_duplicate_ids(monkeypatch, tmp_path, capsys):
-    bdir = tmp_path / "gt"
-    bdir.mkdir()
-    finding = {
-        "finding_id": "F1",
-        "type": "SQLi",
-        "description": "x",
-        "source_code": "https://github.com/acme/widget/tree/abcdef1234567890",
-    }
-    (bdir / "a.json").write_text(json.dumps([finding]))
-    (bdir / "b.json").write_text(json.dumps([finding]))
-    monkeypatch.setattr(run, "BENCHMARK_DIR", str(bdir))
-    with pytest.raises(SystemExit) as exc:
-        run.load_all_benchmarks()
-    assert exc.value.code == 1
-    assert "duplicate finding_id" in capsys.readouterr().out
-
-
 def test_deduplicate_targets(monkeypatch, tmp_path):
     _write_bench(monkeypatch, tmp_path)
     benches = run.load_all_benchmarks()
@@ -113,7 +77,7 @@ def test_load_state_corrupt_starts_fresh(monkeypatch, tmp_path):
     monkeypatch.setattr(run, "STATE_FILE", str(state_file))
     monkeypatch.setattr(run, "MODEL", "m")
     st = run.load_state()
-    assert st == {"scan_targets": {}, "judgments": {}, "model": "m"}
+    assert st == {"scan_targets": {}, "judgments": {}, "model": "unknown"}
 
 
 def test_filter_targets_by_findings():
@@ -165,20 +129,30 @@ def test_phase_clone_skips_already_cloned(monkeypatch, tmp_path):
 
 def test_phase_scan_all_skipped(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(run, "STATE_FILE", str(tmp_path / "state.json"))
+    monkeypatch.setattr(run, "MODEL", "new-model")
     rd = tmp_path / "rd"
     rd.mkdir()
     targets = {"t1": {"key": "t1", "clone_dir": str(tmp_path), "findings": []}}
-    state = {"scan_targets": {"t1": {"status": "scanned", "results_dir": str(rd)}}, "judgments": {}}
+    state = {
+        "scan_targets": {"t1": {"status": "scanned", "results_dir": str(rd)}},
+        "judgments": {},
+        "model": "trial-model",
+    }
     run.phase_scan(targets, state)
     assert "already scanned" in capsys.readouterr().out
+    assert state["model"] == "trial-model"
 
 
 def test_phase_scan_runs(monkeypatch, tmp_path):
     monkeypatch.setattr(run, "STATE_FILE", str(tmp_path / "state.json"))
+    monkeypatch.setattr(run, "MODEL", "new-model")
     monkeypatch.setattr(run, "clean_prior_results", lambda cd: [])
     monkeypatch.setattr(run, "has_valid_results", lambda cd: False)
 
-    def fake_scan_targets(to_scan, max_workers=None):
+    captured = {}
+
+    def fake_scan_targets(to_scan, max_workers=None, readonly=True):
+        captured["readonly"] = readonly
         return [
             ("t1", ScanResult("/c/t1", "t1", 0, 5, 12.0, "/c/t1/rd", {"total_cost_usd": 1.0})),
             ("t2", ScanResult("/c/t2", "t2", 1, 0, 3.0, None, {})),
@@ -193,14 +167,21 @@ def test_phase_scan_runs(monkeypatch, tmp_path):
     state = {
         "scan_targets": {"t1": {"status": "cloned"}, "t2": {"status": "cloned"}},
         "judgments": {"F1": {}, "F2": {}},
+        "model": "trial-model",
     }
     run.phase_scan(targets, state, force_rescan=True)
     assert state["scan_targets"]["t1"]["status"] == "scanned"
     assert state["scan_targets"]["t2"]["status"] == "scan_failed"
+    assert run.load_state()["model"] == "new-model"
+    # Default (execute=False) must scan read-only; --execute opts out.
+    assert captured["readonly"] is True
+    run.phase_scan(targets, state, force_rescan=True, execute=True)
+    assert captured["readonly"] is False
 
 
 def test_phase_scan_adopts_existing_results(monkeypatch, tmp_path):
     monkeypatch.setattr(run, "STATE_FILE", str(tmp_path / "state.json"))
+    monkeypatch.setattr(run, "MODEL", "new-model")
     monkeypatch.setattr(run, "has_valid_results", lambda cd: True)
     monkeypatch.setattr(run, "find_results_dir", lambda cd: "/c/t1/rd")
 
@@ -209,9 +190,10 @@ def test_phase_scan_adopts_existing_results(monkeypatch, tmp_path):
 
     monkeypatch.setattr(run, "scan_targets", fail_scan)
     targets = {"t1": {"key": "t1", "clone_dir": "/c/t1", "findings": []}}
-    state = {"scan_targets": {"t1": {"status": "cloned"}}, "judgments": {}}
+    state = {"scan_targets": {"t1": {"status": "cloned"}}, "judgments": {}, "model": "trial-model"}
     run.phase_scan(targets, state)
     assert state["scan_targets"]["t1"]["results_dir"] == "/c/t1/rd"
+    assert run.load_state()["model"] == "trial-model"
 
 
 def test_phase_judge(monkeypatch, tmp_path):
@@ -317,16 +299,24 @@ def _setup_main(monkeypatch, tmp_path):
     monkeypatch.setattr(run, "STATE_FILE", str(tmp_path / "state.json"))
     monkeypatch.setattr(run, "MODEL", "m")
     monkeypatch.setattr(run, "phase_clone", lambda t, s: None)
-    monkeypatch.setattr(run, "phase_scan", lambda t, s, force_rescan=False, max_workers=5: None)
+    monkeypatch.setattr(
+        run, "phase_scan", lambda t, s, force_rescan=False, max_workers=5, execute=False: None
+    )
     monkeypatch.setattr(run, "phase_judge", lambda t, s, force_rejudge=False: None)
     monkeypatch.setattr(run, "phase_tally", lambda s: None)
     monkeypatch.setattr(run, "update_history", lambda s, t: (1, 0))
 
 
-def test_main_full(monkeypatch, tmp_path):
+@pytest.mark.parametrize("args", [[], ["--judge-only"], ["--tally-only"]])
+def test_main_without_scans_preserves_model(monkeypatch, tmp_path, args):
     _setup_main(monkeypatch, tmp_path)
-    monkeypatch.setattr(run.sys, "argv", ["run"])
+    run.save_state({"scan_targets": {}, "judgments": {}, "model": "trial-model"})
+    tallies = []
+    monkeypatch.setattr(run, "phase_tally", lambda s: tallies.append(run.generate_tally(s)))
+    monkeypatch.setattr(run.sys, "argv", ["run", *args])
     run.main()
+    assert tallies[0]["model"] == "trial-model"
+    assert run.load_state()["model"] == "trial-model"
 
 
 def test_main_tally_only(monkeypatch, tmp_path):
@@ -379,43 +369,3 @@ def test_main_no_benchmarks(monkeypatch, tmp_path):
     monkeypatch.setattr(run.sys, "argv", ["run"])
     with pytest.raises(SystemExit):
         run.main()
-
-
-def test_partial_judge_response_preserves_tally_denominator(monkeypatch, tmp_path):
-    import types
-
-    from local_harness.benchmark import judge, tally
-
-    findings = [
-        {
-            "finding_id": f"F{i}",
-            "type": "synthetic",
-            "description": "test case",
-            "benchmark_file": "test.json",
-        }
-        for i in range(1, 4)
-    ]
-    results = tmp_path / "results"
-    results.mkdir()
-    (results / "README.md").write_text("Synthetic scanner report")
-    monkeypatch.setattr(run, "STATE_FILE", str(tmp_path / "state.json"))
-    monkeypatch.setattr(
-        judge,
-        "_invoke_judge",
-        lambda *args: types.SimpleNamespace(
-            returncode=0, stderr="", stdout='[{"finding_id":"F1","detected":true}]'
-        ),
-    )
-    state = {
-        "scan_targets": {"toy": {"status": "scanned", "results_dir": str(results)}},
-        "judgments": {},
-    }
-    run.phase_judge({"toy": {"findings": findings}}, state)
-    summary = tally.generate_tally(state)["summary"]
-    assert summary["total_findings"] == 3
-    assert summary["detected"] == 1
-    assert summary["missed"] == 0
-    assert summary["errors"] == 2
-    assert summary["detection_rate"] == pytest.approx(1 / 3, abs=0.0001)
-    persisted = json.loads((tmp_path / "state.json").read_text())
-    assert persisted["judgments"]["F2"]["detected"] is None

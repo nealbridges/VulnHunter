@@ -156,7 +156,7 @@ def cmd_scan(args):
         targets,
         max_workers=args.max_workers,
         log_filename=BATCH_LOG_FILENAME,
-        readonly=args.readonly,
+        readonly=not args.execute,
     )
     elapsed = time.time() - start
 
@@ -214,9 +214,10 @@ def main():
         help=f"Parallel scan workers (default: {MAX_SCAN_WORKERS})",
     )
     scan_parser.add_argument(
-        "--readonly",
+        "--execute",
         action="store_true",
-        help="Read-only scan: skip dependency installation and code execution",
+        help="Allow the scan agent to execute code (grants the Bash tool). "
+        "Default is a read-only scan with no code execution (CANON-03).",
     )
 
     subparsers.add_parser("status", help="Check scan progress")
@@ -233,7 +234,7 @@ def main():
         args.re_clone = False
         args.resume = False
         args.max_workers = MAX_SCAN_WORKERS
-        args.readonly = False
+        args.execute = False
 
     if args.command == "scan":
         cmd_scan(args)

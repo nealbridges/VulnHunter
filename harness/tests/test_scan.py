@@ -1,12 +1,37 @@
 """Tests for local_harness.scan."""
 
 import json
+import os
 import sys
 from pathlib import Path
 
+import local_harness.batch.utils as utils
 import local_harness.scan as scan
+import pytest
 
 from vulnhunter_common import hostcmd as hostcmd_mod
+
+# Captured before the autouse stub below replaces it, for the tests that
+# exercise the real git lookups.
+_real_git_metadata = scan.git_metadata
+
+
+@pytest.fixture(autouse=True)
+def _stub_git_metadata(monkeypatch):
+    # scan_folder resolves git metadata via subprocess.run; keep real git out
+    # of the scan_folder tests (they fake the host-command Popen only).
+    monkeypatch.setattr(
+        scan, "git_metadata", lambda folder: ("main [abc1234]", "https://github.com/o/r")
+    )
+
+
+def _prompt_results_dir(prompt):
+    """The VULNHUNT_DIR value from the kickoff prompt's pre-resolved metadata."""
+    for line in prompt.splitlines():
+        if line.startswith("- VULNHUNT_DIR: "):
+            return line[len("- VULNHUNT_DIR: ") :]
+    raise AssertionError(f"no VULNHUNT_DIR in prompt: {prompt!r}")
+
 
 # scan_folder resolves the host command from the environment via
 # hostcmd.resolve(); every test that drives a scan must set VULNHUNT_HOST_CMD
@@ -219,8 +244,16 @@ def test_scan_folder_success(monkeypatch, tmp_path):
         )
     )
     lines = [e + "\n" for e in events] + ["\n", "not-json\n"]
+    written = {}
 
-    def fake_popen(*a, **k):
+    def fake_popen(cmd, *a, **k):
+        # The contract (scan.py): the prompt file path is APPENDED as the last
+        # argument. The prompt names the pre-created results dir; the scan
+        # writes its report there.
+        prompt = Path(cmd[-1]).read_text(encoding="utf-8")
+        written["rd"] = _prompt_results_dir(prompt)
+        with open(os.path.join(written["rd"], "README.md"), "w") as f:
+            f.write("report")
         return _FakePopen(lines, returncode=0)
 
     monkeypatch.setattr(hostcmd_mod.subprocess, "Popen", fake_popen)
@@ -238,14 +271,12 @@ def test_scan_folder_success(monkeypatch, tmp_path):
 
     monkeypatch.setattr(scan.threading, "Timer", _NoTimer)
 
-    rd = folder / "x_VULNHUNT_RESULTS_1"
-    rd.mkdir()
-
     result = scan.scan_folder(str(folder))
     folder_path, label, returncode, event_count, elapsed, results_dir, cost = result
     assert returncode == 0
     assert event_count == 4
-    assert results_dir == str(rd)
+    assert results_dir == written["rd"]
+    assert os.path.dirname(results_dir) == str(folder)
     assert cost["total_cost_usd"] == 0.5
 
 
@@ -329,10 +360,6 @@ def test_scan_folder_timeout_with_valid_results_not_discarded(monkeypatch, tmp_p
     monkeypatch.setattr(scan, "SKILLS_DIR", str(tmp_path / "skills"))
     (tmp_path / "skills").mkdir()
 
-    rd = folder / "x_VULNHUNT_RESULTS_1"
-    rd.mkdir()
-    (rd / "README.md").write_text("x" * 200)
-
     events = [
         json.dumps(
             {
@@ -343,8 +370,15 @@ def test_scan_folder_timeout_with_valid_results_not_discarded(monkeypatch, tmp_p
         )
         + "\n"
     ]
+    written = {}
 
-    def fake_popen(*a, **k):
+    def fake_popen(cmd, *a, **k):
+        # Write the report into the pre-created results dir named by the
+        # prompt (see test_scan_folder_success for the contract).
+        prompt = Path(cmd[-1]).read_text(encoding="utf-8")
+        written["rd"] = _prompt_results_dir(prompt)
+        with open(os.path.join(written["rd"], "README.md"), "w") as f:
+            f.write("x" * 200)
         return _FakePopen(events, returncode=0)
 
     monkeypatch.setattr(hostcmd_mod.subprocess, "Popen", fake_popen)
@@ -362,7 +396,7 @@ def test_scan_folder_timeout_with_valid_results_not_discarded(monkeypatch, tmp_p
     monkeypatch.setattr(scan.threading, "Timer", _FireTimer)
 
     result = scan.scan_folder(str(folder))
-    assert result.results_dir == str(rd)
+    assert result.results_dir == written["rd"]
     assert result.cost_data["total_cost_usd"] == 0.9  # not discarded
 
 
@@ -454,3 +488,168 @@ def test_scan_targets_default_workers(monkeypatch):
     )
     results = scan.scan_targets([{"clone_dir": "/c/a", "key": "a"}], status_interval=10_000)
     assert len(results) == 1
+
+
+# --- upstream hardening: pre-created results dir lifecycle (hostcmd port) ---
+
+
+def _run_fake_scan(monkeypatch, tmp_path, folder, **kw):
+    """Drive scan_folder with the host command faked to produce nothing.
+
+    The scan writes no report, so the pre-created results dir stays empty and
+    scan_folder must remove it and report results_dir=None.
+    """
+    monkeypatch.setenv("VULNHUNT_HOST_CMD", _HOST)
+    monkeypatch.setattr(scan, "SKILLS_DIR", str(tmp_path / "skills"))
+    (tmp_path / "skills").mkdir(exist_ok=True)
+    lines = [json.dumps({"type": "result", "total_cost_usd": 0.1}) + "\n"]
+    monkeypatch.setattr(
+        hostcmd_mod.subprocess, "Popen", lambda *a, **k: _FakePopen(lines, returncode=0)
+    )
+    monkeypatch.setattr(scan.threading, "Timer", _NoTimerClass)
+    return scan.scan_folder(str(folder), **kw)
+
+
+class _NoTimerClass:
+    def __init__(self, *a, **k):
+        pass
+
+    def start(self):
+        pass
+
+    def cancel(self):
+        pass
+
+
+def test_scan_folder_results_dir_none_when_scan_wrote_nothing(monkeypatch, tmp_path):
+    folder = tmp_path / "repo"
+    folder.mkdir()
+    result = _run_fake_scan(monkeypatch, tmp_path, folder)
+    assert result.results_dir is None
+
+
+def test_scan_folder_removes_empty_results_dir(monkeypatch, tmp_path):
+    folder = tmp_path / "repo"
+    folder.mkdir()
+    _run_fake_scan(monkeypatch, tmp_path, folder)
+    assert [e for e in os.listdir(folder) if "_VULNHUNT_RESULTS_" in e] == []
+
+
+def test_scan_folder_tolerates_failure_to_remove_empty_results_dir(monkeypatch, tmp_path):
+    folder = tmp_path / "repo"
+    folder.mkdir()
+
+    def fail_rmdir(path, *args, **kwargs):
+        # Also reached via shutil.rmtree(prompt_dir) in scan_folder's finally
+        # block, which passes dir_fd= — accept and forward anything.
+        raise PermissionError(path)
+
+    monkeypatch.setattr(scan.os, "rmdir", fail_rmdir)
+
+    result = _run_fake_scan(monkeypatch, tmp_path, folder)
+
+    assert result.results_dir is None
+
+
+def test_failed_scan_is_reported_missing_by_collect_results(monkeypatch, tmp_path):
+    # An empty results dir left by a scan that wrote nothing used to be copied
+    # to the upload dir and counted as a result.
+    base = tmp_path / "clones"
+    folder = base / "owner__repo"
+    folder.mkdir(parents=True)
+    _run_fake_scan(monkeypatch, tmp_path, folder)
+
+    out = utils.collect_results(clone_base=str(base), upload_dir=str(tmp_path / "up"))
+
+    assert out == {"copied": [], "missing": ["owner__repo"]}
+
+
+def test_create_results_dir_refuses_existing(monkeypatch, tmp_path):
+    class _FixedDatetime:
+        @staticmethod
+        def now():
+            import datetime as _dt
+
+            return _dt.datetime(2026, 1, 2, 3, 4, 5)
+
+    monkeypatch.setattr(scan, "datetime", _FixedDatetime)
+    rd = scan.create_results_dir(str(tmp_path))
+    assert rd == str(tmp_path / f"{tmp_path.name}_VULNHUNT_RESULTS_2026-01-02-030405")
+    with pytest.raises(FileExistsError):
+        scan.create_results_dir(str(tmp_path))
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("git@github.com:org/repo.git", "https://github.com/org/repo"),
+        ("https://user:tok@github.com/org/repo.git", "https://github.com/org/repo"),
+        ("https://github.com/org/repo", "https://github.com/org/repo"),
+    ],
+)
+def test_normalize_repo_url(raw, expected):
+    assert scan._normalize_repo_url(raw) == expected
+
+
+def test_git_metadata_real_repo(tmp_path):
+    import subprocess
+
+    repo = tmp_path / "proj"
+    repo.mkdir()
+    git = ["git", "-c", "user.email=a@b", "-c", "user.name=a"]
+    subprocess.run(git + ["init", "-q", "-b", "main"], cwd=repo, check=True)
+    (repo / "f").write_text("x")
+    subprocess.run(git + ["add", "f"], cwd=repo, check=True)
+    subprocess.run(git + ["commit", "-qm", "c"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", "https://u:secret@github.com/org/proj.git"],
+        cwd=repo,
+        check=True,
+    )
+    branch, url = _real_git_metadata(str(repo))
+    assert branch.startswith("main [") and branch.endswith("]")
+    assert url == "https://github.com/org/proj"
+
+
+def test_git_metadata_not_a_repo(tmp_path):
+    assert _real_git_metadata(str(tmp_path)) == ("unknown", tmp_path.name)
+
+
+@pytest.mark.parametrize(
+    "readonly,bash_line",
+    [
+        (True, "Bash is NOT available"),
+        (False, "Bash is AVAILABLE"),
+    ],
+)
+def test_scan_folder_prompt_has_preresolved_metadata(monkeypatch, tmp_path, readonly, bash_line):
+    """Without Bash, SKILL.md path B would ask the user for a results dir and
+    git metadata, which a headless run can't answer; the harness pre-creates
+    the dir and hands the values over as SKILL.md path A expects."""
+    folder = tmp_path / "repo"
+    folder.mkdir()
+    monkeypatch.setenv("VULNHUNT_HOST_CMD", _HOST)
+    monkeypatch.setattr(scan, "SKILLS_DIR", str(tmp_path / "skills"))
+    (tmp_path / "skills").mkdir()
+
+    captured = {}
+
+    def fake_popen(cmd, *a, **k):
+        # The contract (scan.py): the prompt file path is APPENDED as the
+        # last argument of the host command; read the prompt back from disk.
+        captured["prompt"] = Path(cmd[-1]).read_text(encoding="utf-8")
+        # The pre-created results dir must exist when the host is launched.
+        assert os.path.isdir(_prompt_results_dir(captured["prompt"]))
+        return _FakePopen([json.dumps({"type": "result"}) + "\n"], returncode=0)
+
+    monkeypatch.setattr(hostcmd_mod.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(scan.threading, "Timer", _NoTimerClass)
+
+    scan.scan_folder(str(folder), readonly=readonly)
+    prompt = captured["prompt"]
+    assert "Pre-resolved scan metadata" in prompt
+    results_dir = _prompt_results_dir(prompt)
+    assert os.path.basename(results_dir).startswith("repo_VULNHUNT_RESULTS_")
+    assert "- VULNHUNT_BRANCH: main [abc1234]" in prompt
+    assert "- Repository URL: https://github.com/o/r" in prompt
+    assert bash_line in prompt

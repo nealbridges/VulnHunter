@@ -5,12 +5,16 @@ import os
 import subprocess
 import sys
 import types
+from pathlib import Path
 
 import local_harness.benchmark.analyze_misses as am
 import pytest
 from local_harness.config import PHASES_DIR
 
 from vulnhunter_common import hostcmd as hostcmd_mod
+
+# Top of the repository: harness/tests/ -> harness/ -> repository root.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _proc(returncode=0, stdout="", stderr=""):
@@ -158,6 +162,22 @@ def test_invoke_diagnostic_success(monkeypatch):
     finding = {"finding_id": "F1", "type": "SQLi", "description": "d", "repo_name": "r"}
     out = am.invoke_diagnostic(finding, "phase1", "ev", "/rd", "/repo")
     assert out["root_cause"] == "rc"
+
+
+def test_phase_prompt_files_exist():
+    """Every prompt file named for a loss phase exists in the phases dir.
+
+    Ours resolves PHASE_TO_PROMPT basenames against config.PHASES_DIR (which
+    honors VULNHUNT_SKILLS_DIR and falls back to the vulnhunt/ copy in this
+    repo); upstream's variant checked repo-root-relative paths instead.
+    """
+    missing = [
+        prompt_file
+        for prompt_files in am.PHASE_TO_PROMPT.values()
+        for prompt_file in prompt_files
+        if not (Path(PHASES_DIR) / prompt_file).is_file()
+    ]
+    assert not missing, missing
 
 
 def test_invoke_diagnostic_timeout(monkeypatch):

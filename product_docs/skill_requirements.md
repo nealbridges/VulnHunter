@@ -226,9 +226,10 @@ the register in the same commit (enforced by test_skill_contracts.py).
 | VH-FIX-138 | `vulnhunter-fix/references/test-quality-rubric.md:54` | must | The test's attack shape must correspond to the scan's stated vector, not a related-but-different attack. |
 | VH-FIX-139 | `vulnhunter-fix/references/test-quality-rubric.md:66` | must | \| Condition \| Verdict \| \|---\|---\| \| R1..R5 all ✓ \| `GOOD` \| \| Any R fails but the test still discriminates (pre-fix fail / post-fix pass) with a fixable gap \| `WEAK` — verification agent writes a fix brief \| \| R1, R4, or R5 fails (standalone demo / non-discriminating / wrong attack) \| `WRONG` — test must be rewritten \| |
 | VH-FIX-140 | `vulnhunter-fix/references/verification-table-rules.md:16` | MUST | When composing PR bodies by hand (not via `render_verification_table`), workers MUST emit these exact 9 headers in this order — any drift (renaming, dropping `#`, adding a `Sink` column) is rejected at delivery time by `scripts/validate-verification.py`. |
-| VH-FIX-141 | `vulnhunter-fix/references/verification-table-rules.md:32` | MUST | **Every `yes` cell MUST carry a `file:line` citation.** The validator opens each cited file at the worktree path, verifies the line exists, and refuses delivery on any uncited `yes`. |
-| VH-FIX-142 | `vulnhunter-fix/references/verification-table-rules.md:40` | must | - The citation must enumerate **every** symbol returned by `graph.callers_of(sink_symbol)`. |
-| VH-FIX-143 | `vulnhunter-fix/references/verification-table-rules.md:42` | must | The worker's `result.callers_routed_through_fix` list must be a superset of this enumeration for the cell to read `yes`. |
+| VH-FIX-141 | `vulnhunter-fix/references/verification-table-rules.md:21` | MUST | Every row MUST have exactly nine cells. |
+| VH-FIX-142 | `vulnhunter-fix/references/verification-table-rules.md:38` | MUST | **Every `yes` cell MUST carry a `file:line` citation.** The validator opens each cited file at the worktree path, verifies the line exists, and refuses delivery on any uncited `yes`. |
+| VH-FIX-143 | `vulnhunter-fix/references/verification-table-rules.md:46` | must | - The citation must enumerate **every** symbol returned by `graph.callers_of(sink_symbol)`. |
+| VH-FIX-144 | `vulnhunter-fix/references/verification-table-rules.md:48` | must | The worker's `result.callers_routed_through_fix` list must be a superset of this enumeration for the cell to read `yes`. |
 | VH-VER-001 | `vulnhunt-fix-verify/README.md:35` | must | - It cannot create directories — every output path must already exist, so the **caller must pre-create the `out` directory**. |
 | VH-VER-002 | `vulnhunt-fix-verify/SKILL.md:24` | must | - You cannot create directories — every output path you write must already exist (the caller is responsible for `out`). |
 | VH-VER-003 | `vulnhunt-fix-verify/SKILL.md:53` | must | Each path must exist at kickoff. |
@@ -267,5 +268,5 @@ the register in the same commit (enforced by test_skill_contracts.py).
 | VH-RUN-009 | `skills/runtime-provisioner/SKILL.md:124` | MUST NOT | A finding without a Runtime line is incomplete and MUST NOT be reported. |
 | VH-RUN-010 | `skills/runtime-provisioner/SKILL.md:152` | must | \| \| `VULNHUNT_HOST_CMD` \| no \| Command prefix for harness session invocation, when the host harness must be driven explicitly. |
 
-Total requirements: 258
+Total requirements: 259
 

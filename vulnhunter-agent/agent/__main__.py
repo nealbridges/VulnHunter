@@ -842,7 +842,7 @@ async def _run_scan_flow(
     download: DownloadedReport | None = None
     scan_totals = SessionTotals()
     extracted = None
-    extraction_error: BaseException | None = None
+    extraction_error: Exception | None = None
     summary: PostSummary | None = None
     results_dir: Path | None = None
 
@@ -1020,6 +1020,12 @@ async def _run_scan_flow(
                     audit_writer.emit_finding(ev)
 
         if issues:
+            if extraction_error is not None:
+                # post_issues() treats extracted=None as "not extracted yet"
+                # and would rerun the extraction that just failed.
+                print(f"Issues:   FAILED (finding extraction failed: {extraction_error})")
+                _persist_manifest(4)
+                return 4
             token_manager = make_token_manager(config, name="issues")
             target_repo_url = args.issues_target_repo or config.issues.target_repo or repo_url
             try:
@@ -1034,7 +1040,6 @@ async def _run_scan_flow(
                     audit_repo_slug=audit_ctx["repo_slug"] if audit_ctx else "",
                     audit_repo_properties=repo_properties,
                     extracted=extracted,
-                    extraction_error=extraction_error,
                     commit_sha=commit_sha if commit_sha != "unknown" else "",
                 )
             except Exception as exc:  # noqa: BLE001
