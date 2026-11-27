@@ -16,7 +16,6 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from .utils import collect_results, parse_repo_list, scan_status
 from local_harness.clone import shallow_clone
 from local_harness.config import (
     BATCH_CLONE_BASE_DIR,
@@ -25,6 +24,7 @@ from local_harness.config import (
 )
 from local_harness.scan import clean_incomplete_results, has_valid_results, scan_targets, ts
 
+from .utils import collect_results, parse_repo_list, scan_status
 
 _GITHUB_COMPONENT_RE = re.compile(r"[A-Za-z0-9._-]+")
 
@@ -168,7 +168,7 @@ def cmd_scan(args):
     successes = 0
     failures = 0
     total_cost = 0.0
-    for target_key, r in results:
+    for _target_key, r in results:
         ok = r.returncode == 0
         successes += ok
         failures += not ok

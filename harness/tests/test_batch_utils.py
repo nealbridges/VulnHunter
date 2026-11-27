@@ -172,7 +172,7 @@ def test_collect_results_does_not_follow_deep_nested_symlinked_subdir(tmp_path):
             fp = os.path.join(root, name)
             if os.path.islink(fp) or not os.path.isfile(fp):
                 continue
-            with open(fp, "r", errors="ignore") as f:
+            with open(fp, errors="ignore") as f:
                 assert "DEEP-NESTED-SECRET" not in f.read(), f"secret leaked into upload at {fp}"
 
 
@@ -254,10 +254,10 @@ def test_scan_status_ignores_fifo_log(tmp_path):
 
 # --- collect: only the owning repo's own, untracked, regular results ---
 
-import shutil as _shutil
-import subprocess as _subprocess
+import shutil as _shutil  # noqa: E402
+import subprocess as _subprocess  # noqa: E402
 
-import pytest
+import pytest  # noqa: E402
 
 
 def _results(repo, name, text="report"):

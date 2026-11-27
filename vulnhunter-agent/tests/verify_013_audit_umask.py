@@ -9,7 +9,6 @@ import os
 import stat
 
 import pytest
-
 from agent.audit import _open_append
 
 

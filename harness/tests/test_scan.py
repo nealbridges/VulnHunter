@@ -5,10 +5,9 @@ import os
 import sys
 from pathlib import Path
 
-import pytest
-
 import local_harness.batch.utils as utils
 import local_harness.scan as scan
+import pytest
 
 from vulnhunter_common import hostcmd as hostcmd_mod
 

@@ -2048,7 +2048,7 @@ async def test_run_vulnhunt_does_not_load_cloned_repo_settings(
         def __init__(self, opts: Any) -> None:
             captured_options.append(opts)
 
-        async def __aenter__(self) -> "_CapturingClient":
+        async def __aenter__(self) -> _CapturingClient:
             return self
 
         async def __aexit__(self, *a: object) -> bool:

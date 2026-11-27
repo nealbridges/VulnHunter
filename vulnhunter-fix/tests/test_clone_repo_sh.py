@@ -16,7 +16,6 @@ import stat
 import subprocess
 from pathlib import Path
 
-
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "clone_repo.sh"
 
 GH_MOCK = """#!/bin/bash

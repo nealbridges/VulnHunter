@@ -1,5 +1,6 @@
 """Run vulnhunt scans on cloned repos."""
 
+import contextlib
 import json
 import os
 import re
@@ -522,11 +523,9 @@ def scan_folder(folder_path, log_file=None, readonly=True):
     # empty; remove it so batch collection does not take the failed scan for
     # a result.
     if not os.listdir(results_dir):
-        try:
+        # An --execute agent may have removed or replaced it already.
+        with contextlib.suppress(OSError):
             os.rmdir(results_dir)
-        except OSError:
-            # An --execute agent may have removed or replaced it already.
-            pass
         results_dir = None
     return ScanResult(
         folder_path, label, proc.returncode, event_count, elapsed, results_dir, cost_data

@@ -51,19 +51,21 @@ from pathlib import Path
 import httpx
 
 from . import audit as audit_mod
-from . import audit_extract
+from . import audit_extract, issues_extract
 from . import issues as issues_stage
-from . import issues_extract
 from . import repo_properties as repo_props
 from ._github import api_base
+from ._stream_events import SessionTotals
 from .auth import make_token_manager, resolve_verify
 from .clone import shallow_clone
-from .config import AgentConfig, AuditConfig, load_config
+from .config import AgentConfig, load_config
+from .issues import PostSummary
 from .issues_remote_report import (
     DownloadedReport,
     RemoteReportError,
     download_latest_report,
 )
+from .manifest import write_manifest
 from .publish import PublishError, publish_results
 from .runner import (
     _git_context,
@@ -72,10 +74,6 @@ from .runner import (
     run_vulnhunt,
     set_verbosity,
 )
-from ._stream_events import SessionTotals
-from .issues import PostSummary
-from .issues_extract import Finding
-from .manifest import write_manifest
 from .token_client import GitHubRole, get_github_token
 
 
@@ -459,12 +457,11 @@ def _validate_modes(*, scan: bool, publish: bool, issues: bool, config: AgentCon
             "embed a link to the published report, but the report wouldn't "
             "be uploaded. Either flip --publish on, or pass --no-issues."
         )
-    if not scan and issues:
-        if not config.publish.destination_repo:
-            raise ValueError(
-                "--no-scan + --issues requires publish.destination_repo to be "
-                "set (we need somewhere to download the latest report from)."
-            )
+    if not scan and issues and not config.publish.destination_repo:
+        raise ValueError(
+            "--no-scan + --issues requires publish.destination_repo to be "
+            "set (we need somewhere to download the latest report from)."
+        )
     # Token presence is required by stage, not blanket.
     # - issues needs scan_token (post + label + dedup-fetch on target repo)
     # - publish needs reports_token (push to destination_repo)
@@ -507,9 +504,8 @@ def _required_roles(*, scan: bool, publish: bool, issues: bool) -> list[GitHubRo
     roles: list[GitHubRole] = []
     if issues:
         roles.append("scan")
-    if publish or (not scan and issues):
-        if "reports" not in roles:
-            roles.append("reports")
+    if (publish or (not scan and issues)) and "reports" not in roles:
+        roles.append("reports")
     return roles
 
 
@@ -774,7 +770,7 @@ async def _amain(args: argparse.Namespace) -> int:
 async def _run_scan_flow(
     args: argparse.Namespace,
     config: AgentConfig,
-    audit_writer: "audit_mod.AuditWriter | None",
+    audit_writer: audit_mod.AuditWriter | None,
 ) -> int:
     """Original scan → publish → issues workflow, threaded with audit emission."""
     # main() already validates ``len(args.targets) == 1`` for scan mode;
@@ -1148,7 +1144,7 @@ def _audit_context_for_results(
     results_dir: Path | None,
     args: argparse.Namespace,
     scan: bool,
-    audit_writer: "audit_mod.AuditWriter | None",
+    audit_writer: audit_mod.AuditWriter | None,
 ) -> dict[str, str] | None:
     """Compute report_id + repo_slug for audit emissions post-scan.
 

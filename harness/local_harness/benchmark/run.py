@@ -36,7 +36,6 @@ from local_harness.config import (
     STATE_FILE,
     atomic_write_json,
 )
-from .judge import judge_findings_batch, read_results_report
 from local_harness.scan import (
     clean_prior_results,
     extract_cost_from_log,
@@ -44,14 +43,15 @@ from local_harness.scan import (
     has_valid_results,
     scan_targets,
 )
+
+from .finding_history import get_stable_findings, update_history
+from .judge import judge_findings_batch, read_results_report
 from .tally import (
     generate_tally,
     print_summary,
     write_tally_json,
     write_tally_markdown,
 )
-from .finding_history import get_stable_findings, update_history
-
 
 _REQUIRED_FIELDS = {"finding_id", "type", "source_code", "description"}
 # Exact shape parse_source_url() expects after its own url.rstrip("/"):
@@ -194,13 +194,13 @@ def phase_clone(targets, state):
     print(f"{'=' * 60}\n")
 
     for key, target in targets.items():
-        if key in state["scan_targets"] and state["scan_targets"][key].get("status") in (
-            "cloned",
-            "scanned",
+        if (
+            key in state["scan_targets"]
+            and state["scan_targets"][key].get("status") in ("cloned", "scanned")
+            and os.path.isdir(target["clone_dir"])
         ):
-            if os.path.isdir(target["clone_dir"]):
-                print(f"  [skip] {key} — already cloned")
-                continue
+            print(f"  [skip] {key} — already cloned")
+            continue
 
         target_dir, error = clone_at_commit(
             target["repo_url"], target["commit_hash"], target["clone_dir"]
@@ -252,7 +252,7 @@ def phase_scan(targets, state, force_rescan=False, max_workers=MAX_SCAN_WORKERS,
         to_scan.append(target)
 
     if not to_scan:
-        print(f"\n  All targets already scanned. Use --force-rescan to re-run.")
+        print("\n  All targets already scanned. Use --force-rescan to re-run.")
         return
 
     # Clean prior results for targets about to be scanned
@@ -305,7 +305,7 @@ def phase_scan(targets, state, force_rescan=False, max_workers=MAX_SCAN_WORKERS,
 def phase_judge(targets, state, force_rejudge=False):
     """Phase 3: Judge each benchmark finding against scan results."""
     print(f"\n{'=' * 60}")
-    print(f"PHASE 3: JUDGE")
+    print("PHASE 3: JUDGE")
     print(f"{'=' * 60}\n")
 
     total_judged = 0
@@ -389,12 +389,12 @@ def phase_judge(targets, state, force_rejudge=False):
 def phase_tally(state):
     """Phase 4: Generate tally report."""
     print(f"\n{'=' * 60}")
-    print(f"PHASE 4: TALLY")
+    print("PHASE 4: TALLY")
     print(f"{'=' * 60}\n")
 
     # Backfill cost data from logs for any scans missing it
     backfilled = 0
-    for key, target_data in state.get("scan_targets", {}).items():
+    for _key, target_data in state.get("scan_targets", {}).items():
         if target_data.get("scan_total_cost_usd"):
             continue
         clone_dir = target_data.get("clone_dir")
@@ -502,7 +502,7 @@ def main():
             if unknown:
                 print(f"Error: Unknown finding IDs: {', '.join(sorted(unknown))}")
             else:
-                print(f"No targets remain after filtering (check --repos combination)")
+                print("No targets remain after filtering (check --repos combination)")
             sys.exit(1)
         args.force_rescan = True
         args.force_rejudge = True

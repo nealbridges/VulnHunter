@@ -922,7 +922,7 @@ def test_pass2_pattern_skips_oversized_files(sweep, tmp_path):
 # CR/LF ends the row and breaks out of the table entirely. Every data cell of
 # ``render_verification_row`` must be table-cell escaped.
 
-import re as _re
+import re as _re  # noqa: E402
 
 _UNESCAPED_PIPE = _re.compile(r"(?<!\\)\|")
 
@@ -1062,7 +1062,7 @@ def test_verification_row_legit_citations_unchanged():
 # treat every non-blank line up to the table's terminating blank line as a row
 # (GFM does — a leading pipe is optional).
 
-import subprocess as _subprocess
+import subprocess as _subprocess  # noqa: E402
 
 _HEADER_ROWS = (
     "| # | VULN-NNN | Stated vector closed? | Test exercises real attack? "

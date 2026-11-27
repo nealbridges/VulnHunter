@@ -34,7 +34,6 @@ import re
 import sys
 from pathlib import Path
 
-
 EXPECTED_HEADERS = [
     "#",
     "VULN-NNN",
@@ -123,7 +122,7 @@ def _check_header(header: list[str], errors: list[str]) -> None:
     if len(header) != 9:
         errors.append(f"header column count: expected 9, got {len(header)}")
         return
-    for got, expected in zip(header, EXPECTED_HEADERS):
+    for got, expected in zip(header, EXPECTED_HEADERS, strict=False):
         if expected not in got:
             errors.append(f"header cell mismatch: expected substring {expected!r}, got {got!r}")
 

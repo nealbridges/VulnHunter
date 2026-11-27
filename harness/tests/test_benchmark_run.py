@@ -2,11 +2,9 @@
 
 import json
 
-import pytest
-
 import local_harness.benchmark.run as run
+import pytest
 from local_harness.scan import ScanResult
-
 
 BENCH_JSON = [
     {

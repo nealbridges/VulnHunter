@@ -10,9 +10,8 @@ Runs in ~0.05s with no network, no model, and no cloning.
 import json
 import os
 
-import pytest
-
 import local_harness.benchmark.run as run
+import pytest
 from local_harness.benchmark.run import _validate_benchmarks
 
 GROUND_TRUTH_DIR = os.path.join(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+import pytest
 from agent.issues_extract import ExtractedReport, Finding
 from agent.issues_render import (
     CleanScanContext,
@@ -326,7 +327,7 @@ class TestMarkerCommentBreakout:
         assert "<script>injected</script>" not in body
         # The finding-id marker line stays a single well-formed comment: exactly
         # one closing '-->' on that line and no injected content after it.
-        marker_line = next(l for l in body.splitlines() if "vulnhunt-finding-id" in l)
+        marker_line = next(ln for ln in body.splitlines() if "vulnhunt-finding-id" in ln)
         assert marker_line.count("-->") == 1
         assert marker_line.rstrip().endswith("-->")
 
@@ -338,7 +339,7 @@ class TestMarkerCommentBreakout:
         )
         assert "--><b>x</b>" not in body
         assert "<b>x</b>" not in body
-        marker_line = next(l for l in body.splitlines() if "vulnhunt-results-dir" in l)
+        marker_line = next(ln for ln in body.splitlines() if "vulnhunt-results-dir" in ln)
         assert marker_line.count("-->") == 1
         assert marker_line.rstrip().endswith("-->")
 
@@ -412,7 +413,7 @@ class TestFindingTableCellInjection:
             report=_report(),
             report_url="https://example/README.md",
         )
-        assert not any(l.startswith("## Fixed") for l in body.splitlines())
+        assert not any(ln.startswith("## Fixed") for ln in body.splitlines())
         rows = _finding_table_rows(body)
         assert len(rows) == 5
         assert all(len(r) == 2 for r in rows), rows

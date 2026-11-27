@@ -29,7 +29,6 @@ import hashlib
 import html
 import re
 
-
 # CANON-44: residual_vectors entries are LLM/finding-derived and get
 # interpolated into the '## Residual Risk' markdown appended to the PR/issue
 # body. The hand-wave / consistency guards reject vague or empty entries but do

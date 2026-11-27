@@ -1,8 +1,7 @@
 """Tests for local_harness.batch.run."""
 
-import pytest
-
 import local_harness.batch.run as brun
+import pytest
 from local_harness.scan import ScanResult
 
 
