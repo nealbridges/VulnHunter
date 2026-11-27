@@ -539,7 +539,9 @@ def test_scan_folder_tolerates_failure_to_remove_empty_results_dir(monkeypatch, 
     folder = tmp_path / "repo"
     folder.mkdir()
 
-    def fail_rmdir(path):
+    def fail_rmdir(path, *args, **kwargs):
+        # Also reached via shutil.rmtree(prompt_dir) in scan_folder's finally
+        # block, which passes dir_fd= — accept and forward anything.
         raise PermissionError(path)
 
     monkeypatch.setattr(scan.os, "rmdir", fail_rmdir)
@@ -636,6 +638,8 @@ def test_scan_folder_prompt_has_preresolved_metadata(monkeypatch, tmp_path, read
         # The contract (scan.py): the prompt file path is APPENDED as the
         # last argument of the host command; read the prompt back from disk.
         captured["prompt"] = Path(cmd[-1]).read_text(encoding="utf-8")
+        # The pre-created results dir must exist when the host is launched.
+        assert os.path.isdir(_prompt_results_dir(captured["prompt"]))
         return _FakePopen([json.dumps({"type": "result"}) + "\n"], returncode=0)
 
     monkeypatch.setattr(hostcmd_mod.subprocess, "Popen", fake_popen)
@@ -645,7 +649,6 @@ def test_scan_folder_prompt_has_preresolved_metadata(monkeypatch, tmp_path, read
     prompt = captured["prompt"]
     assert "Pre-resolved scan metadata" in prompt
     results_dir = _prompt_results_dir(prompt)
-    assert os.path.isdir(results_dir)
     assert os.path.basename(results_dir).startswith("repo_VULNHUNT_RESULTS_")
     assert "- VULNHUNT_BRANCH: main [abc1234]" in prompt
     assert "- Repository URL: https://github.com/o/r" in prompt

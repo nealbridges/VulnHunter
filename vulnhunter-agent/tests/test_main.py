@@ -898,8 +898,9 @@ def test_main_full_pipeline_happy_path(
     assert "Publish:  https://github.com/o/dest@main (abcdef12)" in captured
     assert "Issues:" in captured
     assert calls["post_issues"] == 1
-    assert calls["post_issues_kwargs"]["extracted"] is None
-    assert isinstance(calls["post_issues_kwargs"]["extraction_error"], FileNotFoundError)
+    # The extraction stub returns an empty report (no failure), so post_issues
+    # receives it as-is. (An extraction failure exits 4 before post_issues.)
+    assert calls["post_issues_kwargs"]["extracted"] is not None
 
 
 def test_main_issues_summary_failed_returns_3(
