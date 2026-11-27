@@ -14,6 +14,7 @@ from local_harness.config import (
     JUDGE_TIMEOUT,
     MODEL,
 )
+from local_harness.scan import _is_regular_file
 
 JUDGE_SYSTEM_PROMPT = """You are a security finding comparator. Your job is to determine whether a vulnerability scanner's output detected specific known vulnerabilities.
 
@@ -48,9 +49,13 @@ Output ONLY a valid JSON array with one object per benchmark finding:
 def read_results_report(results_dir):
     """Read the scanner's README.md report from a results directory."""
     readme_path = os.path.join(results_dir, "README.md")
-    if not os.path.isfile(readme_path):
+    # The results dir is written by an agent working on untrusted code: only
+    # read a real regular file, never a symlink to a host file (or a FIFO).
+    # (upstream #8)
+    if not _is_regular_file(readme_path):
         return None
-    with open(readme_path) as f:
+    fd = os.open(readme_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    with os.fdopen(fd, "r") as f:
         return f.read()
 
 

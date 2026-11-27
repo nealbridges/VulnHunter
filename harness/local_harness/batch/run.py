@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
+from .utils import collect_results, parse_repo_list, scan_status
 from local_harness.clone import shallow_clone
 from local_harness.config import (
     BATCH_CLONE_BASE_DIR,
@@ -24,7 +25,6 @@ from local_harness.config import (
 )
 from local_harness.scan import clean_incomplete_results, has_valid_results, scan_targets, ts
 
-from .utils import collect_results, parse_repo_list, scan_status
 
 _GITHUB_COMPONENT_RE = re.compile(r"[A-Za-z0-9._-]+")
 
@@ -156,7 +156,7 @@ def cmd_scan(args):
         targets,
         max_workers=args.max_workers,
         log_filename=BATCH_LOG_FILENAME,
-        readonly=args.readonly,
+        readonly=not args.execute,
     )
     elapsed = time.time() - start
 
@@ -168,7 +168,7 @@ def cmd_scan(args):
     successes = 0
     failures = 0
     total_cost = 0.0
-    for _target_key, r in results:
+    for target_key, r in results:
         ok = r.returncode == 0
         successes += ok
         failures += not ok
@@ -214,9 +214,10 @@ def main():
         help=f"Parallel scan workers (default: {MAX_SCAN_WORKERS})",
     )
     scan_parser.add_argument(
-        "--readonly",
+        "--execute",
         action="store_true",
-        help="Read-only scan: skip dependency installation and code execution",
+        help="Allow the scan agent to execute code (grants the Bash tool). "
+        "Default is a read-only scan with no code execution (CANON-03).",
     )
 
     subparsers.add_parser("status", help="Check scan progress")
@@ -233,7 +234,7 @@ def main():
         args.re_clone = False
         args.resume = False
         args.max_workers = MAX_SCAN_WORKERS
-        args.readonly = False
+        args.execute = False
 
     if args.command == "scan":
         cmd_scan(args)

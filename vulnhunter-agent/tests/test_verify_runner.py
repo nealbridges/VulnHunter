@@ -274,6 +274,10 @@ async def test_run_verify_session_disposition_path(
         "Read",
         "Write",
     ]
+    # CANON-19: verify runs over an untrusted cloned repo (cwd). setting_sources
+    # must be "user" only — a regression to "project"/"local" would load the
+    # scanned repo's .claude/settings(.local).json on the host.
+    assert _FakeSDKClient._recorded_options.setting_sources == ["user"]
     assert _FakeSDKClient._query_calls == ["/vulnhunt-fix-verify\nfoo"]
 
 

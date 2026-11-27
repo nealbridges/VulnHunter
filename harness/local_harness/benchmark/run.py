@@ -36,6 +36,7 @@ from local_harness.config import (
     STATE_FILE,
     atomic_write_json,
 )
+from .judge import judge_findings_batch, read_results_report
 from local_harness.scan import (
     clean_prior_results,
     extract_cost_from_log,
@@ -43,35 +44,28 @@ from local_harness.scan import (
     has_valid_results,
     scan_targets,
 )
-
-from .finding_history import get_stable_findings, update_history
-from .judge import judge_findings_batch, read_results_report
 from .tally import (
     generate_tally,
     print_summary,
     write_tally_json,
     write_tally_markdown,
 )
-
-_REQUIRED_FIELDS = ("finding_id", "type", "source_code", "description")
-# Schema samples use placeholder commits and must not enter a real run.
-_SAMPLE_FILENAMES = frozenset({"EXAMPLE.json"})
-_SOURCE_CODE_RE = re.compile(r"^https://github\.com/[^/]+/[^/]+/tree/[0-9a-fA-F]{7,40}/?$")
+from .finding_history import get_stable_findings, update_history
 
 
-def _nonempty_str(value):
-    """Return stripped text when `value` is a non-empty string, else None."""
-    if not isinstance(value, str):
-        return None
-    stripped = value.strip()
-    return stripped or None
+_REQUIRED_FIELDS = {"finding_id", "type", "source_code", "description"}
+# Exact shape parse_source_url() expects after its own url.rstrip("/"):
+# https://github.com/{org}/{repo}/tree/{commit_hash}, hash hex-only, no trailing
+# segments. A substring check ("/tree/" in url) lets malformed URLs through that
+# then mis-parse (e.g. ".../tree/" -> hash "tree"; ".../tree/abc/sub/file.py" ->
+# hash "file.py") and fail later at clone time instead of here.
+_SOURCE_URL_RE = re.compile(r"^https://github\.com/[^/]+/[^/]+/tree/[0-9a-fA-F]+$")
 
 
-def validate_benchmarks(benchmarks):
-    """Return human-readable errors for a loaded corpus.
+def _validate_benchmarks(benchmarks):
+    """Validate all loaded benchmark findings before any network I/O.
 
-    Empty list means the corpus is safe to clone. `finding_id` values must be
-    unique across every file — judgments and history are keyed by that id.
+    Returns a list of error strings. Empty list means all clear.
     """
     errors = []
     seen_ids = {}
@@ -86,19 +80,25 @@ def validate_benchmarks(benchmarks):
                     f"{loc}: each entry must be a JSON object, got {type(finding).__name__}"
                 )
                 continue
-            missing = [
-                name for name in _REQUIRED_FIELDS if _nonempty_str(finding.get(name)) is None
-            ]
+            missing = _REQUIRED_FIELDS - set(finding.keys())
             if missing:
-                errors.append(f"{loc}: missing required fields: {', '.join(missing)}")
+                errors.append(f"{loc}: missing required fields: {', '.join(sorted(missing))}")
                 continue
-            fid = finding["finding_id"].strip()
+            fid = finding["finding_id"]
+            if not isinstance(fid, str):
+                errors.append(f"{loc}: finding_id must be a string, got {type(fid).__name__}")
+                continue
             if fid in seen_ids:
                 errors.append(f"{loc}: duplicate finding_id '{fid}' (also in {seen_ids[fid]})")
             else:
-                seen_ids[fid] = loc
-            url = finding["source_code"].strip()
-            if not _SOURCE_CODE_RE.match(url):
+                seen_ids[fid] = filename
+            url = finding["source_code"]
+            if not isinstance(url, str):
+                errors.append(
+                    f"{loc} ({fid}): source_code must be a string, got {type(url).__name__}"
+                )
+                continue
+            if not _SOURCE_URL_RE.match(url.rstrip("/")):
                 errors.append(
                     f"{loc} ({fid}): source_code must be "
                     f"https://github.com/{{org}}/{{repo}}/tree/{{commit_hash}}, got: {url!r}"
@@ -107,29 +107,25 @@ def validate_benchmarks(benchmarks):
 
 
 def load_all_benchmarks():
-    """Load all runnable benchmark JSON files.
+    """Load all benchmark JSON files.
 
-    Schema samples (`EXAMPLE.json`, `*.json.template`) are not loaded.
     Returns list of (filename, findings_list) where each finding has parsed
-    `_repo_url`, `_repo_name`, `_commit_hash` fields added.
-    Exits with a clear error if a file is malformed — before any clone.
+    _repo_url, _repo_name, _commit_hash fields added.
     """
     results = []
+    errors = []
     pattern = os.path.join(BENCHMARK_DIR, "*.json")
     for json_file in sorted(glob.glob(pattern)):
         filename = os.path.basename(json_file)
-        if filename in _SAMPLE_FILENAMES:
-            print(f"  Skipping {filename} (schema sample, not a runnable corpus file)")
-            continue
-        try:
-            with open(json_file) as f:
+        with open(json_file) as f:
+            try:
                 findings = json.load(f)
-        except json.JSONDecodeError as exc:
-            print(f"Error: {filename} is not valid JSON: {exc}")
-            sys.exit(1)
+            except json.JSONDecodeError as e:
+                errors.append(f"{filename}: invalid JSON: {e}")
+                continue
         results.append((filename, findings))
 
-    errors = validate_benchmarks(results)
+    errors += _validate_benchmarks(results)
     if errors:
         print("Error: benchmark corpus validation failed:")
         for err in errors:
@@ -142,6 +138,7 @@ def load_all_benchmarks():
             finding["_repo_url"] = repo_url
             finding["_repo_name"] = repo_name
             finding["_commit_hash"] = commit_hash
+
     return results
 
 
@@ -182,7 +179,7 @@ def load_state():
                 return json.load(f)
         except (json.JSONDecodeError, OSError):
             print(f"  WARNING: {STATE_FILE} is corrupt, starting fresh")
-    return {"scan_targets": {}, "judgments": {}, "model": MODEL}
+    return {"scan_targets": {}, "judgments": {}, "model": "unknown"}
 
 
 def save_state(state):
@@ -197,13 +194,13 @@ def phase_clone(targets, state):
     print(f"{'=' * 60}\n")
 
     for key, target in targets.items():
-        if (
-            key in state["scan_targets"]
-            and state["scan_targets"][key].get("status") in ("cloned", "scanned")
-            and os.path.isdir(target["clone_dir"])
+        if key in state["scan_targets"] and state["scan_targets"][key].get("status") in (
+            "cloned",
+            "scanned",
         ):
-            print(f"  [skip] {key} — already cloned")
-            continue
+            if os.path.isdir(target["clone_dir"]):
+                print(f"  [skip] {key} — already cloned")
+                continue
 
         target_dir, error = clone_at_commit(
             target["repo_url"], target["commit_hash"], target["clone_dir"]
@@ -228,7 +225,7 @@ def phase_clone(targets, state):
         save_state(state)
 
 
-def phase_scan(targets, state, force_rescan=False, max_workers=MAX_SCAN_WORKERS):
+def phase_scan(targets, state, force_rescan=False, max_workers=MAX_SCAN_WORKERS, execute=False):
     """Phase 2: Scan all cloned repos in parallel."""
     to_scan = []
     for key, target in targets.items():
@@ -255,7 +252,7 @@ def phase_scan(targets, state, force_rescan=False, max_workers=MAX_SCAN_WORKERS)
         to_scan.append(target)
 
     if not to_scan:
-        print("\n  All targets already scanned. Use --force-rescan to re-run.")
+        print(f"\n  All targets already scanned. Use --force-rescan to re-run.")
         return
 
     # Clean prior results for targets about to be scanned
@@ -278,7 +275,8 @@ def phase_scan(targets, state, force_rescan=False, max_workers=MAX_SCAN_WORKERS)
     print(f"PHASE 2: SCAN ({len(to_scan)} targets, {max_workers} workers)")
     print(f"{'=' * 60}")
 
-    results = scan_targets(to_scan, max_workers=max_workers)
+    results = scan_targets(to_scan, max_workers=max_workers, readonly=not execute)
+    state["model"] = MODEL
 
     for target_key, r in results:
         if r.returncode == 0 and r.results_dir:
@@ -307,7 +305,7 @@ def phase_scan(targets, state, force_rescan=False, max_workers=MAX_SCAN_WORKERS)
 def phase_judge(targets, state, force_rejudge=False):
     """Phase 3: Judge each benchmark finding against scan results."""
     print(f"\n{'=' * 60}")
-    print("PHASE 3: JUDGE")
+    print(f"PHASE 3: JUDGE")
     print(f"{'=' * 60}\n")
 
     total_judged = 0
@@ -391,12 +389,12 @@ def phase_judge(targets, state, force_rejudge=False):
 def phase_tally(state):
     """Phase 4: Generate tally report."""
     print(f"\n{'=' * 60}")
-    print("PHASE 4: TALLY")
+    print(f"PHASE 4: TALLY")
     print(f"{'=' * 60}\n")
 
     # Backfill cost data from logs for any scans missing it
     backfilled = 0
-    for _key, target_data in state.get("scan_targets", {}).items():
+    for key, target_data in state.get("scan_targets", {}).items():
         if target_data.get("scan_total_cost_usd"):
             continue
         clone_dir = target_data.get("clone_dir")
@@ -467,6 +465,12 @@ def main():
         action="store_true",
         help="Skip findings detected in every one of the last 3 runs",
     )
+    parser.add_argument(
+        "--execute",
+        action="store_true",
+        default=False,
+        help="Allow the scan agent to execute code (Bash); default is a read-only scan",
+    )
     args = parser.parse_args()
 
     # Load benchmarks
@@ -498,7 +502,7 @@ def main():
             if unknown:
                 print(f"Error: Unknown finding IDs: {', '.join(sorted(unknown))}")
             else:
-                print("No targets remain after filtering (check --repos combination)")
+                print(f"No targets remain after filtering (check --repos combination)")
             sys.exit(1)
         args.force_rescan = True
         args.force_rejudge = True
@@ -527,7 +531,6 @@ def main():
 
     # Load state
     state = load_state()
-    state["model"] = MODEL
 
     # Execute phases based on flags
     if args.tally_only:
@@ -536,7 +539,13 @@ def main():
 
     if not args.judge_only:
         phase_clone(targets, state)
-        phase_scan(targets, state, force_rescan=args.force_rescan, max_workers=args.max_workers)
+        phase_scan(
+            targets,
+            state,
+            force_rescan=args.force_rescan,
+            max_workers=args.max_workers,
+            execute=args.execute,
+        )
 
     if args.scan_only:
         print("\n  --scan-only: Skipping judge and tally phases.")
